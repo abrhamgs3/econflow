@@ -24,11 +24,11 @@ src/econflow/
 ├── cli.py               Active Typer CLI — doctor and run commands
 ├── pipeline.py          Sequential pipeline orchestrator
 ├── provenance.py        ProvenanceRecorder — run metadata to JSON
-├── exceptions.py        Domain exception hierarchy (AIProdError)
+├── exceptions.py        Domain exception hierarchy (EconFlowError)
 ├── logging.py           Structured logging configuration
 ├── core/                Cross-cutting platform infrastructure
 │   ├── config.py        Pydantic configuration loader
-│   ├── exceptions.py    Extended exception hierarchy (APRPError tree)
+│   ├── exceptions.py    Scaffold exception hierarchy (EconFlowCoreError tree)
 │   ├── pipeline.py      DAG-based pipeline orchestrator (Sprint 3+)
 │   ├── provenance.py    run_metadata snapshot (stub)
 │   └── registry.py      Project registry
@@ -108,12 +108,17 @@ tests/
 
 The package currently has two implementation layers:
 
+Two namespace overlaps are intentional and will be resolved during the scaffold migration:
+
+- `econometrics/` (active suites) and `estimation/` (scaffold estimator classes) serve different abstraction levels. Import from `econflow.econometrics` for running model suites; `econflow.estimation` will expose low-level estimators once populated.
+- `visualization/` (active figures) and `outputs/figures.py` (scaffold renderer) will be merged into `outputs/` in Sprint 4. Use `econflow.visualization` until then.
+
 **Active** (`data/`, `econometrics/`, `features/`, `visualization/`, `reporting/`,
 `pipeline.py`, `provenance.py`, `cli.py`) — production code used by
 `run_pipeline.py` in the paper repo. All 109 tests cover this layer.
 
 **Scaffold** (`core/`, `ingestion/`, `processing/`, `estimation/`, `diagnostics/`,
-`sensitivity/`, `outputs/`, `cli_scaffold/`) — target architecture stubs.
+`sensitivity/`, `outputs/`) — target architecture stubs.
 These will be populated in Sprints 3–8 as the migration progresses. The scaffold
 is imported by `projects/` configs but does not execute real logic yet.
 
@@ -144,7 +149,7 @@ AIProdError
 Extended hierarchy (scaffold, `core/exceptions.py`):
 
 ```
-APRPError
+EconFlowCoreError
 ├── ConfigurationError  └── MissingConfigKeyError
 ├── RegistryError       └── ProjectNotFoundError
 ├── PipelineError       └── StageExecutionError
@@ -154,6 +159,12 @@ APRPError
 ├── DiagnosticsError
 └── OutputError
 ```
+
+---
+
+### Exception hierarchy relationship
+
+`econflow.exceptions` (active layer) and `econflow.core.exceptions` (scaffold layer) are two independent trees with separate roots. `EconFlowError` covers domain errors that callers handle today (`DataValidationError`, `MergeError`, etc.). `EconFlowCoreError` covers infrastructure errors in the scaffold (`ConfigurationError`, `IngestionError`, etc.) and will become the unified root once the scaffold migration completes. `AIProdError` and `APRPError` are deprecated aliases retained for backward compatibility; both will be removed in v0.3.0.
 
 ---
 

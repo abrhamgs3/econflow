@@ -1,5 +1,5 @@
 """
-ai_productivity.outputs — Research output renderers.
+econflow.outputs — Research output renderers.
 
 Sub-modules
 -----------

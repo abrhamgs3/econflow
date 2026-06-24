@@ -1,5 +1,5 @@
 """
-ai_productivity.diagnostics — Post-estimation diagnostic tests.
+econflow.diagnostics — Post-estimation diagnostic tests.
 
 Sub-modules
 -----------

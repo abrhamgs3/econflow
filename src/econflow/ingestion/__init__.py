@@ -1,5 +1,5 @@
 """
-ai_productivity.ingestion — Data connectors for external sources.
+econflow.ingestion — Data connectors for external sources.
 
 Sub-modules
 -----------

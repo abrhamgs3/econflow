@@ -32,16 +32,15 @@ dev = [
 app = [
     "streamlit>=1.35",
 ]
-ai = [
-    "openai>=1.0",
-    "langchain>=0.2",
-]
 
 [project.scripts]
 econflow = "econflow.cli:app"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/econflow"]
+exclude = [
+    "src/econflow/cli_scaffold",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

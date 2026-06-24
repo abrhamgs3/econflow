@@ -1,5 +1,5 @@
 """
-ai_productivity.processing — Data cleaning, harmonisation, and feature construction.
+econflow.processing — Data cleaning, harmonisation, and feature construction.
 
 Sub-modules
 -----------

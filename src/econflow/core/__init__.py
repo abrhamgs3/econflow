@@ -1,5 +1,5 @@
 """
-ai_productivity.core — Cross-cutting infrastructure for the APRP platform.
+econflow.core — Cross-cutting infrastructure for the EconFlow platform.
 
 Sub-modules
 -----------

@@ -1,5 +1,5 @@
 """
-ai_productivity.sensitivity — Robustness and sensitivity analysis.
+econflow.sensitivity — Robustness and sensitivity analysis.
 
 Sub-modules
 -----------

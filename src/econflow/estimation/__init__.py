@@ -1,5 +1,5 @@
 """
-ai_productivity.estimation — Panel econometric estimators.
+econflow.estimation — Panel econometric estimators.
 
 Sub-modules
 -----------

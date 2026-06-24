@@ -26,10 +26,16 @@ uv pip install -e ".[dev]"
 # Check that the environment is ready
 econflow doctor
 
-# Run a pipeline (point at your panel CSV and config)
-econflow run --data path/to/panel_clean.csv              --config examples/ai_productivity_paper/config/config.yaml
+# Run the pipeline against your panel CSV
+econflow run --data-path path/to/panel_clean.csv
 
-# AI & Productivity replication example
+# Run with custom output directories
+econflow run --data-path path/to/panel_clean.csv \\
+             --tables-dir results/tables \\
+             --figures-dir results/figures \\
+             --paper-dir results/paper/sections
+
+# AI & Productivity replication example (interactive dashboard)
 streamlit run examples/ai_productivity_paper/app/streamlit_app.py
 ```
 
