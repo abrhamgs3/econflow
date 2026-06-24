@@ -85,7 +85,7 @@ def record_run(record: RunRecord, output_dir: str | Path) -> Path:
 
     Raises
     ------
-    econflow.core.exceptions.APRPError
+    econflow.core.exceptions.EconFlowCoreError
         If serialisation or the atomic rename fails.
     """
     raise NotImplementedError

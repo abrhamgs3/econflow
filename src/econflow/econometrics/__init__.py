@@ -1,4 +1,4 @@
-"""Panel econometrics for the AI & Productivity analysis."""
+"""EconFlow panel econometrics subpackage."""
 
 from econflow.econometrics.panel import (
     run_falsification_suite,

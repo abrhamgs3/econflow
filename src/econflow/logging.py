@@ -1,5 +1,5 @@
 """
-Centralized logging for the AI and Productivity pipeline.
+EconFlow centralized logging configuration.
 
 Usage
 -----

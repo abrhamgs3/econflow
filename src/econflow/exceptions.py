@@ -1,5 +1,5 @@
 """
-Domain-specific exception hierarchy for the AI and Productivity pipeline.
+EconFlow framework exception hierarchy.
 
 Why custom exceptions?
 ----------------------
@@ -9,53 +9,78 @@ a merge failed, a model is mis-specified, validation blocked the pipeline.
 
 Hierarchy
 ---------
-AIProdError          ← base; catch this to handle any pipeline error
-├── DataValidationError   ← required columns missing, duplicates, non-finite log vars
-├── MergeError            ← ISO3 lookup failed, key collision during merge
-├── PipelineError         ← step ran out of order, intermediate file missing
+EconFlowError                ← canonical base (alias of AIProdError for backward compat)
+├── DataValidationError      ← required columns missing, duplicates, non-finite values
+├── MergeError               ← key-lookup failure, key collision during merge
+├── PipelineError            ← step ran out of order, intermediate file missing
 └── ModelSpecificationError  ← formula invalid, collinear regressors, insufficient obs
+
+Backward compatibility
+----------------------
+``AIProdError`` was the name used before v0.2.0.  It is now an alias for
+``EconFlowError`` (they are the *same class object*) so all existing
+``except AIProdError`` clauses continue to work without modification.
+The alias will be removed in v0.3.0.
 """
 
-
-class AIProdError(Exception):
-    """Base exception for all AI & Productivity pipeline errors."""
+from __future__ import annotations
 
 
-class DataValidationError(AIProdError):
+# ---------------------------------------------------------------------------
+# Root — EconFlowError is the canonical public name.
+# AIProdError is kept as a module-level alias (same object) so that
+# ``except AIProdError`` still catches all subclasses.
+# ---------------------------------------------------------------------------
+
+
+class EconFlowError(Exception):
+    """Base exception for all EconFlow framework errors."""
+
+
+# Backward-compat alias — same object, so isinstance/except work identically.
+# Remove in v0.3.0.
+AIProdError = EconFlowError
+
+
+# ---------------------------------------------------------------------------
+# Concrete exception types
+# ---------------------------------------------------------------------------
+
+class DataValidationError(EconFlowError):
     """Raised when the panel dataset fails schema or quality checks.
 
     Examples
     --------
-    - Required column ``ln_tfp`` is missing.
-    - Duplicate (country, year) rows detected.
-    - Log-transformed variable contains ``-inf`` or ``NaN``.
+    - A required column is missing from the DataFrame.
+    - Duplicate (entity, time) rows detected.
+    - A log-transformed variable contains ``-inf`` or ``NaN``.
     """
 
 
-class MergeError(AIProdError):
+class MergeError(EconFlowError):
     """Raised when a merge between two data sources cannot be completed safely.
 
     Examples
     --------
-    - An ISO3 country code is not found in the reference lookup.
+    - An entity key is not found in the reference lookup table.
     - A left-join produces unexpected row duplication.
     - Two sources disagree on a shared key column.
     """
 
 
-class PipelineError(AIProdError):
+class PipelineError(EconFlowError):
     """Raised when a pipeline step is invoked in an invalid state.
 
     Examples
     --------
-    - ``run_regressions()`` called before ``build_panel()`` has written its output.
+    - A downstream step is called before an upstream step has written output.
     - An intermediate file is missing or empty.
     - A step receives an unexpected data schema from the previous step.
     """
 
 
-class ModelSpecificationError(AIProdError):
-    """Raised when an econometric or ML model cannot be estimated as specified.
+class ModelSpecificationError(EconFlowError):
+    """Raised when an econometric model cannot be estimated as specified.
 
     Examples
     --------

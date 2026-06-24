@@ -1,7 +1,7 @@
 """
 Backward-compatibility shim.
 
-All logic has moved to ``src/ai_productivity/data/``.
+All logic has moved to ``src/econflow/data/``.
 This file re-exports everything so existing scripts keep working.
 """
 from econflow.data.loaders import (

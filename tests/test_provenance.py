@@ -1,7 +1,7 @@
 """
 tests/test_provenance.py
 =========================
-Unit tests for ``src/ai_productivity/provenance.py``.
+Unit tests for ``src/econflow/provenance.py``.
 
 All tests are fully self-contained; they do not touch the real pipeline,
 the reference fixtures, or ``outputs/provenance/``.

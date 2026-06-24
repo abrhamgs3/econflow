@@ -1,4 +1,4 @@
-"""Data loading, validation, and cleaning for the AI & Productivity panel."""
+"""EconFlow data ingestion, validation, and cleaning subpackage."""
 
 from econflow.data.cleaning import sample_selection_summary
 from econflow.data.loaders import drop_aggregate_entities, load_panel

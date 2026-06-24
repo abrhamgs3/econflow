@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "ai-productivity/provenance/run_metadata/v1",
-  "title": "AI & Productivity Pipeline — Run Provenance Metadata",
-  "description": "Reproducibility record for a single pipeline execution. Written by src/ai_productivity/provenance.py. Does not alter any scientific output.",
+  "$id": "econflow/provenance/run_metadata/v1",
+  "title": "EconFlow \u2014 Run Provenance Metadata",
+  "description": "Reproducibility record for a single EconFlow pipeline execution. Written by src/econflow/provenance.py. Does not alter any scientific output.",
   "type": "object",
   "required": [
     "schema_version",
@@ -145,7 +145,7 @@
     },
     "packages": {
       "type": "object",
-      "description": "Installed version of every package in TRACKED_PACKAGES (src/ai_productivity/provenance.py). Value is null when the package is not installed.",
+      "description": "Installed version of every package in TRACKED_PACKAGES (src/econflow/provenance.py). Value is null when the package is not installed.",
       "additionalProperties": {
         "type": [
           "string",

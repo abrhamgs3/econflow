@@ -1,4 +1,4 @@
-"""Publication-quality figures for the AI & Productivity paper."""
+"""EconFlow visualization subpackage — publication-quality figures."""
 
 from econflow.visualization.figures import (
     ai_coefficient_comparison,

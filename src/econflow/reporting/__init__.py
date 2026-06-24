@@ -1,4 +1,4 @@
-"""Automated narrative generation for the AI & Productivity paper."""
+"""EconFlow reporting subpackage — automated narrative generation."""
 
 from econflow.reporting.narrative import write_falsification_results, write_results
 

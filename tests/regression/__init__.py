@@ -1,7 +1,7 @@
 """
 tests/regression
 ================
-Regression-testing utilities for the AI & Productivity research pipeline.
+Regression-testing utilities for the EconFlow research platform.
 
 This package provides reusable comparison functions that verify future
 refactoring does not alter scientific outputs.  Every function raises

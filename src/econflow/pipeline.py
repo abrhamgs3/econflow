@@ -14,7 +14,7 @@ Usage
     run()
 
     # From CLI (Sprint 3)
-    ai-productivity run
+    econflow run
 """
 
 from __future__ import annotations
@@ -223,7 +223,7 @@ def run(
     paper_dir   = Path(paper_dir)
 
     log.info("=" * 60)
-    log.info("AI and Productivity pipeline starting")
+    log.info("EconFlow pipeline starting")
     log.info("=" * 60)
 
     # 1. Validate

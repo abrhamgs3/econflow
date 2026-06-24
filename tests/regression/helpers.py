@@ -1,8 +1,8 @@
 """
 tests/regression/helpers.py
 ============================
-Reusable comparison utilities for regression-testing the AI & Productivity
-research pipeline.  Each function is a drop-in assertion: it raises
+Reusable comparison utilities for regression-testing the EconFlow
+research platform.  Each function is a drop-in assertion: it raises
 ``AssertionError`` with a detailed, diff-style message on failure and returns
 ``None`` on success.
 

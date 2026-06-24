@@ -1,13 +1,13 @@
 """
-tests/conftest.py — Shared pytest fixtures for the APRP test suite.
+tests/conftest.py — Shared pytest fixtures for the EconFlow test suite.
 
-All fixtures reference ``src/ai_productivity/`` — the single authoritative
-package.  Fixtures that depend on sub-systems not yet implemented return
-``None``; tests that require them should be marked ``@pytest.mark.skip``.
+All fixtures reference ``src/econflow/`` — the authoritative package.
+Fixtures that depend on sub-systems not yet implemented return ``None``;
+tests that require them should be marked ``@pytest.mark.skip``.
 
 Fixture inventory
 -----------------
-sample_panel        Synthetic balanced panel (10 countries x 10 years).
+sample_panel        Generic synthetic balanced panel (10 entities × 10 periods).
 world_bank_raw      Well-formed World Bank API v2 JSON response stub.
 oecd_raw            OECD SDMX-JSON response skeleton.
 """
@@ -22,38 +22,43 @@ import pytest
 # Panel fixtures
 # ---------------------------------------------------------------------------
 
-N_COUNTRIES = 10
-N_YEARS = 10
-COUNTRIES = [f"C{i:02d}" for i in range(N_COUNTRIES)]
-YEARS = list(range(2010, 2010 + N_YEARS))
-RNG = np.random.default_rng(42)
+N_ENTITIES = 10
+N_PERIODS  = 10
+ENTITIES   = [f"E{i:02d}" for i in range(N_ENTITIES)]
+PERIODS    = list(range(2010, 2010 + N_PERIODS))
+RNG        = np.random.default_rng(42)
 
 
 @pytest.fixture(scope="session")
 def sample_panel() -> pd.DataFrame:
     """
-    Synthetic balanced panel: 10 countries x 10 years (100 observations).
+    Generic synthetic balanced panel: 10 entities × 10 periods (100 observations).
 
     Columns
     -------
-    iso3, year, tfp_growth, aipi, log_gdp_pc, log_hc, log_capital,
-    trade_openness, gfcf_share, tertiary_enrol
+    entity, time, outcome, treatment, covariate_1, covariate_2,
+    trade_openness, investment_share, tertiary_enrol
+
+    These names are intentionally generic so the fixture can be reused across
+    tests that exercise core platform utilities (validators, merging, feature
+    engineering) without coupling them to the AI & Productivity paper's
+    specific variable names.
     """
     rows = [
         {
-            "iso3": c,
-            "year": y,
-            "tfp_growth": RNG.normal(0.02, 0.03),
-            "aipi": RNG.uniform(0.0, 1.0),
-            "log_gdp_pc": RNG.normal(9.5, 1.0),
-            "log_hc": RNG.normal(0.5, 0.2),
-            "log_capital": RNG.normal(12.0, 1.5),
-            "trade_openness": RNG.uniform(0.3, 1.5),
-            "gfcf_share": RNG.uniform(0.15, 0.40),
-            "tertiary_enrol": RNG.uniform(20.0, 90.0),
+            "entity":           c,
+            "time":             y,
+            "outcome":          RNG.normal(0.02, 0.03),
+            "treatment":        RNG.uniform(0.0, 1.0),
+            "covariate_1":      RNG.normal(9.5, 1.0),
+            "covariate_2":      RNG.normal(0.5, 0.2),
+            "log_capital":      RNG.normal(12.0, 1.5),
+            "trade_openness":   RNG.uniform(0.3, 1.5),
+            "investment_share": RNG.uniform(0.15, 0.40),
+            "tertiary_enrol":   RNG.uniform(20.0, 90.0),
         }
-        for c in COUNTRIES
-        for y in YEARS
+        for c in ENTITIES
+        for y in PERIODS
     ]
     return pd.DataFrame(rows)
 

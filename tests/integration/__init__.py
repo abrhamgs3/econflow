@@ -1,1 +1,1 @@
-"""Integration tests that exercise multiple APRP sub-systems together."""
+"""EconFlow integration tests — multiple sub-systems working together."""

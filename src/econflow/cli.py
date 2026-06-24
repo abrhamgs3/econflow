@@ -1,31 +1,31 @@
 """
-Command-line interface for the AI and Productivity pipeline.
+Command-line interface for the EconFlow panel econometrics platform.
 
-Entry point: ``ai-productivity`` (registered in pyproject.toml).
+Entry point: ``econflow`` (registered in pyproject.toml).
 
 Commands
 --------
-ai-productivity --version
+econflow --version
     Print version and exit.
 
-ai-productivity doctor
+econflow doctor
     Verify environment before running the pipeline.
 
-ai-productivity run [OPTIONS]
+econflow run [OPTIONS]
     Execute the full analysis pipeline:
     validate → load → econometrics → tables → figures → narratives.
 
 Examples
 --------
-    $ uv run ai-productivity --version
-    AI and Productivity 0.1.0
+    $ uv run econflow --version
+    EconFlow 0.2.0
 
-    $ uv run ai-productivity doctor
+    $ uv run econflow doctor
     ✔ Ready
 
-    $ uv run ai-productivity run
+    $ uv run econflow run
     ════════════════════════════════════════
-     AI and Productivity 0.1.0
+     EconFlow 0.2.0
     ════════════════════════════════════════
     ✔ Validation passed (193 countries, 15 years, 2 895 rows)
     ✔ Robustness suite   (4 models)
@@ -48,14 +48,13 @@ from pathlib import Path
 
 import typer
 from rich.console import Console
-from rich.rule import Rule
 from rich.text import Text
 
 from econflow import __version__
 
 app = typer.Typer(
-    name="ai-productivity",
-    help="AI and Productivity — panel econometrics research pipeline.",
+    name="econflow",
+    help="EconFlow — panel econometrics research platform.",
     add_completion=False,
     no_args_is_help=True,
 )
@@ -68,7 +67,7 @@ console = Console()
 
 def _version_callback(value: bool) -> None:
     if value:
-        console.print(f"AI and Productivity {__version__}")
+        console.print(f"EconFlow {__version__}")
         raise typer.Exit()
 
 
@@ -83,7 +82,7 @@ def main(
         help="Show version and exit.",
     ),
 ) -> None:
-    """AI and Productivity pipeline CLI."""
+    """EconFlow pipeline CLI."""
 
 
 # ---------------------------------------------------------------------------
@@ -124,7 +123,7 @@ _OUTPUT_DIRS = [Path("tables"), Path("figures"), Path("outputs")]
 @app.command()
 def doctor() -> None:
     """Verify that the environment is ready to run the pipeline."""
-    console.print("\n[bold]AI and Productivity — environment check[/bold]\n")
+    console.print("\n[bold]EconFlow — environment check[/bold]\n")
 
     all_ok = True
 
@@ -211,14 +210,14 @@ def run(
     """
     # Lazy import keeps CLI startup fast even when heavy deps are installed.
     from econflow.pipeline import run as _run
-    from econflow.exceptions import AIProdError
+    from econflow.exceptions import EconFlowError
     from econflow.logging import configure_logging
     import logging
 
     configure_logging(level=logging.DEBUG if verbose else logging.INFO)
 
     console.print()
-    console.rule(f"[bold]AI and Productivity {__version__}[/bold]")
+    console.rule(f"[bold]EconFlow {__version__}[/bold]")
     console.print()
 
     if not data_path.exists():
@@ -236,7 +235,7 @@ def run(
             paper_dir=paper_dir,
             verbose=verbose,
         )
-    except AIProdError as exc:
+    except EconFlowError as exc:
         console.print()
         console.print(f"[bold red]✘ Pipeline error:[/bold red] {exc}")
         raise typer.Exit(code=1)
@@ -254,7 +253,6 @@ def run(
     console.rule("[bold green]Pipeline complete[/bold green]")
     console.print()
 
-    # Summary of outputs
     _output_summary(tables_dir, figures_dir, paper_dir, elapsed)
 
 

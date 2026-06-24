@@ -1,5 +1,5 @@
 """
-Publication-quality figures for the AI & Productivity paper.
+EconFlow visualization — publication-quality figures for panel econometrics.
 
 All functions follow the same contract:
 - Accept a DataFrame (or dict) and a stem path (without extension).

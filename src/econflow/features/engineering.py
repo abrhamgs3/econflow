@@ -1,5 +1,5 @@
 """
-Feature engineering for the AI & Productivity panel.
+EconFlow feature engineering — log transforms, sub-indices, and derived variables.
 
 This module transforms raw merged data into model-ready variables:
 - Log transformations (ln_gdp, ln_ai, ln_tfp, ln_hc)

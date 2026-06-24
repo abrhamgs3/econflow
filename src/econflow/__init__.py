@@ -15,12 +15,12 @@ Subpackages
 -----------
 core            Configuration, provenance, pipeline orchestration, registry
 ingestion       Data connectors: World Bank, OECD, PWT
-processing      Harmonisation, feature engineering, AI index, TFP, quality
+processing      Harmonisation, feature engineering, composite index, TFP, quality
 estimation      Panel estimators: FE, GLS, IV, GMM, quantile
 diagnostics     Post-estimation tests: Hausman, Sargan, Pesaran CD, AB AR
 sensitivity     SensitivityRunner, ResultsComparison
 visualization   Publication figures
-reporting       LaTeX narrative generation
+reporting       Narrative generation
 outputs         Table, figure, and report renderers
 """
 
@@ -29,7 +29,8 @@ __author__ = "Ab"
 __email__ = "abrhamgs3@gmail.com"
 
 from econflow.exceptions import (
-    AIProdError,
+    EconFlowError,
+    AIProdError,          # deprecated alias — kept for backward compat until v0.3.0
     DataValidationError,
     MergeError,
     ModelSpecificationError,
@@ -38,7 +39,11 @@ from econflow.exceptions import (
 
 __all__ = [
     "__version__",
+    # Canonical name
+    "EconFlowError",
+    # Deprecated alias (removed in v0.3.0)
     "AIProdError",
+    # Concrete exception types
     "DataValidationError",
     "MergeError",
     "ModelSpecificationError",

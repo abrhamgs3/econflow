@@ -1,13 +1,13 @@
 """
-econflow.core.exceptions — Platform-wide exception hierarchy.
+econflow.core.exceptions — Scaffold exception hierarchy.
 
-All APRP-specific exceptions inherit from :class:`APRPError` so callers can
-catch the whole family with a single ``except APRPError`` clause while still
-discriminating on sub-types when needed.
+All EconFlow scaffold exceptions inherit from :class:`EconFlowCoreError` so
+callers can catch the whole family with a single ``except EconFlowCoreError``
+clause while still discriminating on sub-types when needed.
 
 Exception tree
 --------------
-APRPError
+EconFlowCoreError
 ├── ConfigurationError
 │   └── MissingConfigKeyError
 ├── RegistryError
@@ -24,9 +24,16 @@ APRPError
 │   └── ConvergenceError
 ├── DiagnosticsError
 └── OutputError
+
+Backward compatibility
+----------------------
+``APRPError`` is kept as a deprecated alias for ``EconFlowCoreError``.
+It will be removed in v0.3.0.
 """
 
 from __future__ import annotations
+
+import warnings
 
 
 # ---------------------------------------------------------------------------
@@ -34,8 +41,22 @@ from __future__ import annotations
 # ---------------------------------------------------------------------------
 
 
-class APRPError(Exception):
-    """Base class for all APRP exceptions."""
+class EconFlowCoreError(Exception):
+    """Base class for all EconFlow scaffold (core) exceptions."""
+
+
+# Deprecated alias
+class APRPError(EconFlowCoreError):
+    """Deprecated alias for EconFlowCoreError.  Will be removed in v0.3.0."""
+
+    def __init__(self, *args, **kwargs):
+        warnings.warn(
+            "APRPError is deprecated and will be removed in EconFlow v0.3.0. "
+            "Use EconFlowCoreError instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        super().__init__(*args, **kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -43,7 +64,7 @@ class APRPError(Exception):
 # ---------------------------------------------------------------------------
 
 
-class ConfigurationError(APRPError):
+class ConfigurationError(EconFlowCoreError):
     """Raised when a project configuration file is invalid."""
 
 
@@ -60,7 +81,7 @@ class MissingConfigKeyError(ConfigurationError):
 # ---------------------------------------------------------------------------
 
 
-class RegistryError(APRPError):
+class RegistryError(EconFlowCoreError):
     """Raised for project registry lookup failures."""
 
 
@@ -77,9 +98,8 @@ class ProjectNotFoundError(RegistryError):
 # ---------------------------------------------------------------------------
 
 
-class PipelineError(APRPError):
+class PipelineError(EconFlowCoreError):
     """Raised for pipeline orchestration failures."""
-
 
 
 class StageExecutionError(PipelineError):
@@ -96,7 +116,7 @@ class StageExecutionError(PipelineError):
 # ---------------------------------------------------------------------------
 
 
-class IngestionError(APRPError):
+class IngestionError(EconFlowCoreError):
     """Raised for failures during data ingestion."""
 
 
@@ -121,12 +141,12 @@ class CacheError(IngestionError):
 # ---------------------------------------------------------------------------
 
 
-class ProcessingError(APRPError):
+class ProcessingError(EconFlowCoreError):
     """Raised for failures during data processing."""
 
 
 class HarmonisationError(ProcessingError):
-    """Raised when country-ID harmonisation cannot be resolved."""
+    """Raised when entity-ID harmonisation cannot be resolved."""
 
 
 class TransformationError(ProcessingError):
@@ -138,7 +158,7 @@ class TransformationError(ProcessingError):
 # ---------------------------------------------------------------------------
 
 
-class EstimationError(APRPError):
+class EstimationError(EconFlowCoreError):
     """Raised for failures during econometric estimation."""
 
 
@@ -158,7 +178,7 @@ class ConvergenceError(EstimationError):
 # ---------------------------------------------------------------------------
 
 
-class DiagnosticsError(APRPError):
+class DiagnosticsError(EconFlowCoreError):
     """Raised when a diagnostic test cannot be computed."""
 
 
@@ -167,5 +187,5 @@ class DiagnosticsError(APRPError):
 # ---------------------------------------------------------------------------
 
 
-class OutputError(APRPError):
+class OutputError(EconFlowCoreError):
     """Raised when an output renderer fails to produce its artifact."""

@@ -107,7 +107,7 @@ class VariablesConfig(BaseModel):
 
 class Settings(BaseModel):
     """
-    Root settings object for an APRP project.
+    Root settings object for an EconFlow project.
 
     Populated by :func:`load_config` from a project-level ``config.yaml``.
     """
@@ -117,7 +117,7 @@ class Settings(BaseModel):
     variables: VariablesConfig = Field(default_factory=VariablesConfig)
 
     model_config = ConfigDict(
-        env_prefix="APRP_",
+        env_prefix="ECONFLOW_",
         env_nested_delimiter="__",
     )
 

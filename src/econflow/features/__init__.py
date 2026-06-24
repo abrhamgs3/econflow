@@ -1,4 +1,4 @@
-"""Feature engineering for the AI & Productivity panel."""
+"""EconFlow feature engineering subpackage."""
 
 from econflow.features.engineering import add_log_transforms, add_sub_indices, engineer_features
 

@@ -1,1 +1,1 @@
-"""Unit tests for individual APRP modules (no I/O, no network)."""
+"""EconFlow unit tests — individual modules, no I/O, no network."""

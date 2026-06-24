@@ -1,5 +1,5 @@
 """
-AI and Productivity — Streamlit Dashboard
+EconFlow — Streamlit Dashboard
 ==========================================
 Four-tab interactive interface for the panel econometrics research pipeline.
 
@@ -26,7 +26,7 @@ import streamlit as st
 # Page config — must be first Streamlit call
 # ---------------------------------------------------------------------------
 st.set_page_config(
-    page_title="AI & Productivity Pipeline",
+    page_title="EconFlow Pipeline",
     page_icon="📊",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -64,7 +64,7 @@ _init_state()
 
 def _ensure_tmp() -> tuple[Path, Path, Path, Path]:
     if st.session_state.tmp_dir is None:
-        td = tempfile.mkdtemp(prefix="ai_prod_")
+        td = tempfile.mkdtemp(prefix="econflow_")
         st.session_state.tmp_dir = td
         st.session_state.tables_dir  = Path(td) / "tables"
         st.session_state.figures_dir = Path(td) / "figures"
@@ -97,8 +97,8 @@ def _load_data(path: Path, label: str) -> None:
 # Sidebar
 # ---------------------------------------------------------------------------
 with st.sidebar:
-    st.title("📊 AI & Productivity")
-    st.caption("Panel Econometrics Pipeline · v0.1.0")
+    st.title("📊 EconFlow")
+    st.caption("Panel Econometrics Research Platform · v0.2.0")
     st.divider()
     st.markdown(
         """
@@ -375,9 +375,9 @@ with tab_figures:
                             zf.write(f, f"paper/sections/{f.name}")
                 buf.seek(0)
                 st.download_button(
-                    "⬇ Download ai_productivity_outputs.zip",
+                    "⬇ Download econflow_outputs.zip",
                     data=buf.read(),
-                    file_name="ai_productivity_outputs.zip",
+                    file_name="econflow_outputs.zip",
                     mime="application/zip",
                     use_container_width=True,
                 )

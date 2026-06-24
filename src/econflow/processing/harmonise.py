@@ -9,7 +9,7 @@ canonical ISO 3166-1 alpha-3 (ISO-3) code.  Handles:
 * PWT ``countrycode`` → ISO-3 (already aligned but validated here)
 * Free-text country names → ISO-3 via a static crosswalk table
 
-The crosswalk is stored in ``ai_productivity/data/iso3_crosswalk.csv`` (bundled with the
+The crosswalk is stored in ``econflow/data/iso3_crosswalk.csv`` (bundled with the
 package).  Custom additions can be passed as *extra_mapping* at runtime.
 
 Usage (once implemented)

@@ -1,7 +1,7 @@
 """
-src/ai_productivity/provenance.py
+src/econflow/provenance.py
 ===================================
-Reproducibility metadata recorder for the AI & Productivity research pipeline.
+Reproducibility metadata recorder for EconFlow pipelines.
 
 Usage — context-manager (recommended)
 --------------------------------------

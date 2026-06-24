@@ -1,18 +1,18 @@
 """
-Tests for the exception hierarchy.
+Tests for the EconFlow exception hierarchy.
 
-Sprint 1 milestone: the first automated test passes.
-
-These tests verify two things:
-1. Every custom exception can be raised and caught.
-2. The inheritance chain is correct — catching ``AIProdError`` catches all
-   domain exceptions (useful for top-level error handling in the CLI).
+These tests verify:
+1. ``EconFlowError`` is the canonical base class — it catches all domain exceptions.
+2. ``AIProdError`` is a backward-compat alias (same object) — it also catches all.
+3. Exception messages are preserved.
+4. Exception types do not cross-catch siblings.
 """
 
 import pytest
 
 from econflow.exceptions import (
-    AIProdError,
+    EconFlowError,
+    AIProdError,          # backward-compat alias (same object as EconFlowError)
     DataValidationError,
     MergeError,
     ModelSpecificationError,
@@ -20,48 +20,72 @@ from econflow.exceptions import (
 )
 
 
-class TestExceptionHierarchy:
-    """All domain exceptions must be subclasses of AIProdError."""
+class TestEconFlowErrorHierarchy:
+    """All domain exceptions must be subclasses of EconFlowError (canonical base)."""
 
-    def test_data_validation_error_is_aiprod_error(self):
-        with pytest.raises(AIProdError):
-            raise DataValidationError("column 'ln_tfp' missing")
+    def test_data_validation_error_is_econflow_error(self):
+        with pytest.raises(EconFlowError):
+            raise DataValidationError("required column missing")
 
-    def test_merge_error_is_aiprod_error(self):
-        with pytest.raises(AIProdError):
-            raise MergeError("ISO3 code 'XYZ' not found")
+    def test_merge_error_is_econflow_error(self):
+        with pytest.raises(EconFlowError):
+            raise MergeError("entity key not found")
 
-    def test_pipeline_error_is_aiprod_error(self):
-        with pytest.raises(AIProdError):
-            raise PipelineError("panel_clean.csv missing — run 02_clean_data.py first")
+    def test_pipeline_error_is_econflow_error(self):
+        with pytest.raises(EconFlowError):
+            raise PipelineError("intermediate file missing")
 
-    def test_model_specification_error_is_aiprod_error(self):
+    def test_model_specification_error_is_econflow_error(self):
+        with pytest.raises(EconFlowError):
+            raise ModelSpecificationError("collinear regressors")
+
+
+class TestAIProdErrorAlias:
+    """AIProdError must be the same object as EconFlowError (alias, not subclass)."""
+
+    def test_aiprod_error_is_same_class_as_econflow_error(self):
+        """AIProdError IS EconFlowError — they are the same class object."""
+        assert AIProdError is EconFlowError
+
+    def test_data_validation_error_caught_by_aiprod_alias(self):
+        """Backward-compat: existing code with 'except AIProdError' still works."""
         with pytest.raises(AIProdError):
-            raise ModelSpecificationError("ln_ai is collinear with entity effects")
+            raise DataValidationError("column missing")
+
+    def test_merge_error_caught_by_aiprod_alias(self):
+        with pytest.raises(AIProdError):
+            raise MergeError("key not found")
+
+    def test_pipeline_error_caught_by_aiprod_alias(self):
+        with pytest.raises(AIProdError):
+            raise PipelineError("missing file")
+
+    def test_model_specification_error_caught_by_aiprod_alias(self):
+        with pytest.raises(AIProdError):
+            raise ModelSpecificationError("bad formula")
+
+    def test_aiprod_error_is_subclass_of_exception(self):
+        assert issubclass(AIProdError, Exception)
 
 
 class TestExceptionMessages:
     """Exception messages should be preserved and readable."""
 
     def test_data_validation_error_message(self):
-        msg = "duplicate (country, year) rows: 3 detected"
-        exc = DataValidationError(msg)
-        assert str(exc) == msg
+        msg = "duplicate (entity, time) rows: 3 detected"
+        assert str(DataValidationError(msg)) == msg
 
     def test_merge_error_message(self):
         msg = "left join produced 42 unexpected duplicate rows"
-        exc = MergeError(msg)
-        assert str(exc) == msg
+        assert str(MergeError(msg)) == msg
 
     def test_pipeline_error_message(self):
         msg = "step 3 requires step 2 output"
-        exc = PipelineError(msg)
-        assert str(exc) == msg
+        assert str(PipelineError(msg)) == msg
 
     def test_model_specification_error_message(self):
-        msg = "formula 'ln_tfp ~ ln_ai + ln_ai' contains duplicate term"
-        exc = ModelSpecificationError(msg)
-        assert str(exc) == msg
+        msg = "formula contains duplicate term"
+        assert str(ModelSpecificationError(msg)) == msg
 
 
 class TestExceptionSpecificity:
@@ -69,18 +93,14 @@ class TestExceptionSpecificity:
 
     def test_merge_error_not_caught_as_data_validation(self):
         with pytest.raises(MergeError):
-            raise MergeError("wrong key")
-
-        # DataValidationError should NOT catch MergeError
-        with pytest.raises(MergeError):
             try:
                 raise MergeError("wrong key")
             except DataValidationError:
-                pass  # this branch must NOT execute
+                pass  # must NOT execute
 
     def test_pipeline_error_not_caught_as_model_specification(self):
         with pytest.raises(PipelineError):
             try:
                 raise PipelineError("missing file")
             except ModelSpecificationError:
-                pass  # this branch must NOT execute
+                pass  # must NOT execute
