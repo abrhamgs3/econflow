@@ -18,14 +18,14 @@ econflow run [OPTIONS]
 Examples
 --------
     $ uv run econflow --version
-    EconFlow 0.2.0
+    EconFlow 0.1.0
 
     $ uv run econflow doctor
     ✔ Ready
 
     $ uv run econflow run
     ════════════════════════════════════════
-     EconFlow 0.2.0
+     EconFlow 0.1.0
     ════════════════════════════════════════
     ✔ Validation passed (193 countries, 15 years, 2 895 rows)
     ✔ Robustness suite   (4 models)

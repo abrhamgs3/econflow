@@ -17,7 +17,7 @@ EconFlowError                ← canonical base (alias of AIProdError for backwa
 
 Backward compatibility
 ----------------------
-``AIProdError`` was the name used before v0.2.0.  It is now an alias for
+``AIProdError`` was the name used before v0.1.0.  It is now an alias for
 ``EconFlowError`` (they are the *same class object*) so all existing
 ``except AIProdError`` clauses continue to work without modification.
 The alias will be removed in v0.3.0.

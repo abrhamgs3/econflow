@@ -98,7 +98,7 @@ def _load_data(path: Path, label: str) -> None:
 # ---------------------------------------------------------------------------
 with st.sidebar:
     st.title("📊 EconFlow")
-    st.caption("Panel Econometrics Research Platform · v0.2.0")
+    st.caption("Panel Econometrics Research Platform · v0.1.0")
     st.divider()
     st.markdown(
         """

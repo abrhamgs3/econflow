@@ -1,6 +1,6 @@
 # Architecture Overview
 
-**EconFlow Platform** — v0.2.0
+**EconFlow Platform** — v0.1.0
 
 This document describes the current architecture of the `econflow` package
 located at `src/econflow/`. Keep it in sync with the code.

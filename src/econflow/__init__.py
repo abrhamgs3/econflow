@@ -24,7 +24,7 @@ reporting       Narrative generation
 outputs         Table, figure, and report renderers
 """
 
-__version__ = "0.2.0"
+__version__ = "0.1.0"
 __author__ = "Ab"
 __email__ = "abrhamgs3@gmail.com"
 
