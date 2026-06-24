@@ -1,0 +1,37 @@
+cff-version: 1.2.0
+message: "If you use EconFlow in academic or research work, please cite it as below."
+type: software
+title: "EconFlow: Reusable panel econometrics research platform"
+version: "0.1.0"
+date-released: "2026-06-24"
+license: MIT
+url: "https://github.com/abrhamgs3/econflow"
+repository-code: "https://github.com/abrhamgs3/econflow"
+abstract: >
+  EconFlow is an open-source Python framework for reproducible cross-country
+  panel econometric analyses. It provides an end-to-end pipeline covering data
+  ingestion, processing, fixed-effects and IV estimation, diagnostic testing,
+  and publication-ready output rendering. Originally extracted from the
+  AI Adoption and Total Factor Productivity paper, it is designed to be reused
+  for any longitudinal panel study.
+authors:
+  - name: "Ab"
+    email: "abrhamgs3@gmail.com"
+keywords:
+  - econometrics
+  - panel data
+  - fixed effects
+  - reproducibility
+  - Python
+  - open source
+  - research software
+preferred-citation:
+  type: software
+  title: "EconFlow: Reusable panel econometrics research platform"
+  authors:
+    - name: "Ab"
+      email: "abrhamgs3@gmail.com"
+  version: "0.1.0"
+  date-released: "2026-06-24"
+  url: "https://github.com/abrhamgs3/econflow"
+  license: MIT

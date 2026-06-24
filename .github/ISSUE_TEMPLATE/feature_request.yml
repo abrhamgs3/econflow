@@ -1,0 +1,61 @@
+name: Feature Request
+description: Propose a new feature or improvement
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before opening a feature request, please check the
+        [existing issues](https://github.com/abrhamgs3/econflow/issues)
+        to avoid duplicates.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: >
+        Describe the research or workflow pain point this feature addresses.
+        "I want to do X but currently I have to Y instead."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: >
+        How should EconFlow solve this? Describe the API, CLI flags,
+        config options, or behaviour you have in mind.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What workarounds or alternative approaches have you tried?
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Data validation / loading
+        - Econometric estimation
+        - Diagnostic tests
+        - Sensitivity / robustness analysis
+        - Visualization / figures
+        - Output rendering (tables, LaTeX)
+        - CLI
+        - Provenance / reproducibility
+        - Configuration
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Links to papers, related issues, or example data.

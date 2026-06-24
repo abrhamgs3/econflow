@@ -21,14 +21,25 @@ env/
 ENV/
 .uv/
 
+# uv.lock is committed in application repos but not in libraries.
+# EconFlow is a library — lock file is intentionally excluded.
+# uv.lock
+
 # ============================================================
 # Testing & linting
 # ============================================================
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
 coverage.xml
 .ruff_cache/
+
+# ============================================================
+# Type checking
+# ============================================================
+.mypy_cache/
+.pytype/
 
 # ============================================================
 # Jupyter
@@ -38,19 +49,20 @@ coverage.xml
 
 # ============================================================
 # EconFlow generated outputs
-# Platform generates these on every run; they are not tracked.
+# Generated on every run; not version-controlled.
 # ============================================================
 outputs/*/tables/
 outputs/*/figures/
 outputs/*/run_metadata.json
 
-# Keep directory stubs
+# Keep directory stubs and reproducibility record
 !outputs/.gitkeep
 !outputs/provenance/schema.json
 !outputs/provenance/REPRODUCIBILITY_REPORT.md
 
 # ============================================================
-# Raw data cache
+# Raw and processed data
+# Source data should not be version-controlled.
 # ============================================================
 .cache/
 data/raw/
@@ -70,11 +82,14 @@ desktop.ini
 .idea/
 *.swp
 *.swo
+*~
 
 # ============================================================
 # Secrets
 # ============================================================
 .env
 .env.*
+*.env
 secrets.yaml
+secrets.yml
 .streamlit/secrets.toml

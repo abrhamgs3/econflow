@@ -49,3 +49,8 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Econometric pipeline: baseline FE, two-way FE, trimmed FE, growth model,
   sensitivity suite, falsification suite, heterogeneity suite.
 - Visualization: scatter, trend, coefficient comparison, missingness profile.
+
+---
+
+[Unreleased]: https://github.com/abrhamgs3/econflow/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/abrhamgs3/econflow/releases/tag/v0.1.0
