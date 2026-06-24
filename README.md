@@ -23,15 +23,19 @@ uv pip install -e ".[dev]"
 ## Quick Start
 
 ```bash
-econflow project list              # list registered projects
-econflow run example               # run the example project end-to-end
-econflow validate example          # validate config and data only
-econflow reproduce example         # reproduce a prior run from provenance record
+# Check that the environment is ready
+econflow doctor
+
+# Run a pipeline (point at your panel CSV and config)
+econflow run --data path/to/panel_clean.csv              --config examples/ai_productivity_paper/config/config.yaml
+
+# AI & Productivity replication example
+streamlit run examples/ai_productivity_paper/app/streamlit_app.py
 ```
 
 ## Project Configuration
 
-A project lives under `projects/<name>/` and consists of three files:
+A project lives under `examples/<name>/config/` and consists of three files:
 
 | File | Purpose |
 |------|---------|
@@ -62,7 +66,7 @@ src/econflow/
 pytest                          # all tests
 pytest tests/regression/        # regression helper tests
 pytest tests/test_provenance.py # provenance recorder tests
-APRP_RUN_LIVE_REGRESSION=1 pytest tests/regression/test_live_data_reproduction.py
+ECONFLOW_RUN_LIVE_REGRESSION=1 pytest tests/regression/test_live_data_reproduction.py
 ```
 
 ## Origin

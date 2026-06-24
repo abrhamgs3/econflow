@@ -55,3 +55,7 @@ target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
+
+[project.urls]
+Repository = "https://github.com/abrhamgs3/econflow"
+Changelog  = "https://github.com/abrhamgs3/econflow/blob/main/CHANGELOG.md"
