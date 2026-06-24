@@ -1,0 +1,164 @@
+# =============================================================================
+# APRP Model Specifications — ai_productivity
+# Consumed by ai_productivity.sensitivity.runner.SensitivityRunner
+# =============================================================================
+#
+# Each entry in `specifications` defines one estimator run.
+# The SensitivityRunner iterates over them and collects EstimationResult objects
+# for side-by-side comparison in ResultsComparison.
+#
+# Required keys per specification:
+#   name        — unique identifier used as column header in output tables
+#   estimator   — class name from ai_productivity.estimation (e.g. TwoWayFE)
+#   dependent   — dependent variable column name (post-processing)
+#   regressors  — list of exogenous regressors
+# Optional keys:
+#   endog       — endogenous regressors (IV/GMM only)
+#   instruments — excluded instruments (IV only)
+#   gmm_type    — "difference" | "system" (GMM only)
+#   sample_filter — {column: value} dict to subset the panel
+# =============================================================================
+
+specifications:
+
+  # --------------------------------------------------------------------------
+  # (1) Pooled OLS — baseline, no fixed effects
+  # --------------------------------------------------------------------------
+  - name: "OLS_baseline"
+    estimator: "PooledOLS"
+    dependent: "tfp_growth"
+    regressors:
+      - "aipi"
+      - "log_gdp_pc"
+      - "log_hc"
+      - "log_capital"
+      - "trade_openness"
+      - "gfcf_share"
+      - "tertiary_enrol"
+    add_constant: true
+    cluster: "iso3"
+
+  # --------------------------------------------------------------------------
+  # (2) Two-way fixed effects — main specification
+  # --------------------------------------------------------------------------
+  - name: "TWFE_main"
+    estimator: "TwoWayFE"
+    dependent: "tfp_growth"
+    regressors:
+      - "aipi"
+      - "log_gdp_pc"
+      - "log_hc"
+      - "log_capital"
+      - "trade_openness"
+      - "gfcf_share"
+      - "tertiary_enrol"
+    absorb_entity: true
+    absorb_time: true
+    cluster: "iso3"
+
+  # --------------------------------------------------------------------------
+  # (3) Random effects — for Hausman test comparison
+  # --------------------------------------------------------------------------
+  - name: "RE_gls"
+    estimator: "RandomEffectsGLS"
+    dependent: "tfp_growth"
+    regressors:
+      - "aipi"
+      - "log_gdp_pc"
+      - "log_hc"
+      - "log_capital"
+      - "trade_openness"
+      - "gfcf_share"
+      - "tertiary_enrol"
+    cluster: null
+
+  # --------------------------------------------------------------------------
+  # (4) IV / 2SLS — endogeneity-robust specification
+  # --------------------------------------------------------------------------
+  - name: "IV_2SLS"
+    estimator: "IVEstimator"
+    dependent: "tfp_growth"
+    regressors:
+      - "log_gdp_pc"
+      - "log_hc"
+      - "log_capital"
+      - "trade_openness"
+      - "gfcf_share"
+      - "tertiary_enrol"
+    endog:
+      - "aipi"
+    instruments:
+      - "aipi_lag2"
+      - "aipi_lag3"
+    method: "2sls"
+    absorb_entity: true
+    absorb_time: true
+    cluster: "iso3"
+
+  # --------------------------------------------------------------------------
+  # (5) System GMM (Blundell-Bond) — dynamic panel specification
+  # --------------------------------------------------------------------------
+  - name: "SysGMM_BB"
+    estimator: "GMMEstimator"
+    dependent: "tfp_growth"
+    regressors:
+      - "aipi"
+      - "log_gdp_pc"
+      - "log_hc"
+      - "log_capital"
+      - "trade_openness"
+    lag_dep: true
+    gmm_type: "system"
+    max_lag_instruments: 4
+    cluster: "iso3"
+
+  # --------------------------------------------------------------------------
+  # (6) TWFE — OECD countries only (robustness)
+  # --------------------------------------------------------------------------
+  - name: "TWFE_oecd_only"
+    estimator: "TwoWayFE"
+    dependent: "tfp_growth"
+    regressors:
+      - "aipi"
+      - "log_gdp_pc"
+      - "log_hc"
+      - "log_capital"
+      - "trade_openness"
+      - "gfcf_share"
+    absorb_entity: true
+    absorb_time: true
+    cluster: "iso3"
+    sample_filter:
+      oecd_member: true
+
+  # --------------------------------------------------------------------------
+  # (7) TWFE — alternative equal-weight AIPI (robustness)
+  # --------------------------------------------------------------------------
+  - name: "TWFE_ew_aipi"
+    estimator: "TwoWayFE"
+    dependent: "tfp_growth"
+    regressors:
+      - "aipi_ew"            # equal-weight AIPI variant
+      - "log_gdp_pc"
+      - "log_hc"
+      - "log_capital"
+      - "trade_openness"
+      - "gfcf_share"
+    absorb_entity: true
+    absorb_time: true
+    cluster: "iso3"
+
+  # --------------------------------------------------------------------------
+  # (8) Panel quantile — heterogeneous effects
+  # --------------------------------------------------------------------------
+  - name: "PanelQuantile"
+    estimator: "PanelQuantile"
+    dependent: "tfp_growth"
+    regressors:
+      - "aipi"
+      - "log_gdp_pc"
+      - "log_hc"
+      - "log_capital"
+    quantiles: [0.10, 0.25, 0.50, 0.75, 0.90]
+    method: "mmqr"
+    n_bootstrap: 500

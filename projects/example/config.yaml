@@ -1,0 +1,106 @@
+# =============================================================================
+# APRP Project Configuration — ai_productivity
+# AI Adoption and Total Factor Productivity: A Cross-Country Panel Analysis
+# =============================================================================
+
+project:
+  name: "example_project"
+  version: "0.1.0"
+  description: >
+    Panel econometric investigation of the relationship between AI proxy
+    indicators and total factor productivity growth across OECD and
+    emerging-market economies, 2000–2022.
+  authors:
+    - name: "Ab"
+      email: "abrhamgs3@gmail.com"
+  output_dir: "outputs/example_project"
+
+# -----------------------------------------------------------------------------
+# Data sources
+# -----------------------------------------------------------------------------
+data:
+  cache_dir: ".cache/ai_productivity"  # raw-data cache directory
+  sources:
+    world_bank:
+      enabled: true
+      base_url: "https://api.worldbank.org/v2"
+      indicators:
+        - "IT.NET.USER.ZS"      # Internet users (% population)
+        - "TM.VAL.ICTG.ZS.UN"  # ICT goods imports (% total imports)
+        - "TX.VAL.TECH.MF.ZS"  # High-tech exports (% manufactured exports)
+        - "GB.XPD.RSDV.GD.ZS"  # R&D expenditure (% GDP)
+        - "IP.PAT.RESD"         # Patent applications, residents
+        - "NE.GDI.TOTL.ZS"     # Gross capital formation (% GDP)
+        - "SE.TER.ENRR"         # Tertiary school enrolment (gross %)
+        - "SL.TLF.TOTL.IN"     # Labour force, total
+        - "NY.GDP.PCAP.PP.KD"  # GDP per capita, PPP (const. 2017 intl $)
+      extra:
+        per_page: 1000
+        mrv: null              # most-recent-value override (null = use sample years)
+
+    oecd:
+      enabled: true
+      base_url: "https://stats.oecd.org/SDMX-JSON/data"
+      indicators:
+        - "MSTI_PUB.GERD"       # Gross domestic R&D expenditure
+        - "MSTI_PUB.BERD"       # Business enterprise R&D expenditure
+        - "ICT_ISIC4.VA_B"      # ICT sector value-added (% total)
+        - "ICT_ISIC4.EMP_B"     # ICT sector employment share
+      extra:
+        frequency: "A"          # Annual
+        start_period: "2000"
+        end_period: "2022"
+
+    pwt:
+      enabled: true
+      base_url: "https://www.rug.nl/ggdc/docs/pwt1001.xlsx"
+      indicators:
+        - "rtfpna"   # TFP at constant national prices (2017=1)
+        - "ctfp"     # TFP level at current PPPs (USA=1)
+        - "cgdpo"    # Output-side real GDP at current PPPs
+        - "ck"       # Capital services at current PPPs
+        - "emp"      # Persons engaged (millions)
+        - "hc"       # Human capital index
+        - "labsh"    # Labour share of income
+      extra:
+        sheet: "Data"
+        engine: "openpyxl"
+
+  sample:
+    countries: "all"            # "all" or list of ISO-3 codes, e.g. [USA, DEU, CHN]
+    year_start: 2000
+    year_end: 2022
+    min_obs_per_country: 10     # Drop countries with fewer observations than this
+
+# -----------------------------------------------------------------------------
+# Variable definitions
+# -----------------------------------------------------------------------------
+variables:
+  # AI Proxy Index components (fed into ai_productivity.processing.ai_index)
+  ai_proxy:
+    - "IT.NET.USER.ZS"
+    - "TM.VAL.ICTG.ZS.UN"
+    - "TX.VAL.TECH.MF.ZS"
+    - "GB.XPD.RSDV.GD.ZS"
+    - "IP.PAT.RESD"
+    - "MSTI_PUB.BERD"
+    - "ICT_ISIC4.VA_B"
+  ai_index_method: "pca"       # "pca" | "equal_weight"
+
+  # Dependent variable
+  outcome: "tfp_growth"        # annualised log-difference of rtfpna
+
+  # Control variables (column names after processing/merge)
+  controls:
+    - "log_gdp_pc"             # log GDP per capita (PPP)
+    - "log_hc"                 # log human capital index
+    - "log_capital"            # log capital services
+    - "trade_openness"         # (exports + imports) / GDP
+    - "gfcf_share"             # gross fixed capital formation / GDP
+    - "tertiary_enrol"         # tertiary enrolment rate
+
+  # Instrumental variables
+  instruments:
+    - "aipi_lag2"              # AIPI lagged 2 periods
+    - "aipi_lag3"              # AIPI lagged 3 periods
+    - "bartik_ai"              # Bartik-style shift-share instrument (TBD)

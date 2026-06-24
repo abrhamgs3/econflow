@@ -1,0 +1,80 @@
+# ============================================================
+# Python
+# ============================================================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# ============================================================
+# Virtual environments & package managers
+# ============================================================
+.venv/
+venv/
+env/
+ENV/
+.uv/
+
+# ============================================================
+# Testing & linting
+# ============================================================
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+.ruff_cache/
+
+# ============================================================
+# Jupyter
+# ============================================================
+.ipynb_checkpoints/
+*.ipynb_checkpoints/
+
+# ============================================================
+# EconFlow generated outputs
+# Platform generates these on every run; they are not tracked.
+# ============================================================
+outputs/*/tables/
+outputs/*/figures/
+outputs/*/run_metadata.json
+
+# Keep directory stubs
+!outputs/.gitkeep
+!outputs/provenance/schema.json
+!outputs/provenance/REPRODUCIBILITY_REPORT.md
+
+# ============================================================
+# Raw data cache
+# ============================================================
+.cache/
+data/raw/
+data/processed/
+data/interim/
+data/external/
+
+!data/.gitkeep
+
+# ============================================================
+# OS & editor
+# ============================================================
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# ============================================================
+# Secrets
+# ============================================================
+.env
+.env.*
+secrets.yaml
+.streamlit/secrets.toml

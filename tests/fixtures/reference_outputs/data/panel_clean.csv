@@ -1,0 +1,8 @@
+# PLACEHOLDER — See MIGRATION_CHECKLIST.md Decision 2
+#
+# The paper's real panel_clean.csv (SHA-256: 9a65183a5406c76b...) has been
+# intentionally excluded from this repository.
+#
+# Action required: Replace this file with a synthetic generic fixture
+# (e.g. 100 rows, generic column names) before running regression tests.
+# The real panel_clean.csv belongs in the ai-productivity-paper repo.

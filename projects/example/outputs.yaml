@@ -1,0 +1,134 @@
+# =============================================================================
+# APRP Output Preferences — ai_productivity
+# Controls what artefacts are produced and how they are formatted.
+# Consumed by ai_productivity.outputs.* renderers.
+# =============================================================================
+
+output_dir: "outputs/ai_productivity"
+
+# -----------------------------------------------------------------------------
+# Tables
+# -----------------------------------------------------------------------------
+tables:
+  renderer: "TableRenderer"
+  formats:
+    - "latex"       # .tex (booktabs style, suitable for journal submission)
+    - "csv"         # .csv (machine-readable, for supplementary materials)
+  sig_levels: [0.10, 0.05, 0.01]   # *, **, *** thresholds
+  float_fmt: "{:.3f}"
+  note_template: >
+    Notes: Cluster-robust standard errors in parentheses (clustered by country).
+    *p<0.10, **p<0.05, ***p<0.01.
+    All regressions include the controls listed in Section 4 of the paper.
+
+  items:
+    - id: "table1_descriptive"
+      type: "descriptive_stats"
+      variables: null               # null = all variables
+      caption: "Descriptive Statistics"
+      label: "tab:descriptive"
+
+    - id: "table2_main_results"
+      type: "regression_table"
+      specifications:
+        - "OLS_baseline"
+        - "TWFE_main"
+        - "RE_gls"
+        - "IV_2SLS"
+        - "SysGMM_BB"
+      variables:
+        - "aipi"
+        - "log_gdp_pc"
+        - "log_hc"
+        - "log_capital"
+        - "trade_openness"
+      caption: "Main Results: AI Proxy Index and TFP Growth"
+      label: "tab:main_results"
+
+    - id: "table3_robustness"
+      type: "regression_table"
+      specifications:
+        - "TWFE_main"
+        - "TWFE_oecd_only"
+        - "TWFE_ew_aipi"
+      variables:
+        - "aipi"
+        - "aipi_ew"
+        - "log_gdp_pc"
+        - "log_hc"
+      caption: "Robustness Checks"
+      label: "tab:robustness"
+
+    - id: "table4_diagnostics"
+      type: "diagnostic_summary"
+      caption: "Specification Tests"
+      label: "tab:diagnostics"
+
+# -----------------------------------------------------------------------------
+# Figures
+# -----------------------------------------------------------------------------
+figures:
+  renderer: "FigureRenderer"
+  formats:
+    - "pdf"         # vector, for LaTeX inclusion
+    - "png"         # raster preview (300 dpi)
+  dpi: 300
+  style: "seaborn-v0_8-paper"
+  figure_width_cm: 14.0
+  figure_height_cm: 8.0
+
+  items:
+    - id: "fig1_aipi_time_series"
+      type: "time_series_overlay"
+      variable: "aipi"
+      countries: ["USA", "DEU", "CHN", "BRA", "IND", "NGA"]
+      caption: "AI Proxy Index over time: selected economies"
+
+    - id: "fig2_coefficient_path"
+      type: "coefficient_path_plot"
+      variable: "aipi"
+      specifications:
+        - "OLS_baseline"
+        - "TWFE_main"
+        - "IV_2SLS"
+        - "SysGMM_BB"
+        - "TWFE_oecd_only"
+        - "TWFE_ew_aipi"
+      caption: "Coefficient on AIPI across specifications (95% CI)"
+
+    - id: "fig3_quantile_path"
+      type: "quantile_coefficient_plot"
+      specification: "PanelQuantile"
+      variable: "aipi"
+      caption: "Heterogeneous effects: AIPI coefficient by TFP growth quantile"
+
+    - id: "fig4_coverage_heatmap"
+      type: "coverage_heatmap"
+      caption: "Data coverage by country and year"
+
+# -----------------------------------------------------------------------------
+# PDF Report
+# -----------------------------------------------------------------------------
+report:
+  enabled: true
+  renderer: "PDFReportCompiler"
+  filename: "ai_productivity_report.pdf"
+  latex_engine: "latexmk -pdf -interaction=nonstopmode"
+  # template: not yet implemented — see docs/MIGRATION_PLAN.md Phase 4
+  metadata:
+    title: "AI Adoption and Total Factor Productivity: A Cross-Country Panel Analysis"
+    abstract: >
+      We construct a composite AI Proxy Index from seven technology-adoption
+      indicators and estimate its effect on TFP growth in a cross-country
+      panel of up to 120 economies over 2000–2022.  Two-way fixed-effects,
+      IV, and system-GMM estimates consistently indicate a positive and
+      statistically significant association.  Quantile regressions reveal
+      that effects are largest for economies in the upper tail of the TFP
+      growth distribution.
+    journal_target: "Journal of Economic Growth"
+    keywords:
+      - "artificial intelligence"
+      - "total factor productivity"
+      - "panel data"
+      - "technology diffusion"
+      - "endogeneity"
