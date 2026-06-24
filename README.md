@@ -39,7 +39,7 @@ A project lives under `projects/<name>/` and consists of three files:
 | `models.yaml` | Model specifications consumed by `SensitivityRunner` |
 | `outputs.yaml` | Output directories, figure formats, table formats |
 
-See `projects/example/` for a fully annotated template.
+See `examples/ai_productivity_paper/` for the full AI & Productivity replication package.
 
 ## Package Layout
 

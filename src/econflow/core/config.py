@@ -10,7 +10,7 @@ Responsibilities
 Usage (once implemented)
 -------------------------
     from econflow.core.config import load_config
-    cfg = load_config("projects/example/config.yaml")
+    cfg = load_config("examples/ai_productivity_paper/config/config.yaml")
     print(cfg.project.name)
 """
 

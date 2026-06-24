@@ -16,7 +16,7 @@ and can be run sequentially or (future) in parallel using ``concurrent.futures``
 Usage (once implemented)
 -------------------------
     from econflow.sensitivity.runner import SensitivityRunner
-    runner = SensitivityRunner.from_models_yaml("projects/example/models.yaml")
+    runner = SensitivityRunner.from_models_yaml("examples/ai_productivity_paper/config/models.yaml")
     results = runner.run(panel)
 """
 

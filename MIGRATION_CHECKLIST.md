@@ -61,11 +61,11 @@ The source repository (`AI and Productivity/`) was **not modified**.
 | `tests/unit/__init__.py` | `tests/unit/__init__.py` | Reserved stub |
 | `tests/integration/__init__.py` | `tests/integration/__init__.py` | Reserved stub |
 | `tests/fixtures/synthetic/sample_panel.csv` | *new* | Generic 150-row synthetic panel (15 entities × 10 years) |
-| `tests/fixtures/reference_outputs/tables/` (25 files) | `tests/fixtures/reference_outputs/tables/` | Sprint 2 baseline tables |
-| `tests/fixtures/reference_outputs/figures/` (8 files) | `tests/fixtures/reference_outputs/figures/` | Sprint 2 baseline figures |
-| `tests/fixtures/reference_outputs/paper_sections/` (2 files) | `tests/fixtures/reference_outputs/paper_sections/` | Sprint 2 baseline narratives |
-| `tests/fixtures/reference_outputs/manifest.yaml` | `tests/fixtures/reference_outputs/manifest.yaml` | SHA-256 checksums |
-| `tests/fixtures/reference_outputs/data/panel_clean.csv` | *placeholder* | **See Decision 2 below — action required** |
+| `examples/ai_productivity_paper/reference_outputs/tables/` (25 files) | `examples/ai_productivity_paper/reference_outputs/tables/` | Sprint 2 baseline tables |
+| `examples/ai_productivity_paper/reference_outputs/figures/` (8 files) | `examples/ai_productivity_paper/reference_outputs/figures/` | Sprint 2 baseline figures |
+| `examples/ai_productivity_paper/reference_outputs/paper_sections/` (2 files) | `examples/ai_productivity_paper/reference_outputs/paper_sections/` | Sprint 2 baseline narratives |
+| `examples/ai_productivity_paper/reference_outputs/manifest.yaml` | `examples/ai_productivity_paper/reference_outputs/manifest.yaml` | SHA-256 checksums |
+| `examples/ai_productivity_paper/reference_outputs/data/panel_clean.csv` | *placeholder* | **See Decision 2 below — action required** |
 
 ### Infrastructure
 
@@ -80,13 +80,13 @@ The source repository (`AI and Productivity/`) was **not modified**.
 | `CHANGELOG.md` | `CHANGELOG.md` | Unchanged |
 | `docs/MIGRATION_PLAN.md` | `docs/MIGRATION_PLAN.md` | Unchanged |
 | `docs/SPRINT_MIGRATION_ROADMAP.md` | `docs/SPRINT_MIGRATION_ROADMAP.md` | Unchanged |
-| `app/streamlit_app.py` | `app/streamlit_app.py` | Imports updated to econflow |
+| `examples/ai_productivity_paper/app/streamlit_app.py` | `examples/ai_productivity_paper/app/streamlit_app.py` | Imports updated to econflow |
 | `.streamlit/config.toml` | `.streamlit/config.toml` | Unchanged |
 | `outputs/provenance/schema.json` | `outputs/provenance/schema.json` | ProvenanceRecorder JSON Schema |
 | `outputs/provenance/REPRODUCIBILITY_REPORT.md` | `outputs/provenance/REPRODUCIBILITY_REPORT.md` | Sprint 2 audit |
-| `projects/example/config.yaml` | `projects/ai_productivity/config.yaml` | Renamed; project name updated to example_project |
-| `projects/example/models.yaml` | `projects/ai_productivity/models.yaml` | Renamed |
-| `projects/example/outputs.yaml` | `projects/ai_productivity/outputs.yaml` | Renamed |
+| `examples/ai_productivity_paper/config/config.yaml` | `projects/ai_productivity/config.yaml` | Renamed; project name updated to example_project |
+| `examples/ai_productivity_paper/config/models.yaml` | `projects/ai_productivity/models.yaml` | Renamed |
+| `examples/ai_productivity_paper/config/outputs.yaml` | `projects/ai_productivity/outputs.yaml` | Renamed |
 | `.github/agents/econometrics.agent.md` | `.github/agents/research-data-analysis.agent.md` | Renamed; APRP → EconFlow |
 | `.github/workflows/ci.yml` | `.github/workflows/ci.yml` | Package name updated |
 | `agents/data_agent.py` | `agents/data_agent.py` | Shims updated to econflow |
@@ -138,7 +138,7 @@ the repo is already initialized).
 
 ### Decision 2 — Replace placeholder panel_clean.csv  ⚠️ ACTION REQUIRED
 
-`tests/fixtures/reference_outputs/data/panel_clean.csv` is currently a
+`examples/ai_productivity_paper/reference_outputs/data/panel_clean.csv` is currently a
 text placeholder. The Sprint 2 regression baseline (`tests/regression/conftest.py`)
 loads this file to compare against live outputs.
 
@@ -202,9 +202,9 @@ for backward compatibility. Update all active code to catch `APRPError`.
 
 ---
 
-### Decision 6 — Wire projects/example/ into tests  📋 SPRINT 3 TASK
+### Decision 6 — Wire examples/ai_productivity_paper/config/ into tests  📋 SPRINT 3 TASK
 
-`projects/example/config.yaml` references `ai_productivity` as the project
+`examples/ai_productivity_paper/config/config.yaml` references `ai_productivity` as the project
 name in several places (data source URLs, indicator lists). Update the example
 project to use a publicly available, small dataset so that `econflow run example`
 works in a clean environment without access to the paper's private data.

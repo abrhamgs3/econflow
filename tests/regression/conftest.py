@@ -5,7 +5,7 @@ Shared pytest fixtures for the regression helper unit-tests.
 
 All fixtures produce synthetic, self-contained data so that the helper tests
 never touch the real pipeline outputs or the reference fixtures in
-``tests/fixtures/reference_outputs/``.
+``examples/ai_productivity_paper/reference_outputs/``.
 """
 
 from __future__ import annotations

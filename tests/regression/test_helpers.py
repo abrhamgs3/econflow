@@ -6,7 +6,7 @@ Unit tests for every comparison utility in ``tests.regression.helpers``.
 Each test class targets one public function.  Tests are intentionally small
 and self-contained — they generate all data synthetically so they never
 depend on the real pipeline outputs or the reference fixtures in
-``tests/fixtures/reference_outputs/``.
+``examples/ai_productivity_paper/reference_outputs/``.
 
 Coverage targets
 ----------------

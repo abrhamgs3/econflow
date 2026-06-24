@@ -97,7 +97,7 @@ tests/
 ├── fixtures/
 │   ├── synthetic/
 │   │   └── sample_panel.csv  Generic 150-row synthetic panel
-│   └── reference_outputs/    Sprint 2 baseline (44 artefacts + manifest.yaml)
+│   └── reference_outputs/    Moved → examples/ai_productivity_paper/reference_outputs/
 ├── unit/                     Reserved — Sprint 3+
 └── integration/              Reserved — Sprint 3+
 ```

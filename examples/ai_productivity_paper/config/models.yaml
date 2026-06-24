@@ -1,6 +1,6 @@
 # =============================================================================
-# APRP Model Specifications — ai_productivity
-# Consumed by ai_productivity.sensitivity.runner.SensitivityRunner
+# EconFlow Model Specifications — AI & Productivity Paper
+# Consumed by econflow.sensitivity.runner.SensitivityRunner
 # =============================================================================
 #
 # Each entry in `specifications` defines one estimator run.

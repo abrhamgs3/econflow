@@ -70,7 +70,7 @@ phrase "identical to ground truth" is undefined. Recommended resolution:
 **Functions involved:** None moved. This is infrastructure only.
 
 **Action:** From a clean environment, run `run_pipeline.py` on the live data
-and copy all outputs to `tests/fixtures/reference_outputs/`. This directory
+and copy all outputs to `examples/ai_productivity_paper/reference_outputs/`. This directory
 becomes the regression reference set and is committed to version control.
 Reference outputs include:
 - All `.txt` model summary files from `tables/`
@@ -85,7 +85,7 @@ Reference outputs include:
 **Regression tests:** None yet. This sprint creates the test infrastructure.
 
 **Success criteria:**
-- `tests/fixtures/reference_outputs/` exists and is committed.
+- `examples/ai_productivity_paper/reference_outputs/` exists and is committed.
 - A `tests/regression/` directory exists with a `conftest.py` that loads
   the reference set into pytest fixtures.
 - A helper function `assert_csv_equal(actual_path, reference_path, rtol=1e-5)`
@@ -332,7 +332,7 @@ exists. This prevents the test from running in CI on every push.
 
 **Procedure:**
 1. Run `src/ai_productivity/pipeline.run()` into a fresh temp directory.
-2. For each file in `tests/fixtures/reference_outputs/`:
+2. For each file in `examples/ai_productivity_paper/reference_outputs/`:
    - CSV files: compare using `assert_csv_equal` with `rtol=1e-6`.
    - `.tex` files: compare with `assert_tex_equal`.
    - Model summary `.txt` files: compare line by line, skipping any lines
@@ -444,7 +444,7 @@ use `src/ai_productivity/` directly or the CLI.
 - `git grep -r "from run_pipeline" --include="*.py"` returns no results.
 - The numbered `scripts/` files that import from `agents/` have been updated
   to import from `src/ai_productivity/` directly (audit each script).
-- `app/streamlit_app.py` has been audited and does not import from `agents/`
+- `examples/ai_productivity_paper/app/streamlit_app.py` has been audited and does not import from `agents/`
   or `run_pipeline`.
 
 ### Retirement order
@@ -578,7 +578,7 @@ No sprint may begin until its predecessor's success criteria are met.
 | Heterogeneity suite not in run_pipeline.py — published tables are incomplete relative to ground truth | High (known) | High | Resolve in pre-sprint prerequisite; extend run_pipeline.py before Sprint 2 |
 | Floating-point divergence on live panel (linearmodels BLAS-dependent) | Medium | Medium | Use `rtol=1e-6` tolerance; document if any coefficient differs |
 | `scripts/` import from `agents/` and break after Sprint 7 | Medium | Low | Audit all scripts in Sprint 7 gate conditions |
-| `app/streamlit_app.py` imports from `agents/` | Unknown | Medium | Audit in Sprint 7 gate conditions |
+| `examples/ai_productivity_paper/app/streamlit_app.py` imports from `agents/` | Unknown | Medium | Audit in Sprint 7 gate conditions |
 | matplotlib figure hashes differ across OS (font rasterization) | High | Low | Advisory test only; compare summary statistics not checksums |
 | `tfp_regression.txt` and `summary_stats.tex` not reproducible by any pipeline | High (known) | Medium | Document source script in Sprint 2; wire into pipeline or exclude from regression set |
 

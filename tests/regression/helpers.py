@@ -44,10 +44,10 @@ Typical usage
 ...     assert_latex_equal,
 ...     assert_figure_equal,
 ... )
->>> assert_csv_equal("output/results.csv", "tests/fixtures/reference_outputs/tables/results.csv")
+>>> assert_csv_equal("output/results.csv", "examples/ai_productivity_paper/reference_outputs/tables/results.csv")
 >>> assert_coefficient_equal(new_model, old_model, "ln_ai", rtol=1e-6)
 >>> assert_figure_equal("output/trend.png",
-...                     "tests/fixtures/reference_outputs/figures/trend.png",
+...                     "examples/ai_productivity_paper/reference_outputs/figures/trend.png",
 ...                     method="pixel", pixel_rms_tol=1.5)
 """
 

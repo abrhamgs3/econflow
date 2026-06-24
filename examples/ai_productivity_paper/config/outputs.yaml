@@ -1,7 +1,7 @@
 # =============================================================================
-# APRP Output Preferences — ai_productivity
+# EconFlow Output Preferences — AI & Productivity Paper
 # Controls what artefacts are produced and how they are formatted.
-# Consumed by ai_productivity.outputs.* renderers.
+# Consumed by econflow.reporting.* renderers.
 # =============================================================================
 
 output_dir: "outputs/ai_productivity"
