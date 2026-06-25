@@ -12,19 +12,19 @@ Model inventory
 run_tfp_model          Baseline FE: ln_tfp ~ ln_ai + ln_hc (entity effects)
 run_growth_model       GDP growth: first-differenced ln_gdp (entity effects)
 run_robustness_suite   Baseline + two-way FE + trimmed + growth
-run_sensitivity_suite  Lagged AI + time cluster + placebo HC + Driscoll-Kraay + AI_index levels + PWT-only TFP
+run_sensitivity_suite  Lagged AI + time cluster + placebo HC +
+                       Driscoll-Kraay + AI_index levels + PWT-only TFP
 run_falsification_suite Digital infra + innovation + reverse causality + coverage-restricted
 """
 
 from __future__ import annotations
 
+import pandas as pd
 import statsmodels.api as sm
 from linearmodels.panel import PanelOLS
 
 from econflow.exceptions import ModelSpecificationError
 from econflow.logging import get_logger
-
-import pandas as pd
 
 log = get_logger(__name__)
 
@@ -125,7 +125,7 @@ def _fit_driscoll_kraay(
     X = sm.add_constant(model_df[list(regressors)])
 
     try:
-        model = PanelOLS(y, X, entity_effects=entity_effects, time_effects=time_effects, drop_absorbed=True)
+        model = PanelOLS(y, X, entity_effects=entity_effects, time_effects=time_effects, drop_absorbed=True)  # noqa: E501
         return model.fit(cov_type="kernel", kernel="bartlett", bandwidth=2)
     except Exception as exc:
         raise ModelSpecificationError(
@@ -194,7 +194,8 @@ def run_robustness_suite(df: pd.DataFrame) -> dict:
 
 
 def run_sensitivity_suite(df: pd.DataFrame) -> dict:
-    """Six sensitivity checks: lagged AI, time cluster, placebo HC, Driscoll-Kraay, AI_index levels, PWT-only TFP.
+    """Six sensitivity checks: lagged AI, time cluster, placebo HC,
+    Driscoll-Kraay, AI_index levels, PWT-only TFP.
 
     The ai_index_levels_fe spec uses AI_index in levels (not log-transformed).
     AI_index is a z-score composite, so its coefficient reads: a 1-SD increase in
@@ -270,7 +271,7 @@ def run_sensitivity_suite(df: pd.DataFrame) -> dict:
 
 
 def run_falsification_suite(df: pd.DataFrame) -> dict:
-    """Four falsification checks: digital infra, innovation, reverse causality, coverage-restricted."""
+    """Four falsification checks: digital infra, innovation, reverse causality, coverage-restricted."""  # noqa: E501
     log.info("Running falsification suite (4 models)")
     panel_df = _to_panel(df).copy()
 

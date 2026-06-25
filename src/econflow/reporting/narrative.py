@@ -54,17 +54,17 @@ def write_results(results: dict) -> str:
     growth   = results["growth_fe"]
 
     text = (
-        "Baseline fixed-effects estimates show that a 1 percent increase in AI adoption is associated with "
+        "Baseline fixed-effects estimates show that a 1 percent increase in AI adoption is associated with "  # noqa: E501
         f"approximately {_fmt_num(baseline.params.get('ln_ai'))} percent higher TFP "
         f"(p-value {_fmt_pvalue(baseline.pvalues.get('ln_ai'))}), controlling for human capital. "
-        "The estimated AI-TFP relationship remains directionally stable under stronger identification checks, "
+        "The estimated AI-TFP relationship remains directionally stable under stronger identification checks, "  # noqa: E501
         f"including two-way fixed effects ({_fmt_num(twoway.params.get('ln_ai'))}, "
         f"p-value {_fmt_pvalue(twoway.pvalues.get('ln_ai'))}) and trimmed-sample estimation "
         f"({_fmt_num(trimmed.params.get('ln_ai'))}, "
         f"p-value {_fmt_pvalue(trimmed.pvalues.get('ln_ai'))}). "
         "For macro growth outcomes, the AI coefficient in the GDP growth specification is "
-        f"{_fmt_num(growth.params.get('ln_ai'))} (p-value {_fmt_pvalue(growth.pvalues.get('ln_ai'))}), "
-        "suggesting the productivity channel may emerge before fully translating into contemporaneous GDP growth."
+        f"{_fmt_num(growth.params.get('ln_ai'))} (p-value {_fmt_pvalue(growth.pvalues.get('ln_ai'))}), "  # noqa: E501
+        "suggesting the productivity channel may emerge before fully translating into contemporaneous GDP growth."  # noqa: E501
     )
 
     if {"lagged_ai_fe", "time_cluster_fe", "placebo_hc_fe"}.issubset(results.keys()):
@@ -73,20 +73,20 @@ def write_results(results: dict) -> str:
         placebo      = results["placebo_hc_fe"]
 
         text += (
-            " Sensitivity checks also support the main findings: the lagged AI specification yields an AI coefficient of "
-            f"{_fmt_num(lagged.params.get('ln_ai_l1'))} (p-value {_fmt_pvalue(lagged.pvalues.get('ln_ai_l1'))}), "
+            " Sensitivity checks also support the main findings: the lagged AI specification yields an AI coefficient of "  # noqa: E501
+            f"{_fmt_num(lagged.params.get('ln_ai_l1'))} (p-value {_fmt_pvalue(lagged.pvalues.get('ln_ai_l1'))}), "  # noqa: E501
             "and inference remains similar under time-clustered standard errors "
             f"({_fmt_num(time_cluster.params.get('ln_ai'))}, "
             f"p-value {_fmt_pvalue(time_cluster.pvalues.get('ln_ai'))}). "
-            f"The placebo outcome test using log human capital reports {_fmt_num(placebo.params.get('ln_ai'))} "
-            f"(p-value {_fmt_pvalue(placebo.pvalues.get('ln_ai'))}), which should be interpreted as a "
+            f"The placebo outcome test using log human capital reports {_fmt_num(placebo.params.get('ln_ai'))} "  # noqa: E501
+            f"(p-value {_fmt_pvalue(placebo.pvalues.get('ln_ai'))}), which should be interpreted as a "  # noqa: E501
             "falsification check rather than a causal estimate."
         )
 
     if "driscoll_kraay_fe" in results:
         dk = results["driscoll_kraay_fe"]
         text += (
-            " A two-way fixed-effects specification with Driscoll-Kraay standard errors, which is robust to broad "
+            " A two-way fixed-effects specification with Driscoll-Kraay standard errors, which is robust to broad "  # noqa: E501
             "cross-sectional dependence, also preserves a positive AI coefficient "
             f"({_fmt_num(dk.params.get('ln_ai'))}, p-value {_fmt_pvalue(dk.pvalues.get('ln_ai'))})."
         )
@@ -112,31 +112,31 @@ def write_falsification_results(results: dict, selection_summary: pd.DataFrame) 
     coverage   = results["coverage_restricted_fe"]
 
     text = (
-        "Three extended falsification checks probe the construct validity of the AI proxy, the direction of "
-        "the AI-TFP relationship, and the sensitivity of the result to the small complete-case sample.\n\n"
+        "Three extended falsification checks probe the construct validity of the AI proxy, the direction of "  # noqa: E501
+        "the AI-TFP relationship, and the sensitivity of the result to the small complete-case sample.\n\n"  # noqa: E501
         "First, replacing the composite AI index with a digital-infrastructure-only sub-index "
         "(internet use, mobile subscriptions, and secure servers) yields a coefficient of "
         f"{_fmt_num(digital.params.get('digital_infra_index'))} "
         f"(p-value {_fmt_pvalue(digital.pvalues.get('digital_infra_index'))}, "
         f"n = {int(getattr(digital, 'nobs', 0))}). "
-        "An innovation-only sub-index (resident and non-resident patent applications and IP receipts) yields "
+        "An innovation-only sub-index (resident and non-resident patent applications and IP receipts) yields "  # noqa: E501
         f"{_fmt_num(innovation.params.get('innovation_index'))} "
         f"(p-value {_fmt_pvalue(innovation.pvalues.get('innovation_index'))}, "
         f"n = {int(getattr(innovation, 'nobs', 0))}). "
-        "Both sub-indices are positively associated with TFP, indicating that the headline association is not "
+        "Both sub-indices are positively associated with TFP, indicating that the headline association is not "  # noqa: E501
         "isolated to AI-specific activity.\n\n"
         "Second, a reverse-causality check regresses log AI adoption on one-period-lagged log TFP. "
         f"The estimated coefficient is {_fmt_num(reverse.params.get('ln_tfp_l1'))} "
         f"(p-value {_fmt_pvalue(reverse.pvalues.get('ln_tfp_l1'))}, "
         f"n = {int(getattr(reverse, 'nobs', 0))}).\n\n"
-        "Third, restricting the baseline sample to countries with at least 8 of 15 years of non-missing AI data "
+        "Third, restricting the baseline sample to countries with at least 8 of 15 years of non-missing AI data "  # noqa: E501
         f"(n = {int(getattr(coverage, 'nobs', 0))} observations) yields an AI coefficient of "
         f"{_fmt_num(coverage.params.get('ln_ai'))} "
         f"(p-value {_fmt_pvalue(coverage.pvalues.get('ln_ai'))}).\n\n"
-        f"For context, only {selection_summary.attrs.get('in_sample_countries', 'NA')} of the 193 countries in the "
+        f"For context, only {selection_summary.attrs.get('in_sample_countries', 'NA')} of the 193 countries in the "  # noqa: E501
         f"cleaned panel report AI data in at least one year, contributing "
-        f"{selection_summary.attrs.get('in_sample_rows', 'NA')} country-year observations with non-missing AI data, "
-        f"against {selection_summary.attrs.get('out_of_sample_rows', 'NA')} country-years without it. "
-        "Table~\\ref{tab:sample-selection} compares observable characteristics across these two groups."
+        f"{selection_summary.attrs.get('in_sample_rows', 'NA')} country-year observations with non-missing AI data, "  # noqa: E501
+        f"against {selection_summary.attrs.get('out_of_sample_rows', 'NA')} country-years without it. "  # noqa: E501
+        "Table~\\ref{tab:sample-selection} compares observable characteristics across these two groups."  # noqa: E501
     )
     return text

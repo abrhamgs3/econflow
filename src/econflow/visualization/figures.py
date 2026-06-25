@@ -46,7 +46,6 @@ def _save(fig: plt.Figure, stem: Path) -> None:
 
 def _ols_band(x: np.ndarray, y: np.ndarray, alpha: float = 0.05):
     """Return (x_grid, y_hat, y_lower, y_upper) for an OLS fit with CI band."""
-    from numpy.polynomial import polynomial as P
 
     # Fit via lstsq for numerical stability
     X = np.column_stack([np.ones_like(x), x])
@@ -334,7 +333,7 @@ def missingness_profile(
         "secure servers": "Secure Servers", "ai proxy total": "AI Proxy (total)",
         "AI index": "AI Index",
     }
-    labels = [_pretty.get(l, l) for l in labels]
+    labels = [_pretty.get(lbl, lbl) for lbl in labels]
 
     log.info("missingness_profile: %d variables → %s", len(labels), output_path)
 

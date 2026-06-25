@@ -44,7 +44,8 @@ Typical usage
 ...     assert_latex_equal,
 ...     assert_figure_equal,
 ... )
->>> assert_csv_equal("output/results.csv", "examples/ai_productivity_paper/reference_outputs/tables/results.csv")
+>>> ref = "examples/ai_productivity_paper/reference_outputs/tables/results.csv"
+>>> assert_csv_equal("output/results.csv", ref)
 >>> assert_coefficient_equal(new_model, old_model, "ln_ai", rtol=1e-6)
 >>> assert_figure_equal("output/trend.png",
 ...                     "examples/ai_productivity_paper/reference_outputs/figures/trend.png",
@@ -56,8 +57,8 @@ from __future__ import annotations
 import hashlib
 import pathlib
 import re
-import textwrap
-from typing import Literal, Sequence
+from collections.abc import Sequence
+from typing import Literal
 
 import numpy as np
 import pandas as pd
@@ -168,8 +169,10 @@ def assert_dataframe_equal(
             extra    = sorted(set(actual_cols) - set(ref_cols))
             missing  = sorted(set(ref_cols) - set(actual_cols))
             parts = []
-            if extra:   parts.append(f"extra in actual: {extra}")
-            if missing: parts.append(f"missing from actual: {missing}")
+            if extra:
+                parts.append(f"extra in actual: {extra}")
+            if missing:
+                parts.append(f"missing from actual: {missing}")
             raise AssertionError(f"{pfx}Column name mismatch.  " + "  ".join(parts))
         # Align to reference order for element-wise comparison
         actual    = actual[ref_cols]
@@ -545,8 +548,6 @@ def assert_coefficient_equal(
     intentional — it lets Sprint-2 tests freeze coefficient values in YAML
     and compare against them without requiring the full econometric stack.
     """
-    pfx = _label_prefix(label)
-
     act_coef, act_se, act_pv, act_nobs = _extract_coef_values(actual_result, param_name)
     ref_coef, ref_se, ref_pv, ref_nobs = _extract_coef_values(reference_result, param_name)
 

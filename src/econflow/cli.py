@@ -209,10 +209,11 @@ def run(
     On success, every table, figure, and narrative section is regenerated.
     """
     # Lazy import keeps CLI startup fast even when heavy deps are installed.
-    from econflow.pipeline import run as _run
+    import logging
+
     from econflow.exceptions import EconFlowError
     from econflow.logging import configure_logging
-    import logging
+    from econflow.pipeline import run as _run
 
     configure_logging(level=logging.DEBUG if verbose else logging.INFO)
 
@@ -222,7 +223,10 @@ def run(
 
     if not data_path.exists():
         console.print(f"[bold red]✘ Data file not found:[/bold red] {data_path}")
-        console.print("  Run [bold]scripts/02_clean_data.py[/bold] to generate it, or check --data-path.")
+        console.print(
+            "  Run [bold]scripts/02_clean_data.py[/bold] to generate it, "
+            "or check --data-path."
+        )
         raise typer.Exit(code=1)
 
     t0 = time.perf_counter()
@@ -272,7 +276,10 @@ def _output_summary(
     figures_png = _count_files(figures_dir, ".png")
     paper_tex   = _count_files(paper_dir, ".tex")
 
-    console.print(f"  [dim]tables/[/dim]    {tables_txt} model summaries · {tables_csv} CSV · {tables_tex} LaTeX")
+    console.print(
+        f"  [dim]tables/[/dim]    {tables_txt} model summaries "
+        f"· {tables_csv} CSV · {tables_tex} LaTeX"
+    )
     console.print(f"  [dim]figures/[/dim]   {figures_png} PNG")
     console.print(f"  [dim]{paper_dir}/[/dim]   {paper_tex} LaTeX narrative(s)")
     console.print()

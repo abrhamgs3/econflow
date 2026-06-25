@@ -71,7 +71,7 @@ def validate_data(
         ``missing_columns``, ``duplicate_panel_keys``,
         ``missing_by_column``, ``log_vars_non_finite``, ``coverage``.
     """
-    required_columns = required_columns if required_columns is not None else DEFAULT_REQUIRED_COLUMNS
+    required_columns = required_columns if required_columns is not None else DEFAULT_REQUIRED_COLUMNS  # noqa: E501
     log.info("Validating panel at %s", path)
 
     df = load_panel(path)
