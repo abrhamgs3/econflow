@@ -15,8 +15,11 @@ abstract: >
   AI Adoption and Total Factor Productivity paper, it is designed to be reused
   for any longitudinal panel study.
 authors:
-  - name: "Ab"
+  - family-names: "Meressa"
+    given-names: "Abrha Megos"
     email: "abrhamgs3@gmail.com"
+    orcid: "https://orcid.org/0000-0000-0000-0000"  # replace with your ORCID
+    affiliation: ""  # replace with your institution
 keywords:
   - econometrics
   - panel data
@@ -29,8 +32,11 @@ preferred-citation:
   type: software
   title: "EconFlow: Reusable panel econometrics research platform"
   authors:
-    - name: "Ab"
+    - family-names: "Meressa"
+      given-names: "Abrha Megos"
       email: "abrhamgs3@gmail.com"
+      orcid: "https://orcid.org/0000-0000-0000-0000"  # replace with your ORCID
+      affiliation: ""  # replace with your institution
   version: "0.1.0"
   date-released: "2026-06-24"
   url: "https://github.com/abrhamgs3/econflow"

@@ -9,7 +9,7 @@ description = "EconFlow — Reusable panel econometrics research platform"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
-authors = [{ name = "Ab", email = "abrhamgs3@gmail.com" }]
+authors = [{ name = "Abrha Megos Meressa", email = "abrhamgs3@gmail.com" }]
 
 dependencies = [
     "pandas>=2.0",

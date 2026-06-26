@@ -3,7 +3,6 @@
 **Reusable panel econometrics research platform.**
 
 [![CI](https://github.com/abrhamgs3/econflow/actions/workflows/ci.yml/badge.svg)](https://github.com/abrhamgs3/econflow/actions/workflows/ci.yml)
-[![PyPI version](https://img.shields.io/pypi/v/econflow.svg)](https://pypi.org/project/econflow/)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -136,7 +135,7 @@ If you use EconFlow in academic work, please cite it:
 
 ```bibtex
 @software{econflow2026,
-  author  = {Ab},
+  author  = {Meressa, Abrha Megos},
   title   = {{EconFlow}: Reusable panel econometrics research platform},
   year    = {2026},
   version = {0.1.0},
@@ -151,4 +150,4 @@ A `CITATION.cff` file is also provided for tools that read it automatically.
 
 ## License
 
-[MIT](LICENSE) © 2026 Ab
+[MIT](LICENSE) © 2026 Abrha Megos Meressa

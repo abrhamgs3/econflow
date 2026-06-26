@@ -122,7 +122,7 @@ Two namespace overlaps are intentional and will be resolved during the scaffold 
 These will be populated in Sprints 3–8 as the migration progresses. The scaffold
 is imported by `projects/` configs but does not execute real logic yet.
 
-The migration roadmap is in `docs/SPRINT_MIGRATION_ROADMAP.md`.
+The migration roadmap is in `docs/development/SPRINT_MIGRATION_ROADMAP.md`.
 
 ---
 
