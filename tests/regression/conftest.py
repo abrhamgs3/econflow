@@ -10,14 +10,11 @@ never touch the real pipeline outputs or the reference fixtures in
 
 from __future__ import annotations
 
-import io
 import pathlib
-import tempfile
 
 import numpy as np
 import pandas as pd
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # MockResult — a minimal duck-typed regression result object

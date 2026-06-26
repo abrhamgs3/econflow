@@ -31,7 +31,6 @@ import pandas as pd
 
 from econflow.estimation.base import BaseEstimator, EstimationResult
 
-
 QuantileMethod = Literal["powell", "mmqr", "koenker"]
 
 

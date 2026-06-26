@@ -28,7 +28,6 @@ import pandas as pd
 from econflow.core.config import DataSourceConfig
 from econflow.ingestion.base import BaseConnector
 
-
 _PWT_DOWNLOAD_URL = (
     "https://www.rug.nl/ggdc/docs/pwt1001.xlsx"
 )

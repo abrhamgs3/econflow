@@ -11,9 +11,9 @@ These tests verify:
 import pytest
 
 from econflow.exceptions import (
-    EconFlowError,
-    AIProdError,          # backward-compat alias (same object as EconFlowError)
+    AIProdError,  # backward-compat alias (same object as EconFlowError)
     DataValidationError,
+    EconFlowError,
     MergeError,
     ModelSpecificationError,
     PipelineError,

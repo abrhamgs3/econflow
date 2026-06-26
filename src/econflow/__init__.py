@@ -29,9 +29,9 @@ __author__ = "Ab"
 __email__ = "abrhamgs3@gmail.com"
 
 from econflow.exceptions import (
-    EconFlowError,
-    AIProdError,          # deprecated alias — kept for backward compat until v0.3.0
+    AIProdError,  # deprecated alias — kept for backward compat until v0.3.0
     DataValidationError,
+    EconFlowError,
     MergeError,
     ModelSpecificationError,
     PipelineError,

@@ -23,13 +23,15 @@ Total                      48 tests
 from __future__ import annotations
 
 import pathlib
-import shutil
 import textwrap
 
 import numpy as np
 import pandas as pd
 import pytest
 
+# Re-import MockResult from conftest so we can construct it directly in tests
+# that don't use the fixture.
+from tests.regression.conftest import MockResult
 from tests.regression.helpers import (
     assert_coefficient_equal,
     assert_csv_equal,
@@ -38,11 +40,6 @@ from tests.regression.helpers import (
     assert_latex_equal,
     assert_parquet_equal,
 )
-
-# Re-import MockResult from conftest so we can construct it directly in tests
-# that don't use the fixture.
-from tests.regression.conftest import MockResult
-
 
 # ===========================================================================
 # assert_csv_equal

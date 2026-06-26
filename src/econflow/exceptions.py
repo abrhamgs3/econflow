@@ -25,7 +25,6 @@ The alias will be removed in v0.3.0.
 
 from __future__ import annotations
 
-
 # ---------------------------------------------------------------------------
 # Root — EconFlowError is the canonical public name.
 # AIProdError is kept as a module-level alias (same object) so that

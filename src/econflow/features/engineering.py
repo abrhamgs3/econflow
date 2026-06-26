@@ -17,7 +17,6 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from econflow.exceptions import DataValidationError
 from econflow.logging import get_logger
 
 log = get_logger(__name__)

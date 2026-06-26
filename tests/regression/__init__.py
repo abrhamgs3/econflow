@@ -19,12 +19,12 @@ assert_latex_equal      Compare two LaTeX strings (whitespace-normalised).
 assert_figure_equal     Compare two image files by hash or pixel statistics.
 """
 from .helpers import (
+    assert_coefficient_equal,
     assert_csv_equal,
     assert_dataframe_equal,
-    assert_parquet_equal,
-    assert_coefficient_equal,
-    assert_latex_equal,
     assert_figure_equal,
+    assert_latex_equal,
+    assert_parquet_equal,
 )
 
 __all__ = [

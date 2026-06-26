@@ -34,7 +34,6 @@ import pandas as pd
 
 from econflow.estimation.base import BaseEstimator, EstimationResult
 
-
 GMMType = Literal["difference", "system"]
 
 

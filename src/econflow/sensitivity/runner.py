@@ -79,7 +79,7 @@ class SensitivityRunner:
     # ------------------------------------------------------------------
 
     @classmethod
-    def from_models_yaml(cls, path: str | Path) -> "SensitivityRunner":
+    def from_models_yaml(cls, path: str | Path) -> SensitivityRunner:
         """
         Parse a ``models.yaml`` file and build a :class:`SensitivityRunner`.
         """

@@ -32,7 +32,6 @@ from typing import Literal
 
 import pandas as pd
 
-
 AggMethod = Literal["pca", "equal_weight", "factor"]
 
 
@@ -66,7 +65,7 @@ class AIProxyIndexBuilder:
     # Public API
     # ------------------------------------------------------------------
 
-    def fit(self, df: pd.DataFrame) -> "AIProxyIndexBuilder":
+    def fit(self, df: pd.DataFrame) -> AIProxyIndexBuilder:
         """
         Learn normalisation parameters and PCA loadings from *df*.
 

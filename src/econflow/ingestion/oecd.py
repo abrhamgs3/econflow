@@ -22,7 +22,6 @@ import pandas as pd
 from econflow.core.config import DataSourceConfig
 from econflow.ingestion.base import BaseConnector
 
-
 _DEFAULT_BASE_URL = "https://stats.oecd.org/SDMX-JSON/data"
 
 

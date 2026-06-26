@@ -104,9 +104,9 @@ import subprocess
 import sys
 import time
 import uuid
+from collections.abc import Callable, Iterable, Sequence
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable, Iterable, Sequence
 
 # ---------------------------------------------------------------------------
 # Public constants
@@ -351,7 +351,7 @@ class ProvenanceRecorder:
     # Context-manager protocol
     # ------------------------------------------------------------------
 
-    def __enter__(self) -> "ProvenanceRecorder":
+    def __enter__(self) -> ProvenanceRecorder:
         self._start()
         return self
 

@@ -17,7 +17,6 @@ import uuid
 import pytest
 
 from econflow.provenance import (
-    DEFAULT_OUTPUT_PATH,
     SCHEMA_VERSION,
     TRACKED_PACKAGES,
     ProvenanceRecorder,
@@ -31,7 +30,6 @@ from econflow.provenance import (
     _sha256_file,
     record_run,
 )
-
 
 # ===========================================================================
 # _sha256_file

@@ -23,7 +23,6 @@ from typing import Literal
 
 import pandas as pd
 
-
 TFPMethod = Literal["direct_pwt", "growth_accounting", "tornqvist"]
 
 
