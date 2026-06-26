@@ -1,0 +1,38 @@
+# Model specifications — Getting Started tutorial
+# Three progressive specifications to teach fixed effects logic
+
+models:
+  - id: "pooled_ols"
+    label: "Pooled OLS"
+    estimator: "OLS"
+    dependent: "invest"
+    regressors: ["value", "capital"]
+    entity_effects: false
+    time_effects: false
+    description: >
+      Baseline pooled OLS — ignores firm heterogeneity.
+      Included to motivate the need for fixed effects.
+
+  - id: "entity_fe"
+    label: "Entity FE (Within)"
+    estimator: "FE"
+    dependent: "invest"
+    regressors: ["value", "capital"]
+    entity_effects: true
+    time_effects: false
+    cluster: "entity"
+    description: >
+      Firm fixed effects. Controls for all time-invariant firm characteristics
+      (management quality, industry, risk appetite). Standard within estimator.
+
+  - id: "twoway_fe"
+    label: "Two-Way FE"
+    estimator: "FE"
+    dependent: "invest"
+    regressors: ["value", "capital"]
+    entity_effects: true
+    time_effects: true
+    cluster: "entity"
+    description: >
+      Firm + year fixed effects. Also controls for aggregate shocks
+      (recessions, wars, credit conditions) common to all firms.

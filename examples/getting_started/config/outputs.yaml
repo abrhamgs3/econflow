@@ -1,0 +1,17 @@
+# Output configuration — Getting Started tutorial
+
+outputs:
+  base_dir: "examples/getting_started/outputs"
+
+  tables:
+    dir: "outputs/tables"
+    formats: ["csv", "latex"]
+    comparison_table:
+      filename: "table_fe_investment"
+      models: ["pooled_ols", "entity_fe", "twoway_fe"]
+      stars: true          # statistical significance stars
+      se_type: "clustered" # standard error type shown in parentheses
+
+  figures:
+    dir: "outputs/figures"
+    enabled: false         # figures not used in this tutorial

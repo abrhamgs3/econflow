@@ -1,0 +1,27 @@
+# EconFlow project configuration — Getting Started tutorial
+# Dataset: Grunfeld (1935–1954) firm investment panel
+
+project:
+  name: "getting_started"
+  description: "Firm investment and fixed effects — Grunfeld panel (1935–1954)"
+
+data:
+  path: "examples/getting_started/data/grunfeld.csv"
+  entity_col: "firm"
+  time_col: "year"
+  required_columns:
+    - firm
+    - year
+    - invest
+    - value
+    - capital
+
+sample:
+  start_year: 1935
+  end_year: 1954
+
+variables:
+  dependent: "invest"
+  regressors:
+    - "value"
+    - "capital"
