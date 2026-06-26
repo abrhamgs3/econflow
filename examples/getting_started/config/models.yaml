@@ -14,7 +14,7 @@ models:
       Included to motivate the need for fixed effects.
 
   - id: "entity_fe"
-    label: "Entity FE (Within)"
+    label: "Entity FE"
     estimator: "FE"
     dependent: "invest"
     regressors: ["value", "capital"]

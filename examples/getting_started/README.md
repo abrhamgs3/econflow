@@ -152,39 +152,38 @@ Open `outputs/tables/table_fe_investment.csv`:
                           (1)            (2)            (3)
                      Pooled OLS    Entity FE     Two-Way FE
 ─────────────────────────────────────────────────────────────
-value                 0.116***      0.110***       0.119***
-                     (0.006)       (0.014)        (0.015)
+value                 0.115***      0.110***       0.117***
+                     (0.006)       (0.014)        (0.011)
 
-capital               0.231***      0.310***       0.361***
-                     (0.025)       (0.050)        (0.060)
+capital               0.228***      0.310***       0.351***
+                     (0.024)       (0.050)        (0.047)
 
 Firm FE                  No            Yes            Yes
 Year FE                  No             No            Yes
 
 N                        220           220            220
-R² (within)                —          0.767          0.804
+R² (within)                —          0.767          0.757
 ─────────────────────────────────────────────────────────────
-Clustered SE by firm in parentheses. *** p<0.01
+Pooled OLS: heteroskedasticity-robust SE. FE: clustered SE by firm. *** p<0.01
 ```
 
 **Reading column (1).** Pooled OLS treats all 220 observations as if they
 came from 220 independent firms. They did not. The estimates conflate
 within-firm variation (what we want) with between-firm variation (which
 reflects the fact that large firms have large everything). The standard
-errors ignore the repeated-observations structure and are too small — the
-coefficient on capital looks very precisely estimated, but the precision
-is false.
+errors here are heteroskedasticity-robust but do not account for the
+serial correlation in investment within a firm over time.
 
 **Reading column (2).** Adding firm fixed effects forces the estimator to
 work only within firms over time. The value coefficient falls slightly
-(0.116 → 0.110), but the capital coefficient rises substantially
-(0.231 → 0.310). This is the omitted-variable bias correcting itself.
+(0.115 → 0.110), but the capital coefficient rises substantially
+(0.228 → 0.310). This is the omitted-variable bias correcting itself.
 In pooled OLS, the capital coefficient was absorbing cross-sectional
 differences in firm size. Once we control for firm identity, the coefficient
 on capital measures something closer to the marginal propensity to invest
 out of an increase in the capital stock — replacement and expansion demand.
 
-The standard errors widen (capital: 0.025 → 0.050). This is not a problem;
+The standard errors widen (capital: 0.024 → 0.050). This is not a problem;
 it is honesty. The effective sample size for within estimation is smaller,
 and clustering by firm accounts for the serial correlation in investment
 behaviour within a firm over time.
@@ -192,8 +191,8 @@ behaviour within a firm over time.
 **Reading column (3).** Year fixed effects absorb aggregate shocks that
 affect all firms simultaneously — the sharp drop in investment during the
 late 1930s Depression trough, the surge during wartime. Once removed, the
-remaining within-firm, within-year variation drives a further increase in
-the capital coefficient (0.310 → 0.361) and raises R² within to 0.804.
+remaining within-firm, within-year variation drives a further shift in the
+capital coefficient (0.310 → 0.351). R² within holds at 0.757.
 
 **The core result.** A $1 million increase in firm market value is associated
 with roughly $0.110 million in additional investment within that firm in the

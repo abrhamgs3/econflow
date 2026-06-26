@@ -171,28 +171,47 @@ def doctor() -> None:
 
 @app.command()
 def run(
+    config: Path = typer.Option(
+        None,
+        "--config", "-c",
+        help=(
+            "Path to config.yaml for a generic panel pipeline. "
+            "When provided, --models and --outputs are also required. "
+            "Ignores --data-path, --tables-dir, --figures-dir, --paper-dir."
+        ),
+    ),
+    models: Path = typer.Option(
+        None,
+        "--models",
+        help="Path to models.yaml (required when --config is set).",
+    ),
+    outputs: Path = typer.Option(
+        None,
+        "--outputs",
+        help="Path to outputs.yaml (required when --config is set).",
+    ),
     data_path: Path = typer.Option(
         Path("data/processed/panel_clean.csv"),
         "--data-path", "-d",
-        help="Path to the processed panel CSV.",
+        help="Path to the processed panel CSV (legacy pipeline, used when --config is absent).",
         show_default=True,
     ),
     tables_dir: Path = typer.Option(
         Path("tables"),
         "--tables-dir",
-        help="Output directory for tables.",
+        help="Output directory for tables (legacy pipeline).",
         show_default=True,
     ),
     figures_dir: Path = typer.Option(
         Path("figures"),
         "--figures-dir",
-        help="Output directory for figures.",
+        help="Output directory for figures (legacy pipeline).",
         show_default=True,
     ),
     paper_dir: Path = typer.Option(
         Path("paper/sections"),
         "--paper-dir",
-        help="Output directory for auto-generated LaTeX narrative.",
+        help="Output directory for auto-generated LaTeX narrative (legacy pipeline).",
         show_default=True,
     ),
     verbose: bool = typer.Option(
@@ -201,25 +220,79 @@ def run(
         help="Enable DEBUG-level logging.",
     ),
 ) -> None:
-    """Run the full analysis pipeline.
+    """Run the analysis pipeline.
 
-    Executes in order: validate → load → econometrics (12 models) →
-    tables → figures → LaTeX narratives.
+    Generic mode (recommended for new projects):
 
-    On success, every table, figure, and narrative section is regenerated.
+        econflow run \\
+            --config  config.yaml \\
+            --models  models.yaml \\
+            --outputs outputs.yaml
+
+    Legacy mode (AI & Productivity paper replication):
+
+        econflow run --data-path data/processed/panel_clean.csv
     """
-    # Lazy import keeps CLI startup fast even when heavy deps are installed.
     import logging
 
     from econflow.exceptions import EconFlowError
     from econflow.logging import configure_logging
-    from econflow.pipeline import run as _run
 
     configure_logging(level=logging.DEBUG if verbose else logging.INFO)
 
     console.print()
     console.rule(f"[bold]EconFlow {__version__}[/bold]")
     console.print()
+
+    t0 = time.perf_counter()
+
+    # ------------------------------------------------------------------ Generic mode
+    if config is not None:
+        from econflow.pipeline_generic import run_from_config
+
+        missing_flags = []
+        if models is None:
+            missing_flags.append("--models")
+        if outputs is None:
+            missing_flags.append("--outputs")
+        if missing_flags:
+            console.print(
+                f"[bold red]✘ --config requires:[/bold red] {', '.join(missing_flags)}"
+            )
+            raise typer.Exit(code=1)
+
+        for label, path in [("config", config), ("models", models), ("outputs", outputs)]:
+            if not path.exists():
+                console.print(f"[bold red]✘ {label} file not found:[/bold red] {path}")
+                raise typer.Exit(code=1)
+
+        try:
+            run_from_config(
+                config_path=config,
+                models_path=models,
+                outputs_path=outputs,
+            )
+        except EconFlowError as exc:
+            console.print()
+            console.print(f"[bold red]✘ Pipeline error:[/bold red] {exc}")
+            raise typer.Exit(code=1)
+        except Exception as exc:
+            console.print()
+            console.print(f"[bold red]✘ Unexpected error:[/bold red] {exc}")
+            if verbose:
+                import traceback
+                traceback.print_exc()
+            raise typer.Exit(code=1)
+
+        elapsed = time.perf_counter() - t0
+        console.print()
+        console.rule("[bold green]Pipeline complete[/bold green]")
+        console.print(f"  Completed in [bold]{elapsed:.1f} s[/bold]")
+        console.print()
+        return
+
+    # ------------------------------------------------------------------ Legacy mode
+    from econflow.pipeline import run as _run
 
     if not data_path.exists():
         console.print(f"[bold red]✘ Data file not found:[/bold red] {data_path}")
@@ -228,8 +301,6 @@ def run(
             "or check --data-path."
         )
         raise typer.Exit(code=1)
-
-    t0 = time.perf_counter()
 
     try:
         _run(

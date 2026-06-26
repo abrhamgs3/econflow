@@ -93,3 +93,8 @@ desktop.ini
 secrets.yaml
 secrets.yml
 .streamlit/secrets.toml
+
+# Getting started tutorial generated outputs
+examples/*/outputs/tables/
+examples/*/outputs/figures/
+examples/*/outputs/provenance/

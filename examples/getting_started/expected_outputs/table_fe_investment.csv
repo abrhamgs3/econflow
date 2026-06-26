@@ -1,9 +1,9 @@
 Specification,Pooled OLS,Entity FE,Two-Way FE
-Coefficient: value,0.1161***,0.1101***,0.1194***
-SE: value,(0.006),(0.014),(0.015)
-Coefficient: capital,0.2307***,0.3100***,0.3613***
-SE: capital,(0.025),(0.050),(0.060)
+Coefficient: value,0.1145***,0.1101***,0.1167***
+SE: value,(0.006),(0.014),(0.011)
+Coefficient: capital,0.2275***,0.3100***,0.3514***
+SE: capital,(0.024),(0.050),(0.047)
 Firm FE,No,Yes,Yes
 Year FE,No,No,Yes
 N,220,220,220
-R² within,—,0.7667,0.8041
+R² within,—,0.7667,0.7566

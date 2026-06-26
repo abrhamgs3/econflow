@@ -1,32 +1,20 @@
-% EconFlow — auto-generated regression table
-% Dataset: Grunfeld (1935–1954) firm investment panel
-% Estimator: Panel OLS / Within (FE)
-% Standard errors: Clustered by firm
-
 \begin{table}[htbp]
 \centering
-\caption{Determinants of Firm Investment (Grunfeld 1935--1954)}
-\label{tab:fe_investment}
-\begin{tabular}{lccc}
+\caption{Panel regression results -- getting_started}
+\begin{tabular}{lrrr}
 \toprule
- & (1) & (2) & (3) \\
- & Pooled OLS & Entity FE & Two-Way FE \\
+ & (1) Pooled OLS & (2) Entity FE & (3) Two-Way FE \\
 \midrule
-Market value & 0.116$^{***}$ & 0.110$^{***}$ & 0.119$^{***}$ \\
-             & (0.006)       & (0.014)       & (0.015)       \\[4pt]
-Capital stock & 0.231$^{***}$ & 0.310$^{***}$ & 0.361$^{***}$ \\
-              & (0.025)       & (0.050)       & (0.060)       \\
+Coefficient: value & 0.1145$^{$^{$^{*}$$^{*}$}$$^{*}$}$ & 0.1101$^{$^{$^{*}$$^{*}$}$$^{*}$}$ & 0.1167$^{$^{$^{*}$$^{*}$}$$^{*}$}$ \\
+ & (0.006) & (0.014) & (0.011) \\
+Coefficient: capital & 0.2275$^{$^{$^{*}$$^{*}$}$$^{*}$}$ & 0.3100$^{$^{$^{*}$$^{*}$}$$^{*}$}$ & 0.3514$^{$^{$^{*}$$^{*}$}$$^{*}$}$ \\
+ & (0.024) & (0.050) & (0.047) \\
 \midrule
-Firm FE      & No  & Yes & Yes \\
-Year FE      & No  & No  & Yes \\
-$N$          & 220 & 220 & 220 \\
-$R^2$ (within) & ---  & 0.767 & 0.804 \\
+Firm FE & No & Yes & Yes \\
+Year FE & No & No & Yes \\
+\midrule
+N & 220 & 220 & 220 \\
+$R^2$ within & --- & 0.7667 & 0.7566 \\
 \bottomrule
 \end{tabular}
-\begin{tablenotes}
-\small
-\item \textit{Notes:} Clustered standard errors by firm in parentheses.
-$^{*}$ $p<0.10$, $^{**}$ $p<0.05$, $^{***}$ $p<0.01$.
-Data: Grunfeld (1958), as distributed with \texttt{statsmodels}.
-\end{tablenotes}
 \end{table}
