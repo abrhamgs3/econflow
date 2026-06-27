@@ -8,47 +8,51 @@ Commands
 econflow --version
     Print version and exit.
 
+econflow init [DIRECTORY]
+    Scaffold a new EconFlow project.
+
 econflow doctor
-    Verify environment before running the pipeline.
+    Comprehensive environment health check (Python, packages, git, LaTeX, …).
+
+econflow validate
+    Validate configuration files and project structure.
+
+econflow info
+    Display project version, estimator registry, and configuration summary.
 
 econflow run [OPTIONS]
-    Execute the full analysis pipeline:
-    validate → load → econometrics → tables → figures → narratives.
+    Execute the analysis pipeline (generic or legacy mode).
 
 Examples
 --------
-    $ uv run econflow --version
+    $ econflow --version
     EconFlow 0.1.0
 
-    $ uv run econflow doctor
-    ✔ Ready
+    $ econflow init my_project
+    EconFlow init — creating project my_project …
 
-    $ uv run econflow run
-    ════════════════════════════════════════
-     EconFlow 0.1.0
-    ════════════════════════════════════════
-    ✔ Validation passed (193 countries, 15 years, 2 895 rows)
-    ✔ Robustness suite   (4 models)
-    ✔ Sensitivity suite  (4 models)
-    ✔ Falsification suite (4 models)
-    ✔ Tables written  → tables/
-    ✔ Figures written → figures/
-    ✔ Narratives written → paper/sections/
-    ════════════════════════════════════════
-     Pipeline complete in 18.3 s
-    ════════════════════════════════════════
+    $ econflow doctor
+    EconFlow — environment health check …
+
+    $ econflow validate --config config/config.yaml
+    EconFlow validate …
+
+    $ econflow info --config config/config.yaml
+    EconFlow info …
+
+    $ econflow run \\
+          --config  config/config.yaml \\
+          --models  config/models.yaml \\
+          --outputs config/outputs.yaml
 """
 
 from __future__ import annotations
 
-import importlib.metadata
-import sys
 import time
 from pathlib import Path
 
 import typer
 from rich.console import Console
-from rich.text import Text
 
 from econflow import __version__
 
@@ -86,87 +90,209 @@ def main(
 
 
 # ---------------------------------------------------------------------------
-# Shared helper
+# init
 # ---------------------------------------------------------------------------
 
-def _check(label: str, ok: bool, detail: str = "") -> bool:
-    icon = Text("✔", style="bold green") if ok else Text("✘", style="bold red")
-    line = f"  {label}"
-    if detail:
-        line += f"  ({detail})"
-    console.print(icon, line)
-    return ok
+@app.command()
+def init(
+    directory: Path = typer.Argument(
+        Path("."),
+        help="Directory for the new project.  Defaults to the current directory.",
+    ),
+    name: str = typer.Option(
+        "",
+        "--name", "-n",
+        help=(
+            "Project name used in YAML files and README.  "
+            "Defaults to the directory's basename."
+        ),
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Overwrite existing files in the target directory without prompting.",
+    ),
+) -> None:
+    """Scaffold a new EconFlow project with config files and directory structure.
 
+    Creates:
 
-def _count_rows(path: Path) -> int | None:
-    try:
-        with path.open(encoding="utf-8") as f:
-            return sum(1 for _ in f) - 1
-    except Exception:
-        return None
+        config/   (config.yaml, models.yaml, outputs.yaml)
+        data/     (raw/, processed/)
+        outputs/  (tables/, figures/, provenance/)
+        paper/    (sections/)
+        scripts/  (01_download_data.py, 02_clean_data.py)
+        docs/
+        notebooks/
+        README.md
+        .gitignore
+
+    Examples:
+
+        econflow init                     # init in current directory
+
+        econflow init my_study            # init in ./my_study/
+
+        econflow init my_study --force    # overwrite existing files
+    """
+    from econflow.commands.init import run_init
+
+    exit_code = run_init(
+        directory=directory,
+        name=name,
+        force=force,
+        console=console,
+    )
+    if exit_code != 0:
+        raise typer.Exit(code=exit_code)
 
 
 # ---------------------------------------------------------------------------
-# doctor command
+# doctor
 # ---------------------------------------------------------------------------
-
-_REQUIRED_PACKAGES = ["pandas", "numpy", "statsmodels", "linearmodels", "matplotlib", "scipy"]
-_DATA_FILES = [
-    Path("data/processed/panel_clean.csv"),
-    Path("data/raw/wdi.csv"),
-    Path("data/raw/pwt.csv"),
-    Path("data/raw/ai_proxy.csv"),
-]
-_OUTPUT_DIRS = [Path("tables"), Path("figures"), Path("outputs")]
-
 
 @app.command()
 def doctor() -> None:
-    """Verify that the environment is ready to run the pipeline."""
-    console.print("\n[bold]EconFlow — environment check[/bold]\n")
+    """Inspect the environment and produce a health report.
 
-    all_ok = True
+    Checks Python version, all required and optional packages,
+    external tools (git, LaTeX, pandoc), and operating system.
 
-    py_version = sys.version.split()[0]
-    py_ok = sys.version_info >= (3, 10)
-    all_ok &= _check(f"Python {py_version}", py_ok, "" if py_ok else "need ≥ 3.10")
+    Exit code is 0 when all required checks pass (warnings are allowed).
+    """
+    from econflow.commands.doctor import run_doctor
 
-    for pkg in _REQUIRED_PACKAGES:
-        try:
-            ver = importlib.metadata.version(pkg)
-            all_ok &= _check(f"{pkg} {ver}", True)
-        except importlib.metadata.PackageNotFoundError:
-            all_ok &= _check(pkg, False, "not installed — run: uv pip install -e .")
-
-    console.print()
-    console.print("  [dim]Data files[/dim]")
-    for path in _DATA_FILES:
-        if path.exists():
-            rows = _count_rows(path)
-            detail = f"{rows:,} rows" if rows is not None else "found"
-            all_ok &= _check(str(path), True, detail)
-        else:
-            all_ok &= _check(str(path), False, "missing — run scripts/01_download_data.py")
-
-    console.print()
-    console.print("  [dim]Output directories[/dim]")
-    for out_dir in _OUTPUT_DIRS:
-        try:
-            out_dir.mkdir(parents=True, exist_ok=True)
-            all_ok &= _check(str(out_dir) + "/", True, "writable")
-        except OSError as exc:
-            all_ok &= _check(str(out_dir) + "/", False, str(exc))
-
-    console.print()
-    if all_ok:
-        console.print("[bold green]✔ Ready[/bold green]\n")
-    else:
-        console.print("[bold red]✘ Some checks failed.[/bold red]\n")
-        raise typer.Exit(code=1)
+    exit_code = run_doctor(console)
+    if exit_code != 0:
+        raise typer.Exit(code=exit_code)
 
 
 # ---------------------------------------------------------------------------
-# run command
+# validate
+# ---------------------------------------------------------------------------
+
+@app.command()
+def validate(
+    config: Path = typer.Option(
+        Path("config/config.yaml"),
+        "--config", "-c",
+        help="Path to config.yaml.",
+        show_default=True,
+    ),
+    models: Path = typer.Option(
+        Path("config/models.yaml"),
+        "--models",
+        help="Path to models.yaml.",
+        show_default=True,
+    ),
+    outputs: Path = typer.Option(
+        Path("config/outputs.yaml"),
+        "--outputs",
+        help="Path to outputs.yaml.",
+        show_default=True,
+    ),
+    data: bool = typer.Option(
+        False,
+        "--data",
+        help=(
+            "Also validate the data file referenced in config.yaml.  "
+            "Checks column presence and duplicate panel keys."
+        ),
+    ),
+) -> None:
+    """Validate configuration files, directory structure, and variables.
+
+    Runs a suite of checks on the three YAML configuration files and
+    reports pass / warn / fail for each.  Optionally validates the
+    processed data CSV when --data is set.
+
+    Exit code is 0 when no FAIL checks are found (warnings are allowed).
+
+    Examples:
+
+        # Validate configuration only (defaults to config/ sub-directory)
+        econflow validate
+
+        # Validate with explicit paths
+        econflow validate \\
+            --config  examples/getting_started/config/config.yaml \\
+            --models  examples/getting_started/config/models.yaml \\
+            --outputs examples/getting_started/config/outputs.yaml
+
+        # Also validate the data CSV
+        econflow validate --data
+    """
+    from econflow.commands.validate import run_validate
+
+    exit_code = run_validate(
+        config_path=config,
+        models_path=models,
+        outputs_path=outputs,
+        check_data=data,
+        console=console,
+    )
+    if exit_code != 0:
+        raise typer.Exit(code=exit_code)
+
+
+# ---------------------------------------------------------------------------
+# info
+# ---------------------------------------------------------------------------
+
+@app.command()
+def info(
+    config: Path = typer.Option(
+        Path("config/config.yaml"),
+        "--config", "-c",
+        help="Path to config.yaml.  Skipped if the file does not exist.",
+        show_default=True,
+    ),
+    models: Path = typer.Option(
+        Path("config/models.yaml"),
+        "--models",
+        help="Path to models.yaml.  Skipped if the file does not exist.",
+        show_default=True,
+    ),
+    outputs: Path = typer.Option(
+        Path("config/outputs.yaml"),
+        "--outputs",
+        help="Path to outputs.yaml.  Skipped if the file does not exist.",
+        show_default=True,
+    ),
+) -> None:
+    """Display project information, estimator registry, and provenance status.
+
+    Always shows: EconFlow version, Python version, registered estimators,
+    and registered data connectors.
+
+    When configuration files are found, also shows: project metadata,
+    model specification list, output paths, and last provenance record.
+
+    Examples:
+
+        # Show platform info + estimator registry (no project needed)
+        econflow info
+
+        # Show full project summary
+        econflow info \\
+            --config  config/config.yaml \\
+            --models  config/models.yaml \\
+            --outputs config/outputs.yaml
+    """
+    from econflow.commands.info import run_info
+
+    exit_code = run_info(
+        config_path=config,
+        models_path=models,
+        outputs_path=outputs,
+        console=console,
+    )
+    if exit_code != 0:
+        raise typer.Exit(code=exit_code)
+
+
+# ---------------------------------------------------------------------------
+# run
 # ---------------------------------------------------------------------------
 
 @app.command()
@@ -225,7 +351,7 @@ def run(
     Generic mode (recommended for new projects):
 
         econflow run \\
-            --config  config.yaml \\
+            --config  config/config.yaml \\
             --models  models.yaml \\
             --outputs outputs.yaml
 
