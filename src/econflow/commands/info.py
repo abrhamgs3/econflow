@@ -37,11 +37,11 @@ import json
 import platform
 from pathlib import Path
 
-import yaml
 from rich.console import Console
 from rich.table import Table
 
 from econflow import __version__
+from econflow.commands._shared import deep_get, load_yaml_safe
 
 # ---------------------------------------------------------------------------
 # Static registries
@@ -127,23 +127,13 @@ DATA_CONNECTOR_REGISTRY: list[dict] = [
 # ---------------------------------------------------------------------------
 
 def _load_yaml(path: Path) -> dict | None:
-    if not path.exists():
-        return None
-    try:
-        with path.open(encoding="utf-8") as f:
-            data = yaml.safe_load(f)
-        return data if isinstance(data, dict) else None
-    except Exception:
-        return None
+    """Load YAML file; return dict or None on any error."""
+    data, _ = load_yaml_safe(path)
+    return data
 
 
-def _deep_get(data: dict, *keys: str) -> object:
-    obj = data
-    for k in keys:
-        if not isinstance(obj, dict):
-            return None
-        obj = obj.get(k)
-    return obj
+# deep_get imported from ._shared
+_deep_get = deep_get
 
 
 def _status_icon(status: str) -> str:
@@ -181,6 +171,9 @@ def _render_platform(console: Console) -> None:
         console.print(f"  [bold]Installed[/bold]  {loc}")
     except Exception:
         console.print("  [bold]Installed[/bold]  [dim](editable install or unknown)[/dim]")
+
+    # Project path (current working directory)
+    console.print(f"  [bold]Project[/bold]    {Path.cwd()}")
 
     console.print()
 

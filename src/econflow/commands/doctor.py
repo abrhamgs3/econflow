@@ -9,6 +9,8 @@ Checks performed
 System
   [SYS-01]  Python version >= 3.10
   [SYS-02]  Operating system (info only)
+  [SYS-03]  CPU count and model (info only)
+  [SYS-04]  Total RAM (info only)
 
 Core Python packages (required for any pipeline run)
   [PKG-*]   pandas, numpy, statsmodels, linearmodels, matplotlib,
@@ -18,6 +20,8 @@ External tools
   [EXT-01]  git            — version control and provenance
   [EXT-02]  LaTeX          — PDF table / paper rendering (pdflatex / xelatex / lualatex)
   [EXT-03]  pandoc         — document conversion
+  [EXT-04]  uv             — fast Python package manager (optional)
+  [EXT-05]  pip            — Python package installer
 
 Optional Python packages
   [OPT-01]  pytest         — running the test suite
@@ -35,6 +39,7 @@ Exit codes
 from __future__ import annotations
 
 import importlib.metadata
+import os
 import platform
 import shutil
 import subprocess
@@ -44,6 +49,8 @@ from typing import Literal
 
 from rich.console import Console
 from rich.table import Table
+
+from econflow.commands._shared import STATUS_ICONS
 
 # ---------------------------------------------------------------------------
 # Result model
@@ -94,6 +101,12 @@ _EXTERNAL_TOOLS: list[tuple[str, str, bool]] = [
     ("pandoc",   "Pandoc", False),
 ]
 
+# Package managers checked under EXT
+_PKG_MANAGER_TOOLS: list[tuple[str, str]] = [
+    ("uv",  "uv  (fast Python package manager)"),
+    ("pip", "pip (Python package installer)"),
+]
+
 # LaTeX flavours: try in order, stop at first found
 _LATEX_BINARIES = ["pdflatex", "xelatex", "lualatex"]
 
@@ -128,6 +141,53 @@ def _cmp_versions(installed: str, minimum: str) -> bool:
         return _parse_version(installed) >= _parse_version(minimum)
     except Exception:
         return True  # assume OK on any unexpected error
+
+
+def _get_ram_gb() -> str:
+    """Return total RAM as a human-readable string, e.g. '15.8 GB'."""
+    # Prefer psutil — most accurate cross-platform
+    try:
+        import psutil  # type: ignore[import-untyped]
+        total = psutil.virtual_memory().total
+        return f"{total / (1024 ** 3):.1f} GB"
+    except ImportError:
+        pass
+
+    # Linux fallback: /proc/meminfo
+    try:
+        with open("/proc/meminfo", encoding="utf-8") as fh:
+            for line in fh:
+                if line.startswith("MemTotal:"):
+                    kb = int(line.split()[1])
+                    return f"{kb / (1024 ** 2):.1f} GB"
+    except OSError:
+        pass
+
+    # Windows fallback: ctypes GlobalMemoryStatusEx
+    try:
+        import ctypes
+
+        class _MEMORYSTATUSEX(ctypes.Structure):
+            _fields_ = [
+                ("dwLength", ctypes.c_ulong),
+                ("dwMemoryLoad", ctypes.c_ulong),
+                ("ullTotalPhys", ctypes.c_ulonglong),
+                ("ullAvailPhys", ctypes.c_ulonglong),
+                ("ullTotalPageFile", ctypes.c_ulonglong),
+                ("ullAvailPageFile", ctypes.c_ulonglong),
+                ("ullTotalVirtual", ctypes.c_ulonglong),
+                ("ullAvailVirtual", ctypes.c_ulonglong),
+                ("sullAvailExtendedVirtual", ctypes.c_ulonglong),
+            ]
+
+        status = _MEMORYSTATUSEX()
+        status.dwLength = ctypes.sizeof(_MEMORYSTATUSEX)
+        ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(status))  # type: ignore[attr-defined]
+        return f"{status.ullTotalPhys / (1024 ** 3):.1f} GB"
+    except Exception:
+        pass
+
+    return "(unavailable — install psutil for RAM info)"
 
 
 def _check_package(
@@ -217,6 +277,28 @@ def _run_system_checks() -> list[EnvCheck]:
         detail=os_str,
     ))
 
+    # CPU info
+    cpu_count = os.cpu_count() or 0
+    cpu_model = platform.processor() or platform.machine() or "unknown"
+    cpu_detail = f"{cpu_count} logical core(s)"
+    if cpu_model and cpu_model != "unknown":
+        cpu_detail = f"{cpu_count} logical core(s) — {cpu_model}"
+    checks.append(EnvCheck(
+        code="SYS-03",
+        label="CPU",
+        status="info",
+        detail=cpu_detail,
+    ))
+
+    # RAM info
+    ram_detail = _get_ram_gb()
+    checks.append(EnvCheck(
+        code="SYS-04",
+        label="RAM",
+        status="info",
+        detail=ram_detail,
+    ))
+
     return checks
 
 
@@ -288,6 +370,20 @@ def _run_external_checks() -> list[EnvCheck]:
         fix="" if pandoc_found else "Install Pandoc: https://pandoc.org/installing.html",
     ))
 
+    # Package managers (uv, pip) — informational / warn if missing
+    for i, (binary, friendly) in enumerate(_PKG_MANAGER_TOOLS, start=4):
+        found, ver = _check_external_tool(binary)
+        checks.append(EnvCheck(
+            code=f"EXT-{i:02d}",
+            label=friendly,                           # fixed label, version in detail
+            status="pass" if found else "warn",
+            detail=ver if found else "not found on PATH",
+            fix="" if found else (
+                "Install uv: https://docs.astral.sh/uv/"
+                if binary == "uv" else ""
+            ),
+        ))
+
     return checks
 
 
@@ -296,6 +392,7 @@ def _run_optional_checks() -> list[EnvCheck]:
     for i, (pkg_name, dist_name, min_ver) in enumerate(_OPTIONAL_PACKAGES, start=1):
         found, ver_or_err = _check_package(pkg_name, dist_name, min_ver)
         if found:
+
             checks.append(EnvCheck(
                 code=f"OPT-{i:02d}",
                 label=f"{pkg_name} {ver_or_err}",
@@ -307,7 +404,7 @@ def _run_optional_checks() -> list[EnvCheck]:
                 code=f"OPT-{i:02d}",
                 label=pkg_name,
                 status="warn",
-                detail="Optional — not installed",
+                detail="Optional -- not installed",
                 fix=f"pip install {pkg_name}>={min_ver}",
             ))
     return checks
@@ -317,12 +414,8 @@ def _run_optional_checks() -> list[EnvCheck]:
 # Rendering
 # ---------------------------------------------------------------------------
 
-_STATUS_ICON = {
-    "pass": "[bold green]✔[/bold green]",
-    "warn": "[bold yellow]⚠[/bold yellow]",
-    "fail": "[bold red]✘[/bold red]",
-    "info": "[bold blue]ℹ[/bold blue]",
-}
+# STATUS_ICONS imported from ._shared (includes pass/warn/fail/skip/info)
+_STATUS_ICON = STATUS_ICONS
 
 
 def _render(checks: list[EnvCheck], title: str, console: Console) -> None:
@@ -371,8 +464,8 @@ def run_doctor(console: Console) -> int:
     console.print()
     console.print("[bold]EconFlow — environment health check[/bold]\n")
 
-    system_checks  = _run_system_checks()
-    package_checks = _run_package_checks()
+    system_checks   = _run_system_checks()
+    package_checks  = _run_package_checks()
     external_checks = _run_external_checks()
     optional_checks = _run_optional_checks()
 

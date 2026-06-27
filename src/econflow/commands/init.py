@@ -20,6 +20,9 @@ Creates a complete EconFlow project skeleton in *directory*:
     ├── scripts/
     │   ├── 01_download_data.py
     │   └── 02_clean_data.py
+    ├── tests/
+    │   ├── __init__.py
+    │   └── test_pipeline.py
     ├── docs/
     ├── notebooks/
     ├── README.md
@@ -51,6 +54,7 @@ _DIRECTORIES = [
     "outputs/provenance",
     "paper/sections",
     "scripts",
+    "tests",
     "docs",
     "notebooks",
 ]
@@ -360,6 +364,78 @@ if __name__ == "__main__":
 '''
 
 
+_TEST_INIT = '''\
+"""tests/__init__.py — test package for {name}."""
+'''
+
+_TEST_PIPELINE = '''\
+"""
+tests/test_pipeline.py — smoke tests for {name}.
+
+Run with:
+    pytest tests/
+"""
+
+from pathlib import Path
+
+import pytest
+
+
+# Locate project root (one level above tests/)
+PROJECT_ROOT = Path(__file__).parent.parent
+
+
+def test_config_files_exist() -> None:
+    """All three config files must be present before running the pipeline."""
+    assert (PROJECT_ROOT / "config" / "config.yaml").exists(), (
+        "config/config.yaml not found — run `econflow init` or create it manually"
+    )
+    assert (PROJECT_ROOT / "config" / "models.yaml").exists(), (
+        "config/models.yaml not found"
+    )
+    assert (PROJECT_ROOT / "config" / "outputs.yaml").exists(), (
+        "config/outputs.yaml not found"
+    )
+
+
+def test_data_file_exists() -> None:
+    """Processed panel CSV must exist before estimation."""
+    data_file = PROJECT_ROOT / "data" / "processed" / "panel.csv"
+    assert data_file.exists(), (
+        f"Panel CSV not found at {{data_file}}. "
+        "Run scripts/01_download_data.py and scripts/02_clean_data.py first."
+    )
+
+
+@pytest.mark.skipif(
+    not (PROJECT_ROOT / "data" / "processed" / "panel.csv").exists(),
+    reason="panel.csv not yet created",
+)
+def test_pipeline_runs_without_error() -> None:
+    """End-to-end smoke test: run the pipeline and verify output tables exist."""
+    import subprocess
+    import sys
+
+    result = subprocess.run(
+        [
+            sys.executable, "-m", "econflow.cli", "run",
+            "--config",  str(PROJECT_ROOT / "config" / "config.yaml"),
+            "--models",  str(PROJECT_ROOT / "config" / "models.yaml"),
+            "--outputs", str(PROJECT_ROOT / "config" / "outputs.yaml"),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, (
+        f"Pipeline exited {{result.returncode}}:\\n{{result.stdout}}\\n{{result.stderr}}"
+    )
+    # At least one table should have been written
+    tables_dir = PROJECT_ROOT / "outputs" / "tables"
+    csv_tables = list(tables_dir.glob("*.csv"))
+    assert csv_tables, f"No CSV tables found in {{tables_dir}} after pipeline run"
+'''
+
+
 # ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
@@ -458,9 +534,25 @@ def run_init(
         console=console,
     )
 
+    # ---------------------------------------------------------------- Tests
+    console.print()
+    console.print("  [dim]Writing starter tests...[/dim]")
+    _write_file(
+        directory / "tests" / "__init__.py",
+        _TEST_INIT.format(name=name),
+        force=force,
+        console=console,
+    )
+    _write_file(
+        directory / "tests" / "test_pipeline.py",
+        _TEST_PIPELINE.format(name=name),
+        force=force,
+        console=console,
+    )
+
     # ---------------------------------------------------------------- README / .gitignore
     console.print()
-    console.print("  [dim]Writing README and .gitignore…[/dim]")
+    console.print("  [dim]Writing README and .gitignore...[/dim]")
     _write_file(
         directory / "README.md",
         _README.format(name=name),
@@ -479,7 +571,7 @@ def run_init(
     console.rule("[bold green]Project ready[/bold green]")
     console.print(f"\n  Project [cyan]{name}[/cyan] created at [dim]{directory}[/dim]\n")
     console.print("  Next steps:\n")
-    console.print("    1. Edit [bold]config/config.yaml[/bold] — set data path and variable names")
+    console.print("    1. Edit [bold]config/config.yaml[/bold] -- set data path and variable names")
     console.print("    2. Add your data to [bold]data/raw/[/bold]")
     console.print(
         "    3. Implement [bold]scripts/01_download_data.py[/bold]"
@@ -499,11 +591,11 @@ def run_init(
 # ---------------------------------------------------------------------------
 
 def _write_file(
-    path: Path,
+    path,
     content: str,
     *,
     force: bool,
-    console: Console,
+    console,
 ) -> None:
     """Write *content* to *path*, respecting *force* flag."""
     rel = path.name  # just filename for display

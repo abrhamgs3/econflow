@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "econflow"
 version = "0.1.0"
-description = "EconFlow — Reusable panel econometrics research platform"
+description = "EconFlow -- Reusable panel econometrics research platform"
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.10"
@@ -47,6 +47,44 @@ exclude = [
 testpaths = ["tests"]
 addopts = "-v --tb=short --import-mode=importlib"
 pythonpath = ["src"]
+
+[tool.coverage.run]
+source = ["src/econflow"]
+omit = [
+    # Development scaffold (not shipped in wheel)
+    "src/econflow/cli_scaffold/*",
+    # Dead-code stub packages (all NotImplementedError -- see docs/development/TECHNICAL_DEBT.md)
+    "src/econflow/core/*",
+    "src/econflow/data/*",
+    "src/econflow/diagnostics/*",
+    "src/econflow/estimation/*",
+    "src/econflow/econometrics/*",
+    "src/econflow/features/*",
+    "src/econflow/ml/*",
+    "src/econflow/processing/*",
+    "src/econflow/reporting/*",
+    "src/econflow/sensitivity/*",
+    "src/econflow/outputs/*",
+    # Legacy stub ingestion adapters (csv_loader is live)
+    "src/econflow/ingestion/base.py",
+    "src/econflow/ingestion/cache.py",
+    "src/econflow/ingestion/world_bank.py",
+    "src/econflow/ingestion/oecd.py",
+    "src/econflow/ingestion/pwt.py",
+    # Legacy pipeline (superseded by pipeline_generic.py)
+    "src/econflow/pipeline.py",
+    # Logger stub
+    "src/econflow/logging.py",
+]
+
+[tool.coverage.report]
+fail_under = 70
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+]
 
 [tool.ruff]
 src = ["src"]
