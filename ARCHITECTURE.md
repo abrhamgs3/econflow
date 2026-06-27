@@ -32,12 +32,19 @@ src/econflow/
 │   ├── pipeline.py      DAG-based pipeline orchestrator (Sprint 3+)
 │   ├── provenance.py    run_metadata snapshot (stub)
 │   └── registry.py      Project registry
-├── ingestion/           Data connectors
-│   ├── base.py          Abstract BaseConnector
-│   ├── cache.py         DownloadCache filesystem key-value store
-│   ├── world_bank.py    World Bank API v2 connector
-│   ├── oecd.py          OECD SDMX-JSON connector
-│   └── pwt.py           Penn World Tables connector
+├── ingestion/           Data connectors (Sprint 4)
+│   ├── __init__.py      Public API re-exports
+│   ├── base.py          AbstractConnector + ConnectorError
+│   ├── registry.py      @register() decorator, get_connector(), list_connectors()
+│   ├── metadata.py      DatasetMetadata — immutable provenance record
+│   ├── cache.py         CacheManager — slot-based filesystem cache + SHA-256 verification
+│   ├── validation.py    DataValidator, DataValidationConfig, DataValidationReport
+│   └── connectors/
+│       ├── __init__.py  Imports all built-in connectors (triggers @register())
+│       ├── csv_connector.py  LocalCSVConnector [implemented]
+│       ├── world_bank.py     WorldBankConnector [implemented]
+│       ├── oecd.py           OECDConnector [stub]
+│       └── pwt.py            PennWorldTablesConnector [stub]
 ├── processing/          Data transformation pipeline
 │   ├── harmonise.py     CountryHarmoniser — ISO-3 crosswalk
 │   ├── merge.py         DatasetMerger
@@ -80,6 +87,12 @@ src/econflow/
 │   ├── tables.py        TableRenderer
 │   ├── figures.py       FigureRenderer
 │   └── reports.py       PDFReportCompiler
+├── commands/            Sprint 3B+ CLI command implementations
+│   ├── _shared.py       Shared utilities: STATUS_ICONS, deep_get, load_yaml_safe
+│   ├── init.py          econflow init — project scaffold
+│   ├── doctor.py        econflow doctor — environment health check
+│   ├── validate.py      econflow validate — config/data validation
+│   └── info.py          econflow info — project summary + estimator registry
 ├── cli_scaffold/        Future multi-command CLI (Sprint 6)
 │   ├── main.py          Typer app root
 │   └── commands/        run, validate, reproduce, project
@@ -89,18 +102,44 @@ src/econflow/
 tests/
 ├── conftest.py               Shared fixtures (generic sample_panel)
 ├── test_exceptions.py        Exception hierarchy tests
-├── test_provenance.py        ProvenanceRecorder unit tests (35 tests)
+├── test_provenance.py        ProvenanceRecorder unit tests
 ├── regression/
 │   ├── helpers.py            Six comparison utilities
 │   ├── conftest.py           Reference-set loading fixtures
-│   └── test_helpers.py       Unit tests for helpers (49 tests)
+│   └── test_helpers.py       Unit tests for helpers
 ├── fixtures/
 │   ├── synthetic/
 │   │   └── sample_panel.csv  Generic 150-row synthetic panel
 │   └── reference_outputs/    Moved → examples/ai_productivity_paper/reference_outputs/
-├── unit/                     Reserved — Sprint 3+
-└── integration/              Reserved — Sprint 3+
+├── unit/                     Unit tests for command modules + shared utilities
+│   ├── test_shared.py        STATUS_ICONS, deep_get, load_yaml_safe (Sprint 3B.1)
+│   ├── test_cmd_init.py      econflow init command
+│   ├── test_cmd_doctor.py    econflow doctor command
+│   ├── test_cmd_validate.py  econflow validate command
+│   └── test_cmd_info.py      econflow info command
+└── integration/              End-to-end workflow tests
+    ├── test_workspace_lifecycle.py   init → validate → info roundtrip
+    ├── test_pipeline_e2e.py         Full pipeline on getting_started example
+    └── test_csv_connector.py        LocalCSVConnector end-to-end (fetch + cache)
 ```
+
+---
+
+## Shared CLI Utilities (`commands/_shared.py`)
+
+All four command modules share common building blocks extracted into
+`econflow.commands._shared` (Sprint 3B.1).  Import from here rather than
+duplicating:
+
+| Symbol | Type | Used by |
+|--------|------|---------|
+| `STATUS_ICONS` | `dict[str, str]` | doctor, validate, init |
+| `deep_get(data, *keys)` | function | validate, info |
+| `load_yaml_safe(path)` | function | validate, info |
+
+**Registry-driven validation**: `validate.py` derives `_SUPPORTED_ESTIMATORS`
+from `ESTIMATOR_REGISTRY` (defined in `info.py`).  Adding a new implemented
+estimator to the registry automatically makes it accepted by `econflow validate`.
 
 ---
 

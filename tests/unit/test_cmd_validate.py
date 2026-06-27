@@ -320,3 +320,41 @@ def test_validate_data_flag_warns_on_duplicate_panel_keys(tmp_path: Path) -> Non
     # Duplicates trigger a warning — exit should still be 0
     assert result.exit_code == 0
     assert "duplicate" in result.output.lower()
+
+
+# ---------------------------------------------------------------------------
+# Registry-driven estimator validation (Sprint 3B.1)
+# ---------------------------------------------------------------------------
+
+def test_supported_estimators_derived_from_registry() -> None:
+    """_SUPPORTED_ESTIMATORS must be a subset of ESTIMATOR_REGISTRY IDs."""
+    from econflow.commands.info import ESTIMATOR_REGISTRY
+    from econflow.commands.validate import _SUPPORTED_ESTIMATORS
+
+    registry_ids = {e["id"] for e in ESTIMATOR_REGISTRY if e["status"] == "implemented"}
+    # Every estimator in _SUPPORTED_ESTIMATORS must be implemented in the registry
+    for est in _SUPPORTED_ESTIMATORS:
+        assert est in registry_ids, (
+            f"Estimator '{est}' in _SUPPORTED_ESTIMATORS "
+            "but not 'implemented' in ESTIMATOR_REGISTRY"
+        )
+
+
+def test_supported_estimators_matches_implemented_registry_entries() -> None:
+    """_SUPPORTED_ESTIMATORS must equal exactly the implemented entries in the registry."""
+    from econflow.commands.info import ESTIMATOR_REGISTRY
+    from econflow.commands.validate import _SUPPORTED_ESTIMATORS
+
+    expected = frozenset(e["id"] for e in ESTIMATOR_REGISTRY if e["status"] == "implemented")
+    assert _SUPPORTED_ESTIMATORS == expected, (
+        f"Mismatch: _SUPPORTED_ESTIMATORS={set(_SUPPORTED_ESTIMATORS)}, "
+        f"registry implemented={set(expected)}"
+    )
+
+
+def test_ols_and_fe_are_supported() -> None:
+    """OLS and FE must always be in the supported set (core estimators)."""
+    from econflow.commands.validate import _SUPPORTED_ESTIMATORS
+
+    assert "OLS" in _SUPPORTED_ESTIMATORS
+    assert "FE" in _SUPPORTED_ESTIMATORS

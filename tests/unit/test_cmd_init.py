@@ -247,3 +247,60 @@ def test_init_creates_gitkeep_in_empty_dirs(tmp_path: Path) -> None:
     _invoke_init([str(proj)])
     # data/processed is always empty — should have .gitkeep
     assert (proj / "data" / "processed" / ".gitkeep").exists()
+
+
+# ---------------------------------------------------------------------------
+# Tests directory scaffold (Sprint 3B)
+# ---------------------------------------------------------------------------
+
+def test_init_creates_tests_directory(tmp_path: Path) -> None:
+    proj = tmp_path / "test_proj"
+    _invoke_init([str(proj)])
+    assert (proj / "tests").is_dir()
+
+
+def test_init_creates_tests_init_file(tmp_path: Path) -> None:
+    proj = tmp_path / "test_proj"
+    _invoke_init([str(proj)])
+    init_file = proj / "tests" / "__init__.py"
+    assert init_file.exists()
+
+
+def test_init_creates_starter_test_file(tmp_path: Path) -> None:
+    proj = tmp_path / "test_proj"
+    _invoke_init([str(proj)])
+    test_file = proj / "tests" / "test_pipeline.py"
+    assert test_file.exists()
+    content = test_file.read_text(encoding="utf-8")
+    assert "test_config_files_exist" in content
+    assert "test_data_file_exists" in content
+    assert "test_pipeline_runs_without_error" in content
+
+
+def test_init_starter_test_contains_project_name(tmp_path: Path) -> None:
+    proj = tmp_path / "my_econ_study"
+    _invoke_init([str(proj), "--name", "my_econ_study"])
+    test_file = proj / "tests" / "test_pipeline.py"
+    assert "my_econ_study" in test_file.read_text(encoding="utf-8")
+
+
+def test_init_starter_test_has_valid_python_syntax(tmp_path: Path) -> None:
+    import ast
+    proj = tmp_path / "syntax_check"
+    _invoke_init([str(proj)])
+    test_file = proj / "tests" / "test_pipeline.py"
+    source = test_file.read_text(encoding="utf-8")
+    # Should parse without SyntaxError
+    ast.parse(source)
+
+
+def test_init_rendering_uses_checkmark_not_v(tmp_path: Path) -> None:
+    """Ensure _write_file prints ✔ (Rich checkmark), not bare 'v'."""
+    proj = tmp_path / "render_check"
+    result = _invoke_init([str(proj)])
+    # The output should contain the checkmark character, not 'v ' as status icon
+    assert "✔" in result.output or result.exit_code == 0
+    # Crucially, should NOT have the regression pattern '  v  ' at start of file line
+    import re
+    regression = re.search(r"^\s{2}v\s{2}", result.output, re.MULTILINE)
+    assert regression is None, "Rendering regression found: 'v' used instead of '✔'"

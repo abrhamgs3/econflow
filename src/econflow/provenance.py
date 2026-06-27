@@ -95,6 +95,11 @@ The top-level keys are:
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from econflow.ingestion.metadata import DatasetMetadata
+
 import hashlib
 import importlib.metadata as _meta
 import json
@@ -383,6 +388,7 @@ class ProvenanceRecorder:
             "config":          _config_info(self.config_path),
             "inputs":          _input_records(self.input_paths),
             "outputs":         [],
+            "datasets":        [],
         }
 
     def _finish(self, *, exit_status: str) -> None:
@@ -408,6 +414,36 @@ class ProvenanceRecorder:
     def get_output_path(self) -> Path:
         """Return the path where metadata was (or will be) written."""
         return self.output_path
+
+    def record_dataset(self, metadata: DatasetMetadata) -> None:
+        """
+        Record a dataset acquisition event in the provenance log.
+
+        Call this after each :meth:`~econflow.ingestion.base.AbstractConnector.fetch`
+        call to capture the full dataset provenance trail alongside the pipeline run.
+
+        Parameters
+        ----------
+        metadata:
+            :class:`~econflow.ingestion.metadata.DatasetMetadata` object returned
+            by a connector's :meth:`~econflow.ingestion.base.AbstractConnector.metadata`
+            method.
+
+        Example
+        -------
+        ::
+
+            with ProvenanceRecorder(...) as rec:
+                path, meta = connector.fetch()
+                rec.record_dataset(meta)
+                run_pipeline(path)
+        """
+        if self._metadata is None:
+            raise RuntimeError(
+                "record_dataset() called before the ProvenanceRecorder was started. "
+                "Use it inside a 'with' block or after calling _start()."
+            )
+        self._metadata["datasets"].append(metadata.to_dict())
 
 
 # ---------------------------------------------------------------------------

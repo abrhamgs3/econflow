@@ -53,9 +53,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
-import yaml
 from rich.console import Console
 from rich.table import Table
+
+from econflow.commands._shared import STATUS_ICONS, deep_get, load_yaml_safe
+from econflow.commands.info import ESTIMATOR_REGISTRY
 
 # ---------------------------------------------------------------------------
 # Result model
@@ -119,38 +121,22 @@ class ValidationReport:
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-_STATUS_ICON = {
-    "pass": "[bold green]✔[/bold green]",
-    "warn": "[bold yellow]⚠[/bold yellow]",
-    "fail": "[bold red]✘[/bold red]",
-    "skip": "[dim]–[/dim]",
-}
+# Status icons imported from ._shared (STATUS_ICONS)
+# Alias for backward compat with render function that uses _STATUS_ICON
+_STATUS_ICON = STATUS_ICONS
 
-_SUPPORTED_ESTIMATORS = {"OLS", "FE"}
-
-
-def _load_yaml_safe(path: Path) -> tuple[dict | None, str]:
-    """Try to load a YAML file.  Returns (data, error_message)."""
-    if not path.exists():
-        return None, f"File not found: {path}"
-    try:
-        with path.open(encoding="utf-8") as f:
-            data = yaml.safe_load(f)
-        if not isinstance(data, dict):
-            return None, "YAML parsed but did not produce a mapping (dict)"
-        return data, ""
-    except yaml.YAMLError as exc:
-        return None, f"YAML parse error: {exc}"
+# Derived from ESTIMATOR_REGISTRY — single source of truth
+_SUPPORTED_ESTIMATORS: frozenset[str] = frozenset(
+    e["id"] for e in ESTIMATOR_REGISTRY if e["status"] == "implemented"
+)
 
 
-def _deep_get(data: dict, *keys: str) -> object:
-    """Navigate nested dict with dot-notation keys; return None if missing."""
-    obj = data
-    for key in keys:
-        if not isinstance(obj, dict):
-            return None
-        obj = obj.get(key)
-    return obj
+# _load_yaml_safe imported from ._shared as load_yaml_safe
+_load_yaml_safe = load_yaml_safe
+
+
+# deep_get imported from ._shared
+_deep_get = deep_get
 
 
 # ---------------------------------------------------------------------------

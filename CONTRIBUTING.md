@@ -34,7 +34,7 @@ pip install -e ".[dev]"
 Verify everything works:
 
 ```bash
-pytest          # 100 tests should pass
+pytest          # 371 tests should pass
 ruff check src/ tests/
 econflow doctor
 ```
@@ -98,6 +98,60 @@ Key conventions:
 - Python 3.10+ syntax
 - Type hints on all public functions
 - Google-style docstrings
+
+---
+
+## Adding a data connector
+
+Data connectors live in `src/econflow/ingestion/connectors/`. Each connector
+is a class that inherits from `AbstractConnector` and implements five methods:
+
+| Method | Contract |
+|--------|----------|
+| `connect()` | Verify the source is reachable. Raise `ConnectorError` on failure. |
+| `download(*, force=False)` | Fetch data. Return the path to the cached CSV. |
+| `validate(path)` | Run `DataValidator` checks. Return `DataValidationReport`. |
+| `metadata()` | Return the `DatasetMetadata` from the last `download()` call. |
+| `cache_key()` | Return a 64-char SHA-256 hex derived from `_make_cache_key()`. |
+
+Register the connector with a single decorator:
+
+```python
+from econflow.ingestion.registry import register
+from econflow.ingestion.base import AbstractConnector
+
+@register("my_source", label="My Data Source", status="implemented")
+class MySourceConnector(AbstractConnector):
+    ...
+```
+
+Then add the import to `src/econflow/ingestion/connectors/__init__.py`.
+No other code changes are required — the connector will appear in
+`econflow info` and be available via `get_connector("my_source")`.
+
+See `docs/architecture/DATA_ECOSYSTEM.md` for the full design rationale and
+`connectors/world_bank.py` for a complete reference implementation.
+
+**Testing requirements for new connectors:**
+- `tests/unit/test_<source>_connector.py` — all five methods, constructor
+  validation, `cache_key()` determinism
+- `tests/integration/test_<source>_connector.py` — full `fetch()` end-to-end,
+  with and without `CacheManager`, marked `@pytest.mark.network` if it needs
+  live internet access
+
+---
+
+## Shared CLI utilities
+
+CLI command modules share helpers from `src/econflow/commands/_shared.py`:
+
+| Symbol | Use it for |
+|--------|-----------|
+| `STATUS_ICONS` | Rich-markup status indicators (pass ✔ / warn ⚠ / fail ✘ / skip – / info ℹ) |
+| `deep_get(data, *keys)` | Safe navigation of nested dicts |
+| `load_yaml_safe(path)` | YAML loading with structured error return |
+
+Import from `_shared` rather than duplicating these in command modules.
 
 ---
 
