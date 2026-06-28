@@ -11,10 +11,12 @@ Platform
 
 Registered estimators
     All estimators available in the generic pipeline, with implementation
-    status (implemented / stub).
+    status (implemented / stub).  Driven by the real estimator registry —
+    no hard-coded list.
 
 Registered data connectors
-    All data source adapters, with implementation status.
+    All data source adapters, with implementation status.  Driven by the
+    real connector registry.
 
 Project configuration  (only if --config is resolvable)
     Project name, data file, entity/time dimensions, dependent variable,
@@ -44,82 +46,42 @@ from econflow import __version__
 from econflow.commands._shared import deep_get, load_yaml_safe
 
 # ---------------------------------------------------------------------------
-# Static registries
+# Live registries
 # ---------------------------------------------------------------------------
+# Both registries are populated at import time by the respective __init__.py
+# modules (which trigger @register() / @register_diagnostic() calls).
+#
+# If either import fails (e.g. optional dependency missing), we degrade
+# gracefully to an empty list rather than crashing the whole ``info`` command.
 
-#: Estimators available in the generic pipeline (pipeline_generic.py)
-ESTIMATOR_REGISTRY: list[dict] = [
-    {
-        "id":      "OLS",
-        "label":   "Pooled OLS",
-        "status":  "implemented",
-        "module":  "econflow.pipeline_generic",
-        "notes":   "Heteroskedasticity-robust SEs via linearmodels.PooledOLS",
-    },
-    {
-        "id":      "FE",
-        "label":   "Fixed Effects (within estimator)",
-        "status":  "implemented",
-        "module":  "econflow.pipeline_generic",
-        "notes":   "Entity FE / Two-Way FE via linearmodels.PanelOLS; clustered SEs",
-    },
-    {
-        "id":      "GMM",
-        "label":   "GMM Estimator",
-        "status":  "stub",
-        "module":  "econflow.estimation.gmm",
-        "notes":   "Not yet implemented — raises NotImplementedError",
-    },
-    {
-        "id":      "IV",
-        "label":   "IV / 2SLS",
-        "status":  "stub",
-        "module":  "econflow.estimation.iv",
-        "notes":   "Not yet implemented — raises NotImplementedError",
-    },
-    {
-        "id":      "RE",
-        "label":   "Random Effects (GLS)",
-        "status":  "stub",
-        "module":  "econflow.estimation.random_effects",
-        "notes":   "Not yet implemented — raises NotImplementedError",
-    },
-    {
-        "id":      "Quantile",
-        "label":   "Panel Quantile Regression",
-        "status":  "stub",
-        "module":  "econflow.estimation.quantile",
-        "notes":   "Not yet implemented — raises NotImplementedError",
-    },
-]
+def _load_estimator_registry() -> list[dict]:
+    """Return live list from the estimator plugin registry."""
+    try:
+        import econflow.estimation  # noqa: F401 — triggers @register() calls
+        from econflow.estimation.registry import list_estimators
+        return list_estimators()
+    except Exception:
+        return []
 
-#: Data source connectors
-DATA_CONNECTOR_REGISTRY: list[dict] = [
-    {
-        "id":     "csv",
-        "label":  "CSV / Panel file",
-        "status": "implemented",
-        "notes":  "Any panel CSV with entity and time columns",
-    },
-    {
-        "id":     "world_bank",
-        "label":  "World Bank WDI",
-        "status": "stub",
-        "notes":  "econflow.ingestion.world_bank — stub, raises NotImplementedError",
-    },
-    {
-        "id":     "oecd",
-        "label":  "OECD Statistics",
-        "status": "stub",
-        "notes":  "econflow.ingestion.oecd — stub, raises NotImplementedError",
-    },
-    {
-        "id":     "pwt",
-        "label":  "Penn World Tables",
-        "status": "stub",
-        "notes":  "econflow.ingestion.pwt — stub, raises NotImplementedError",
-    },
-]
+
+def _load_connector_registry() -> list[dict]:
+    """Return live list from the connector plugin registry."""
+    try:
+        import econflow.ingestion  # noqa: F401 — triggers @register() calls
+        from econflow.ingestion.registry import list_connectors
+        return list_connectors()
+    except Exception:
+        return []
+
+
+# ---------------------------------------------------------------------------
+# Backward-compatibility alias
+# ---------------------------------------------------------------------------
+# validate.py (and any external code) does:
+#   from econflow.commands.info import ESTIMATOR_REGISTRY
+# Keep this name importable; it now reflects the live registry.
+
+ESTIMATOR_REGISTRY: list[dict] = _load_estimator_registry()
 
 
 # ---------------------------------------------------------------------------
@@ -182,17 +144,23 @@ def _render_estimators(console: Console) -> None:
     console.rule("[bold]Registered estimators[/bold]")
     console.print()
 
+    estimators = _load_estimator_registry()
+
+    if not estimators:
+        console.print("  [dim]No estimators registered.[/dim]\n")
+        return
+
     table = Table(show_header=True, header_style="bold", box=None, padding=(0, 2, 0, 0))
-    table.add_column("ID",     style="bold cyan", width=10)
-    table.add_column("Label",  min_width=32)
+    table.add_column("ID",     style="bold cyan", width=12)
+    table.add_column("Label",  min_width=36)
     table.add_column("Status", width=20)
     table.add_column("Notes",  style="dim")
 
-    for est in ESTIMATOR_REGISTRY:
+    for est in estimators:
         table.add_row(
-            est["id"],
-            est["label"],
-            _status_icon(est["status"]),
+            est.get("id", ""),
+            est.get("label", est.get("id", "")),
+            _status_icon(est.get("status", "stub")),
             est.get("notes", ""),
         )
 
@@ -204,17 +172,23 @@ def _render_connectors(console: Console) -> None:
     console.rule("[bold]Registered data connectors[/bold]")
     console.print()
 
+    connectors = _load_connector_registry()
+
+    if not connectors:
+        console.print("  [dim]No connectors registered.[/dim]\n")
+        return
+
     table = Table(show_header=True, header_style="bold", box=None, padding=(0, 2, 0, 0))
     table.add_column("ID",     style="bold cyan", width=14)
-    table.add_column("Label",  min_width=24)
+    table.add_column("Label",  min_width=28)
     table.add_column("Status", width=20)
     table.add_column("Notes",  style="dim")
 
-    for conn in DATA_CONNECTOR_REGISTRY:
+    for conn in connectors:
         table.add_row(
-            conn["id"],
-            conn["label"],
-            _status_icon(conn["status"]),
+            conn.get("id", ""),
+            conn.get("label", conn.get("id", "")),
+            _status_icon(conn.get("status", "stub")),
             conn.get("notes", ""),
         )
 

@@ -1,100 +1,133 @@
 """
-econflow.estimation.iv — Instrumental-Variables estimator (2SLS).
+econflow.estimation.iv — Instrumental variables (2SLS) estimator.
 
-Implements Two-Stage Least Squares for panel data using
-``linearmodels.IV2SLS`` / ``linearmodels.IVLIML``.  Addresses potential
-endogeneity of the AI Proxy Index by instrumenting with:
-
-* Lagged AI adoption indicators (t-2, t-3).
-* Geographic/linguistic distance-weighted peer-country adoption (Bartik-style).
-* Historical telecommunications infrastructure as an adoption shifter.
-
-Usage (once implemented)
--------------------------
-    from econflow.estimation.iv import IVEstimator
-    model = IVEstimator(
-        dependent="tfp_growth",
-        regressors=["log_capital", "log_hc"],
-        endog=["aipi"],
-        instruments=["aipi_lag2", "bartik_ai"],
-    )
-    result = model.fit(panel)
+Uses ``linearmodels.IV2SLS`` for the second-stage regression.
 """
 
 from __future__ import annotations
 
 import pandas as pd
 
-from econflow.estimation.base import BaseEstimator, EstimationResult
+from econflow.estimation.base import BaseEstimator, EstimationResult, EstimatorError
+from econflow.estimation.registry import register
+from econflow.estimation.result import DiagnosticResult
 
 
-class IVEstimator(BaseEstimator):
+@register(
+    "iv",
+    label="IV / 2SLS",
+    status="implemented",
+    notes="linearmodels.IV2SLS; requires instruments in params['instruments']",
+    supported_data=["balanced_panel", "unbalanced_panel"],
+)
+class IV2SLS(BaseEstimator):
     """
-    Two-Stage Least Squares (2SLS) panel estimator.
+    Two-stage least squares with instrumental variables.
 
-    Parameters
-    ----------
-    dependent:
-        Dependent variable column name.
-    regressors:
-        Exogenous explanatory variable column names.
-    endog:
-        Endogenous explanatory variable column names.
-    instruments:
-        Excluded instrument column names.
-    entity_col / time_col:
-        Panel dimension identifiers.
-    cluster:
-        Column on which to cluster SEs.
-    method:
-        IV method: ``"2sls"`` (default) or ``"liml"``.
-    absorb_entity:
-        Whether to absorb entity fixed effects prior to IV estimation.
-    absorb_time:
-        Whether to absorb time fixed effects.
+    Parameters (``params`` dict keys)
+    -----------------------------------
+    dependent : str   Required.
+    regressors : list[str]   Exogenous regressors.  Required.
+    endog : list[str]   Endogenous regressors.  Required.
+    instruments : list[str]   Instruments (excluded).  Required.
+    entity_col : str   Default ``"entity"``.
+    time_col : str   Default ``"time"``.
+    cov_type : str   Default ``"robust"``.
     """
 
-    estimator_name = "iv_2sls"
+    estimator_id = "iv"
+    name = "IV / 2SLS"
+    description = (
+        "Two-stage least squares.  Addresses endogeneity via excluded "
+        "instruments.  Requires params['endog'] and params['instruments']."
+    )
+    supported_data = ["balanced_panel", "unbalanced_panel"]
+    required_parameters = ["dependent", "regressors", "endog", "instruments"]
+    optional_parameters = {
+        "entity_col": "entity",
+        "time_col": "time",
+        "cov_type": "robust",
+    }
 
-    def __init__(
-        self,
-        dependent: str,
-        regressors: list[str],
-        endog: list[str],
-        instruments: list[str],
-        entity_col: str = "iso3",
-        time_col: str = "year",
-        cluster: str | None = None,
-        method: str = "2sls",
-        absorb_entity: bool = True,
-        absorb_time: bool = True,
-    ) -> None:
-        super().__init__(dependent, regressors, entity_col, time_col, cluster)
-        self.endog = endog
-        self.instruments = instruments
-        self.method = method
-        self.absorb_entity = absorb_entity
-        self.absorb_time = absorb_time
+    def validate(self, data: pd.DataFrame) -> None:
+        self._require_params("dependent", "regressors", "endog", "instruments")
+        dep = self.params["dependent"]
+        regs = self.params["regressors"]
+        endog = self.params["endog"]
+        instruments = self.params["instruments"]
+        entity_col = self.params.get("entity_col", "entity")
+        time_col = self.params.get("time_col", "time")
+        self._require_columns(data, dep, entity_col, time_col,
+                              *regs, *endog, *instruments)
+        if len(instruments) < len(endog):
+            raise EstimatorError(
+                "Order condition violated: need at least as many instruments "
+                "as endogenous regressors.",
+                estimator_id=self.estimator_id,
+            )
 
-    # ------------------------------------------------------------------
-    # BaseEstimator interface
-    # ------------------------------------------------------------------
+    def fit(self, data: pd.DataFrame) -> EstimationResult:
+        from linearmodels.iv import IV2SLS as _IV2SLS  # noqa: PLC0415
 
-    def fit(self, df: pd.DataFrame) -> EstimationResult:
-        """
-        Estimate the IV model on *df*.
+        dep = self.params["dependent"]
+        regs = self.params["regressors"]
+        endog = self.params["endog"]
+        instruments = self.params["instruments"]
+        entity_col = self.params.get("entity_col", "entity")
+        time_col = self.params.get("time_col", "time")
+        cov_type = self.params.get("cov_type", "robust")
 
-        Stores the first-stage F-statistic (Cragg-Donald / Kleibergen-Paap)
-        in ``result.extra["first_stage_f"]``.
-        """
-        raise NotImplementedError
+        panel = data.dropna(subset=[dep, *regs, *endog]).copy()
+        panel = panel.set_index([entity_col, time_col]).sort_index()
 
-    # ------------------------------------------------------------------
-    # IV-specific diagnostics (delegates to ai_productivity.diagnostics)
-    # ------------------------------------------------------------------
+        try:
+            import numpy as np  # noqa: PLC0415
+            # Exogenous regressors = all regressors minus any endogenous ones.
+            # Passing endogenous variables in both exog and endog causes a
+            # rank deficiency error in linearmodels.
+            endog_set = set(endog)
+            exog_regs = [r for r in regs if r not in endog_set]
+            const = np.ones((len(panel), 1))
+            if exog_regs:
+                exog = pd.DataFrame(
+                    const, index=panel.index, columns=["const"]
+                ).join(panel[exog_regs])
+            else:
+                exog = pd.DataFrame(const, index=panel.index, columns=["const"])
+            mod = _IV2SLS(panel[dep], exog, panel[endog], panel[instruments])
+            res = mod.fit(cov_type=cov_type)
+        except Exception as exc:
+            raise EstimatorError(
+                f"IV2SLS fitting failed: {exc}",
+                estimator_id=self.estimator_id, cause=exc,
+            ) from exc
 
-    def first_stage_summary(self, df: pd.DataFrame) -> dict:
-        """
-        Return first-stage regression results for each endogenous variable.
-        """
-        raise NotImplementedError
+        ci = pd.DataFrame(
+            res.conf_int().values,
+            index=res.params.index, columns=["lower", "upper"],
+        )
+        entities = sorted(panel.index.get_level_values(0).unique().tolist())
+        times = sorted(panel.index.get_level_values(1).unique().tolist())
+
+        return EstimationResult(
+            estimator_id=self.estimator_id,
+            estimator_name=self.name,
+            params=res.params,
+            std_err=res.std_errors,
+            conf_int=ci,
+            pvalues=res.pvalues,
+            nobs=int(res.nobs),
+            ngroups=len(entities),
+            df_resid=int(res.df_resid),
+            rsquared=float(res.rsquared),
+            rsquared_adj=float(res.rsquared),
+            entity_col=entity_col,
+            time_col=time_col,
+            entities=[str(e) for e in entities],
+            time_periods=times,
+            provenance=self._provenance_stamp(),
+            extra={"endog": endog, "instruments": instruments, "cov_type": cov_type},
+        )
+
+    def diagnostics(self, result: EstimationResult) -> list[DiagnosticResult]:
+        return []

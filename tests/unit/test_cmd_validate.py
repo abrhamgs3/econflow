@@ -356,5 +356,5 @@ def test_ols_and_fe_are_supported() -> None:
     """OLS and FE must always be in the supported set (core estimators)."""
     from econflow.commands.validate import _SUPPORTED_ESTIMATORS
 
-    assert "OLS" in _SUPPORTED_ESTIMATORS
-    assert "FE" in _SUPPORTED_ESTIMATORS
+    assert "ols" in _SUPPORTED_ESTIMATORS
+    assert "fe" in _SUPPORTED_ESTIMATORS

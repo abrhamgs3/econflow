@@ -9,6 +9,97 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Sprint 5 — Estimation Framework (2026-06-28)
+
+#### Added
+- `src/econflow/estimation/result.py`: `EstimationResult` immutable dataclass with
+  full provenance, `tvalues` property, `summary_frame()`, `to_dict()`, `to_json()`.
+  `DiagnosticResult` dataclass with `to_dict()`, `to_json()`, `from_dict()`.
+- `src/econflow/estimation/registry.py`: `@register()` decorator and
+  `get_estimator()` / `list_estimators()` / `unregister()`.  Estimators
+  self-register at import time.  Raises `RegistryError` (not `ValueError`) on
+  duplicate or unknown id.
+- `src/econflow/estimation/base.py` (rewrite): `BaseEstimator` abstract class with
+  `validate()`, `fit()`, `diagnostics()`, concrete `run()` chain, and helper
+  methods `_require_params()`, `_require_columns()`, `_to_panel()`,
+  `_provenance_stamp()`.  `EstimatorError` for typed failure reporting.
+  Re-exports `EstimationResult` and `DiagnosticResult` for backward compatibility.
+- `src/econflow/estimation/ols.py`: `PooledOLS` — `linearmodels.PooledOLS`.
+  Registers as `"ols"`.
+- `src/econflow/estimation/fixed_effects.py`: `EntityFE` (`"fe"`) and `TwoWayFE`
+  (`"twfe"`) via `linearmodels.PanelOLS`.
+- `src/econflow/estimation/random_effects.py`: `RandomEffects` (`"re"`) via
+  `linearmodels.RandomEffects`.
+- `src/econflow/estimation/first_difference.py`: `FirstDifference` (`"fd"`) via
+  `linearmodels.FirstDifferenceOLS`.
+- `src/econflow/estimation/iv.py`: `IV2SLS` (`"iv"`) via `linearmodels.iv.IV2SLS`.
+  Enforces order condition; correctly splits exogenous and endogenous regressors.
+- `src/econflow/estimation/gmm.py`: `SystemGMM` (`"gmm"`) — stub.
+- `src/econflow/estimation/quantile.py`: `PanelQuantile` (`"quantile"`) — stub.
+- `src/econflow/estimation/__init__.py` (rewrite): full public API; imports all
+  built-in estimators to trigger `@register()` calls.
+- `src/econflow/diagnostics/base.py`: `BaseDiagnostic` ABC with `run()`,
+  `supports()`, `_not_applicable()`.  `DiagnosticError` exception.
+- `src/econflow/diagnostics/registry.py`: `@register_diagnostic()`,
+  `get_diagnostic()`, `list_diagnostics()`, `unregister_diagnostic()`.
+  Raises `RegistryError` on duplicate/unknown id.
+- `src/econflow/diagnostics/__init__.py` (rewrite): full public API; imports all
+  built-in plugins.
+- `src/econflow/diagnostics/plugins/hausman.py`: Hausman endogeneity test.
+  Regularises near-singular covariance difference matrix.  Registers as
+  `"hausman"`.
+- `src/econflow/diagnostics/plugins/breusch_pagan.py`: Breusch-Pagan LM
+  heteroskedasticity test via `statsmodels`.  Registers as `"breusch_pagan"`.
+- `src/econflow/diagnostics/plugins/pesaran_cd.py`: Pesaran (2004) cross-sectional
+  dependence CD test.  Registers as `"pesaran_cd"`.
+- `src/econflow/diagnostics/plugins/vif.py`: Variance Inflation Factor check via
+  `statsmodels` with numpy fallback.  Registers as `"vif"`.
+- `src/econflow/diagnostics/plugins/wooldridge.py`: stub — registers as
+  `"wooldridge"`.
+- `src/econflow/diagnostics/plugins/serial_correlation.py`: stub — registers as
+  `"serial_correlation"`.
+- `tests/unit/test_estimation_result.py`: 27 tests covering `EstimationResult`
+  and `DiagnosticResult` construction, serialisation, and mutability.
+- `tests/unit/test_estimation_registry.py`: 21 tests covering `@register()`,
+  `get_estimator()`, `list_estimators()`, `unregister()`, and all 8 built-in
+  estimator registrations.
+- `tests/unit/test_estimation_base.py`: 29 tests covering `EstimatorError`,
+  `BaseEstimator` abstract enforcement, `run()` chain, helpers, and backward-compat
+  re-exports.
+- `tests/unit/test_diagnostic_registry.py`: 23 tests covering
+  `@register_diagnostic()`, `BaseDiagnostic`, `DiagnosticError`, and all 6 built-in
+  plugin registrations.
+- `tests/integration/test_estimator_run.py`: 21 end-to-end tests — each implemented
+  estimator run on a 200-row synthetic panel; stubs verified to raise
+  `NotImplementedError`.
+- `tests/integration/test_diagnostic_run.py`: 24 end-to-end tests — Hausman,
+  Breusch-Pagan, Pesaran CD, and VIF on real `EstimationResult` objects; stubs
+  verified; registry round-trip tested.
+- `docs/architecture/ESTIMATION_FRAMEWORK.md`: full architecture document.
+
+#### Changed
+- `src/econflow/commands/info.py`: removed hard-coded `ESTIMATOR_REGISTRY` and
+  `DATA_CONNECTOR_REGISTRY` lists (H1 tech debt).  Both tables now driven by
+  `list_estimators()` and `list_connectors()` from the live registries.
+  `ESTIMATOR_REGISTRY` is retained as a module-level alias (calls live registry)
+  for backward compatibility.
+- `src/econflow/commands/validate.py`: `_SUPPORTED_ESTIMATORS` now derived from
+  `list_estimators()` instead of the hand-coded list in `info.py`.
+- `src/econflow/estimation/registry.py`: raises `RegistryError` (not `ValueError`
+  / `KeyError`) for duplicate registration and unknown id lookups. `unregister()`
+  now raises `RegistryError` on unknown id (was silent).
+- `src/econflow/diagnostics/registry.py`: same `RegistryError` upgrade.
+  `unregister_diagnostic()` now raises on unknown id.
+- `src/econflow/estimation/base.py`: `_provenance_stamp()` now includes
+  `econflow_version` field.
+- `src/econflow/diagnostics/base.py`: `_not_applicable()` now returns
+  `level="skip"` (was `"info"`).
+- `tests/unit/test_cmd_info.py`: updated to use `_load_connector_registry()` and
+  lowercase estimator IDs (`"ols"`, `"fe"`).
+- `tests/unit/test_cmd_validate.py`: updated to use lowercase estimator IDs.
+
+---
+
 ### Sprint 4 — Data Ecosystem (2026-06-27)
 
 #### Added
@@ -44,92 +135,4 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `DatasetMetadata`, `register`, `get_connector`, `list_connectors`,
   `DataValidator`, `DataValidationConfig`, `DataValidationReport`, `ValidationIssue`.
 - `src/econflow/provenance.py`: `ProvenanceRecorder.record_dataset(metadata)`
-  appends a dataset provenance record to `metadata["datasets"]` in the run JSON.
-- `tests/unit/test_ingestion_metadata.py`: 25 tests covering `DatasetMetadata`.
-- `tests/unit/test_ingestion_cache.py`: 25 tests covering `CacheManager`.
-- `tests/unit/test_ingestion_validation.py`: 25 tests covering `DataValidator`
-  (all six checks + report serialization + config defaults).
-- `tests/unit/test_ingestion_registry.py`: 26 tests covering registry
-  decorator, get/list/unregister, and built-in connector registration.
-- `tests/integration/test_csv_connector.py`: 20 end-to-end tests for
-  `LocalCSVConnector` (connect, download, validate, metadata, fetch, cache).
-- `docs/architecture/DATA_ECOSYSTEM.md`: Architecture document covering design
-  goals, module responsibilities, data flow diagram, cache key design,
-  provenance integration, extension guide, and testing instructions.
-
----
-
-### Sprint 3B.1 — Architecture Cleanup (2026-06-27)
-
-#### Added
-- `src/econflow/commands/_shared.py`: shared CLI utilities module with
-  `STATUS_ICONS` (all five check statuses), `deep_get()`, and `load_yaml_safe()`.
-  Eliminates duplicate implementations previously copied across command modules.
-- `tests/unit/test_shared.py`: 22 unit tests covering `STATUS_ICONS`, `deep_get`,
-  and `load_yaml_safe`.
-- Tests directory scaffold in `econflow init`: `tests/__init__.py` and
-  `tests/test_pipeline.py` (smoke tests) are now written by `econflow init`.
-- Unit tests for `tests/` scaffold creation added to `test_cmd_init.py`.
-- Unit tests for registry-driven estimator validation added to `test_cmd_validate.py`.
-
-#### Changed
-- `validate.py`: `_STATUS_ICON`, `_deep_get`, `_load_yaml_safe` removed; now
-  imported from `._shared`. `_SUPPORTED_ESTIMATORS` is now a `frozenset` derived
-  from `ESTIMATOR_REGISTRY` — adding an implemented estimator to the registry
-  automatically makes `econflow validate` accept it.
-- `doctor.py`: local `_STATUS_ICON` removed; now uses `STATUS_ICONS` from
-  `._shared`. `EXT-04`/`EXT-05` (uv/pip) now display version in the **detail**
-  column (consistent with `EXT-01`..`EXT-03`), not embedded in the label.
-- `info.py`: local `_deep_get` and `_load_yaml` removed; now delegates to
-  `deep_get` and `load_yaml_safe` from `._shared`.
-- `init.py`: fixed rendering regression in `_write_file()` — success icon was
-  `v` (plain text), now correctly `✔` (Rich markup `[green]✔[/green]`);
-  skip icon was `-`, now `–` (en-dash, consistent with doctor/validate).
-- `ARCHITECTURE.md`: updated package layout, added Shared CLI Utilities section,
-  documented registry-driven validation design.
-
----
-
-## [0.1.0] — 2026-06-24 — *First public release*
-
-### Added
-- Professional `src/econflow/` package layout extracted from the AI & Productivity paper.
-- `pyproject.toml`: package installable via `pip install econflow` or `uv pip install -e .`.
-- CLI entry point `econflow` with `--version`, `doctor`, and `run` commands.
-- Centralised structured logger (`econflow.logging`).
-- Domain-specific exception hierarchy: `EconFlowError`, `DataValidationError`,
-  `MergeError`, `PipelineError`, `ModelSpecificationError`.
-  `AIProdError` kept as a deprecated alias; will be removed in v0.3.0.
-- `EconFlowCoreError` as scaffold root; `APRPError` kept as deprecated alias.
-- Configurable `validate_data()`: accepts `required_columns`, `entity_col`,
-  `time_col`, and `log_vars` parameters; `DEFAULT_REQUIRED_COLUMNS` constant.
-- Provenance recorder (`ProvenanceRecorder`) with SHA-256 output hashing.
-- Regression testing framework with 6 comparison utilities.
-- Reference output fixtures (44 artefacts + SHA-256 manifest) in
-  `examples/ai_productivity_paper/reference_outputs/`.
-- Full automated test suite: 100 tests (49 regression, 16 exception, 35 provenance).
-- GitHub Actions CI: pytest on Python 3.10/3.11/3.12 + ruff lint.
-- MIT LICENSE.
-
-### Domain-neutral rewrite (pre-release cleanup)
-- Renamed base exception `AIProdError` → `EconFlowError`.
-- Renamed CLI entry point `ai-productivity` → `econflow`.
-- Renamed environment-variable prefix `APRP_` → `ECONFLOW_`.
-- Renamed scaffold root exception `APRPError` → `EconFlowCoreError`.
-- Provenance schema `$id` updated to `econflow/provenance/run_metadata/v1`.
-- Fixed broken path in `src/econflow/processing/harmonise.py`.
-- All module docstrings updated to reference EconFlow.
-- AI & Productivity paper assets relocated to `examples/ai_productivity_paper/`
-  (config, Streamlit dashboard, reference outputs).
-
-### Existing (pre-extraction, unchanged)
-- Panel dataset: 25-column CSV, 193 countries × 2010–2024.
-- Data sources: WDI, PWT, AI Index proxy, WGI, Barro-Lee.
-- Econometric pipeline: baseline FE, two-way FE, trimmed FE, growth model,
-  sensitivity suite, falsification suite, heterogeneity suite.
-- Visualization: scatter, trend, coefficient comparison, missingness profile.
-
----
-
-[Unreleased]: https://github.com/abrhamgs3/econflow/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/abrhamgs3/econflow/releases/tag/v0.1.0
+  appends a dataset provenan

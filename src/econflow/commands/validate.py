@@ -57,7 +57,9 @@ from rich.console import Console
 from rich.table import Table
 
 from econflow.commands._shared import STATUS_ICONS, deep_get, load_yaml_safe
-from econflow.commands.info import ESTIMATOR_REGISTRY
+
+# ESTIMATOR_REGISTRY import removed — derive from live registry instead
+from econflow.estimation.registry import list_estimators as _list_estimators
 
 # ---------------------------------------------------------------------------
 # Result model
@@ -125,10 +127,19 @@ class ValidationReport:
 # Alias for backward compat with render function that uses _STATUS_ICON
 _STATUS_ICON = STATUS_ICONS
 
-# Derived from ESTIMATOR_REGISTRY — single source of truth
-_SUPPORTED_ESTIMATORS: frozenset[str] = frozenset(
-    e["id"] for e in ESTIMATOR_REGISTRY if e["status"] == "implemented"
-)
+# Derived from live estimator registry — adding a new @register()ed estimator
+# automatically makes econflow validate accept it.
+def _get_supported_estimators() -> frozenset[str]:
+    try:
+        import econflow.estimation  # noqa: F401 — triggers @register() calls
+        return frozenset(
+            e["id"] for e in _list_estimators() if e["status"] == "implemented"
+        )
+    except Exception:
+        return frozenset()
+
+
+_SUPPORTED_ESTIMATORS: frozenset[str] = _get_supported_estimators()
 
 
 # _load_yaml_safe imported from ._shared as load_yaml_safe

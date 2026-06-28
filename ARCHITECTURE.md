@@ -52,20 +52,30 @@ src/econflow/
 │   ├── ai_index.py      AIProxyIndexBuilder (PCA / equal-weight)
 │   ├── tfp.py           TFPProcessor — PWT extraction + Solow residual
 │   └── quality.py       QualityReporter, validate_data
-├── estimation/          Panel estimators
-│   ├── base.py          Abstract BaseEstimator, EstimationResult
-│   ├── ols.py           PooledOLS
-│   ├── fixed_effects.py TwoWayFE (linearmodels.PanelOLS wrapper)
-│   ├── random_effects.py RandomEffectsGLS
-│   ├── iv.py            IVEstimator (2SLS)
-│   ├── gmm.py           GMMEstimator (Arellano-Bond / Blundell-Bond)
-│   └── quantile.py      PanelQuantile
-├── diagnostics/         Post-estimation diagnostic tests
-│   ├── specification.py Hausman test
-│   ├── overid.py        Sargan-Hansen J-test
-│   ├── dependence.py    Pesaran cross-sectional dependence CD test
-│   ├── serial.py        Arellano-Bond AR(1)/AR(2) test
-│   └── reporter.py      DiagnosticReport — unified diagnostics summary
+├── estimation/          Plugin-based estimation framework (Sprint 5)
+│   ├── __init__.py      Public API; imports all built-ins (triggers @register())
+│   ├── registry.py      @register() decorator, get_estimator(), list_estimators()
+│   ├── base.py          BaseEstimator ABC, EstimatorError (re-exports result types)
+│   ├── result.py        EstimationResult, DiagnosticResult dataclasses
+│   ├── ols.py           PooledOLS [implemented]
+│   ├── fixed_effects.py EntityFE, TwoWayFE [implemented]
+│   ├── random_effects.py RandomEffects [implemented]
+│   ├── first_difference.py FirstDifference [implemented]
+│   ├── iv.py            IV2SLS [implemented]
+│   ├── gmm.py           SystemGMM [stub]
+│   └── quantile.py      PanelQuantile [stub]
+├── diagnostics/         Post-estimation diagnostic plugin framework (Sprint 5)
+│   ├── __init__.py      Public API; imports all plugins (triggers @register_diagnostic())
+│   ├── registry.py      @register_diagnostic(), get_diagnostic(), list_diagnostics()
+│   ├── base.py          BaseDiagnostic ABC, DiagnosticError
+│   └── plugins/
+│       ├── __init__.py  Imports all 6 plugins to trigger registration
+│       ├── hausman.py         Hausman endogeneity test [implemented]
+│       ├── breusch_pagan.py   Breusch-Pagan LM test [implemented]
+│       ├── pesaran_cd.py      Pesaran CD test [implemented]
+│       ├── vif.py             VIF check [implemented]
+│       ├── wooldridge.py      Wooldridge test [stub]
+│       └── serial_correlation.py  Serial correlation test [stub]
 ├── sensitivity/         Robustness analysis
 │   ├── runner.py        SensitivityRunner.from_models_yaml()
 │   └── comparison.py    ResultsComparison — side-by-side table
@@ -120,7 +130,9 @@ tests/
 └── integration/              End-to-end workflow tests
     ├── test_workspace_lifecycle.py   init → validate → info roundtrip
     ├── test_pipeline_e2e.py         Full pipeline on getting_started example
-    └── test_csv_connector.py        LocalCSVConnector end-to-end (fetch + cache)
+    ├── test_csv_connector.py        LocalCSVConnector end-to-end (fetch + cache)
+    ├── test_estimator_run.py        OLS/FE/TWFE/RE/FD/IV on synthetic panel (Sprint 5)
+    └── test_diagnostic_run.py       Hausman/BP/CD/VIF diagnostic plugins (Sprint 5)
 ```
 
 ---
@@ -138,8 +150,9 @@ duplicating:
 | `load_yaml_safe(path)` | function | validate, info |
 
 **Registry-driven validation**: `validate.py` derives `_SUPPORTED_ESTIMATORS`
-from `ESTIMATOR_REGISTRY` (defined in `info.py`).  Adding a new implemented
-estimator to the registry automatically makes it accepted by `econflow validate`.
+from `list_estimators()` (Sprint 5 live registry).  Adding a new `@register()`ed
+estimator automatically makes it accepted by `econflow validate` and visible in
+`econflow info` — no manual list updates needed.
 
 ---
 
@@ -154,67 +167,4 @@ Two namespace overlaps are intentional and will be resolved during the scaffold 
 
 **Active** (`data/`, `econometrics/`, `features/`, `visualization/`, `reporting/`,
 `pipeline.py`, `provenance.py`, `cli.py`) — production code used by
-`run_pipeline.py` in the paper repo. All 109 tests cover this layer.
-
-**Scaffold** (`core/`, `ingestion/`, `processing/`, `estimation/`, `diagnostics/`,
-`sensitivity/`, `outputs/`) — target architecture stubs.
-These will be populated in Sprints 3–8 as the migration progresses. The scaffold
-is imported by `projects/` configs but does not execute real logic yet.
-
-The migration roadmap is in `docs/development/SPRINT_MIGRATION_ROADMAP.md`.
-
----
-
-## Pipeline (Active)
-
-`econflow.pipeline.run()` executes five subsystems in order:
-
-```
-validate_data → load_panel → econometrics suites → figures → narratives
-```
-
----
-
-## Exception Hierarchy (Active)
-
-```
-AIProdError
-├── DataValidationError
-├── MergeError
-├── PipelineError
-└── ModelSpecificationError
-```
-
-Extended hierarchy (scaffold, `core/exceptions.py`):
-
-```
-EconFlowCoreError
-├── ConfigurationError  └── MissingConfigKeyError
-├── RegistryError       └── ProjectNotFoundError
-├── PipelineError       └── StageExecutionError
-├── IngestionError      ├── DownloadError, CacheError
-├── ProcessingError     ├── HarmonisationError, TransformationError
-├── EstimationError     └── ConvergenceError
-├── DiagnosticsError
-└── OutputError
-```
-
----
-
-### Exception hierarchy relationship
-
-`econflow.exceptions` (active layer) and `econflow.core.exceptions` (scaffold layer) are two independent trees with separate roots. `EconFlowError` covers domain errors that callers handle today (`DataValidationError`, `MergeError`, etc.). `EconFlowCoreError` covers infrastructure errors in the scaffold (`ConfigurationError`, `IngestionError`, etc.) and will become the unified root once the scaffold migration completes. `AIProdError` and `APRPError` are deprecated aliases retained for backward compatibility; both will be removed in v0.3.0.
-
----
-
-## Testing
-
-```bash
-pytest                          # all tests
-pytest tests/regression/        # regression helper tests (49)
-pytest tests/test_provenance.py # ProvenanceRecorder (35)
-```
-
-Known baseline issue: `ai_index_levels_fe` reference output (n=1,144) was
-produced from an intermediate dataset. Current platform produces n=2,053.
-Root cause documented in the paper repo's `outputs/FORENSIC_REPORT_ai_index_levels_fe.md`.
+`run_pipe

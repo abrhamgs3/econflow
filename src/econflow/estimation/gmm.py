@@ -1,96 +1,69 @@
 """
-econflow.estimation.gmm — GMM estimators (Arellano-Bond / Blundell-Bond).
+econflow.estimation.gmm — System GMM estimator (stub).
 
-Implements difference-GMM (Arellano-Bond 1991) and system-GMM
-(Blundell-Bond 1998) for dynamic panel models of the form:
-
-    y_{it} = ρ·y_{i,t-1} + β·X_{it} + α_i + u_{it}
-
-These estimators are appropriate when the lagged dependent variable is
-included as a regressor, making within-group (FE) estimates inconsistent for
-short-T panels (Nickell bias).
-
-Internal moment conditions use lagged levels (AB) or lagged differences (BB)
-as instruments for the first-differenced equation.
-
-Usage (once implemented)
--------------------------
-    from econflow.estimation.gmm import GMMEstimator
-    model = GMMEstimator(
-        dependent="tfp_growth",
-        regressors=["aipi", "log_hc"],
-        lag_dep=True,
-        gmm_type="system",
-        max_lag_instruments=4,
-    )
-    result = model.fit(panel)
+Implementation plan:
+* Use ``linearmodels.IV2SLS`` for a limited-information version, or
+* Integrate ``pydynpd`` (Arellano-Bond / Blundell-Bond) once available.
 """
 
 from __future__ import annotations
 
-from typing import Literal
-
 import pandas as pd
 
 from econflow.estimation.base import BaseEstimator, EstimationResult
+from econflow.estimation.registry import register
+from econflow.estimation.result import DiagnosticResult
 
-GMMType = Literal["difference", "system"]
 
-
-class GMMEstimator(BaseEstimator):
+@register(
+    "gmm",
+    label="System GMM",
+    status="stub",
+    notes="Arellano-Bond / Blundell-Bond; not yet implemented",
+    supported_data=["balanced_panel", "unbalanced_panel"],
+)
+class SystemGMM(BaseEstimator):
     """
-    Dynamic panel GMM estimator (Arellano-Bond or Blundell-Bond).
+    System GMM estimator (Arellano-Bond / Blundell-Bond).
 
-    Parameters
-    ----------
-    dependent:
-        Dependent variable column name.
-    regressors:
-        Strictly exogenous explanatory variable column names.
-    lag_dep:
-        Include the lagged dependent variable as a right-hand-side regressor.
-    gmm_type:
-        ``"difference"`` for Arellano-Bond; ``"system"`` for Blundell-Bond.
-    max_lag_instruments:
-        Maximum lag depth used for internal GMM instruments (default: 4).
-    entity_col / time_col:
-        Panel dimension identifiers.
-    cluster:
-        Column on which to cluster SEs.
+    **Status: stub.** Interface is complete; estimation logic is not yet
+    implemented.  Calling :meth:`fit` raises ``NotImplementedError``.
+
+    Parameters (``params`` dict keys)
+    -----------------------------------
+    dependent : str   Required.
+    regressors : list[str]   Required.
+    endog : list[str]   Endogenous regressors.  Default ``[]``.
+    lags : int   Number of lags to use as instruments.  Default ``2``.
+    entity_col : str   Default ``"entity"``.
+    time_col : str   Default ``"time"``.
     """
 
-    estimator_name = "gmm"
+    estimator_id = "gmm"
+    name = "System GMM"
+    description = (
+        "Dynamic panel estimator (Arellano-Bond / Blundell-Bond system GMM).  "
+        "Addresses endogeneity and lagged-dependent-variable bias via moment "
+        "conditions.  Not yet implemented."
+    )
+    supported_data = ["balanced_panel", "unbalanced_panel"]
+    required_parameters = ["dependent", "regressors"]
+    optional_parameters = {
+        "endog": [],
+        "lags": 2,
+        "entity_col": "entity",
+        "time_col": "time",
+    }
 
-    def __init__(
-        self,
-        dependent: str,
-        regressors: list[str],
-        lag_dep: bool = True,
-        gmm_type: GMMType = "system",
-        max_lag_instruments: int = 4,
-        entity_col: str = "iso3",
-        time_col: str = "year",
-        cluster: str | None = None,
-    ) -> None:
-        super().__init__(dependent, regressors, entity_col, time_col, cluster)
-        self.lag_dep = lag_dep
-        self.gmm_type = gmm_type
-        self.max_lag_instruments = max_lag_instruments
+    def validate(self, data: pd.DataFrame) -> None:
+        self._require_params("dependent", "regressors")
 
-    # ------------------------------------------------------------------
-    # BaseEstimator interface
-    # ------------------------------------------------------------------
+    def fit(self, data: pd.DataFrame) -> EstimationResult:
+        raise NotImplementedError(
+            "SystemGMM.fit() is not yet implemented.  "
+            "This estimator is a documented stub.  "
+            "See the module docstring for the implementation plan."
+        )
 
-    def fit(self, df: pd.DataFrame) -> EstimationResult:
-        """
-        Estimate the GMM model on *df*.
-
-        Stores the Sargan-Hansen J-statistic and AR(1)/AR(2) test results
-        in ``result.extra``.
-
-        Raises
-        ------
-        econflow.core.exceptions.ConvergenceError
-            If the GMM optimisation fails to converge.
-        """
-        raise NotImplementedError
+    def diagnostics(self, result: EstimationResult) -> list[DiagnosticResult]:
+        return []

@@ -1,148 +1,290 @@
 """
 econflow.estimation.base — Abstract estimator interface.
 
-All APRP estimators subclass :class:`BaseEstimator` and return a
-:class:`EstimationResult` dataclass.  This contract allows the sensitivity
-runner, diagnostic suite, and output renderers to operate uniformly across
-model specifications.
+All EconFlow estimators inherit from :class:`BaseEstimator` and return an
+:class:`EstimationResult`.  This contract allows the sensitivity runner,
+diagnostic suite, and output renderers to operate uniformly across model
+specifications.
 
-Result contract
----------------
-Every :class:`EstimationResult` must expose:
-* ``params``   — coefficient point estimates (``pd.Series``).
-* ``std_err``  — standard errors (``pd.Series``).
-* ``pvalues``  — two-sided p-values (``pd.Series``).
-* ``nobs``     — number of observations used.
-* ``rsquared`` — R-squared or pseudo-R-squared.
-* ``extra``    — dict of estimator-specific statistics (F-stat, J-stat, etc.).
+The class-level attributes provide self-documenting metadata that is surfaced
+by ``econflow info`` and can be validated by the config system before any data
+is loaded.
+
+Backward compatibility
+-----------------------
+``EstimationResult`` is still importable from this module — all existing
+``from econflow.estimation.base import EstimationResult`` statements continue
+to work without modification.
 """
 
 from __future__ import annotations
 
 import abc
-from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any
 
 import pandas as pd
 
+# Re-export for backward compat (diagnostics/*, outputs/*, sensitivity/* all
+# import EstimationResult from here).
+from econflow.estimation.result import DiagnosticResult, EstimationResult
 
-@dataclass
-class EstimationResult:
+__all__ = ["BaseEstimator", "EstimationResult", "DiagnosticResult", "EstimatorError"]
+
+
+# ---------------------------------------------------------------------------
+# Estimator-level exception
+# ---------------------------------------------------------------------------
+
+class EstimatorError(Exception):
     """
-    Standardised container for econometric estimation output.
-
-    Attributes
-    ----------
-    estimator_name:
-        String identifier for the estimator class.
-    params:
-        Coefficient point estimates indexed by variable name.
-    std_err:
-        Standard errors aligned with *params*.
-    pvalues:
-        Two-sided p-values aligned with *params*.
-    conf_int:
-        95 % confidence intervals as a two-column DataFrame.
-    nobs:
-        Effective sample size.
-    rsquared:
-        R-squared or within-R-squared (FE models).
-    extra:
-        Estimator-specific supplementary statistics.
-    """
-
-    estimator_name: str
-    params: pd.Series
-    std_err: pd.Series
-    pvalues: pd.Series
-    conf_int: pd.DataFrame
-    nobs: int
-    rsquared: float
-    extra: dict[str, Any] = field(default_factory=dict)
-
-    # ------------------------------------------------------------------
-    # Derived statistics
-    # ------------------------------------------------------------------
-
-    @property
-    def tvalues(self) -> pd.Series:
-        """t-statistics computed as ``params / std_err``."""
-        return self.params / self.std_err
-
-    def summary_frame(self) -> pd.DataFrame:
-        """
-        Return a tidy DataFrame combining params, std_err, t-values,
-        p-values, and confidence intervals.
-        """
-        raise NotImplementedError
-
-
-class BaseEstimator(abc.ABC):
-    """
-    Abstract base for all APRP panel estimators.
+    Raised when an estimator cannot complete its work.
 
     Parameters
     ----------
-    dependent:
-        Column name of the dependent variable.
-    regressors:
-        Column names of the explanatory variables (excluding constant).
-    entity_col:
-        Column name for the cross-sectional identifier.
-    time_col:
-        Column name for the time period.
-    cluster:
-        Column name on which to cluster standard errors, or ``None``.
+    message:
+        Human-readable description of the failure.
+    estimator_id:
+        Registry ID of the failing estimator.
+    cause:
+        Original exception, if any.
     """
-
-    estimator_name: str = "base"
 
     def __init__(
         self,
-        dependent: str,
-        regressors: list[str],
-        entity_col: str = "iso3",
-        time_col: str = "year",
-        cluster: str | None = None,
+        message: str,
+        *,
+        estimator_id: str = "",
+        cause: Exception | None = None,
     ) -> None:
-        self.dependent = dependent
-        self.regressors = regressors
-        self.entity_col = entity_col
-        self.time_col = time_col
-        self.cluster = cluster
+        super().__init__(message)
+        self.estimator_id = estimator_id
+        self.cause = cause
+
+    def __str__(self) -> str:
+        base = super().__str__()
+        if self.estimator_id:
+            base = f"[{self.estimator_id}] {base}"
+        if self.cause:
+            base = f"{base}\nCaused by: {self.cause!r}"
+        return base
+
+
+# ---------------------------------------------------------------------------
+# Abstract base estimator
+# ---------------------------------------------------------------------------
+
+class BaseEstimator(abc.ABC):
+    """
+    Abstract base for all EconFlow panel estimators.
+
+    Subclasses must:
+
+    1. Set class-level metadata attributes (``name``, ``description``, …).
+    2. Implement :meth:`validate`, :meth:`fit`, and :meth:`diagnostics`.
+    3. Decorate the class with ``@register(estimator_id)``.
+
+    The concrete :meth:`run` method chains ``validate → fit → diagnostics``
+    and returns the enriched :class:`EstimationResult`.
+
+    Class attributes
+    ----------------
+    estimator_id:
+        Short registry key set by ``@register()`` (e.g. ``"twfe"``).
+    name:
+        Human-readable name.
+    description:
+        One-paragraph description of the estimator.
+    supported_data:
+        Data formats the estimator accepts (e.g. ``["balanced_panel",
+        "unbalanced_panel"]``).
+    required_parameters:
+        Parameter names that *must* be present in the ``params`` dict
+        passed to the constructor.
+    optional_parameters:
+        Parameter names that *may* be present with their default values.
+    """
+
+    # Subclasses should override these
+    estimator_id: str = "base"
+    name: str = "BaseEstimator"
+    description: str = ""
+    supported_data: list[str] = ["panel"]
+    required_parameters: list[str] = ["dependent", "regressors"]
+    optional_parameters: dict[str, Any] = {}
+
+    def __init__(self, params: dict[str, Any] | None = None) -> None:
+        """
+        Parameters
+        ----------
+        params:
+            Configuration dict.  At minimum must contain the keys listed in
+            :attr:`required_parameters`.  Validated by :meth:`validate`.
+        """
+        self.params: dict[str, Any] = dict(params or {})
 
     # ------------------------------------------------------------------
-    # Abstract interface
+    # Abstract interface — subclasses must implement these
     # ------------------------------------------------------------------
 
     @abc.abstractmethod
-    def fit(self, df: pd.DataFrame) -> EstimationResult:
+    def validate(self, data: pd.DataFrame) -> None:
         """
-        Fit the model on *df* and return an :class:`EstimationResult`.
+        Validate *data* and ``self.params`` before estimation.
+
+        Should raise :class:`EstimatorError` with a descriptive message if
+        validation fails.  Does not return a value.
 
         Parameters
         ----------
-        df:
+        data:
+            Wide-format panel DataFrame.
+        """
+
+    @abc.abstractmethod
+    def fit(self, data: pd.DataFrame) -> EstimationResult:
+        """
+        Estimate the model and return a populated :class:`EstimationResult`.
+
+        Parameters
+        ----------
+        data:
             Wide-format panel DataFrame containing all referenced columns.
         """
 
+    @abc.abstractmethod
+    def diagnostics(self, result: EstimationResult) -> list[DiagnosticResult]:
+        """
+        Compute post-estimation diagnostics.
+
+        Returns a list of :class:`DiagnosticResult` objects to be attached
+        to the result.  Return an empty list if no diagnostics are applicable
+        or if the estimator is a stub.
+
+        Parameters
+        ----------
+        result:
+            The :class:`EstimationResult` returned by :meth:`fit`.
+        """
+
     # ------------------------------------------------------------------
-    # Concrete helpers
+    # Optional interface — subclasses may override
     # ------------------------------------------------------------------
 
-    def _validate_columns(self, df: pd.DataFrame) -> None:
+    def predict(
+        self,
+        result: EstimationResult,
+        newdata: pd.DataFrame | None = None,
+    ) -> pd.Series:
         """
-        Assert that all required columns are present in *df*.
+        Generate predictions from a fitted result.
+
+        Default implementation applies the estimated coefficients to
+        *newdata* (or the original sample if *newdata* is ``None``).
+        Subclasses should override for more specialised prediction logic.
+
+        Parameters
+        ----------
+        result:
+            A fitted :class:`EstimationResult`.
+        newdata:
+            DataFrame to predict on.  Must contain all regressor columns.
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__}.predict() is not implemented. "
+            "Override this method to provide prediction logic."
+        )
+
+    # ------------------------------------------------------------------
+    # Concrete convenience wrapper
+    # ------------------------------------------------------------------
+
+    def run(self, data: pd.DataFrame) -> EstimationResult:
+        """
+        Full estimation pipeline: ``validate → fit → diagnostics``.
+
+        Equivalent to::
+
+            estimator.validate(data)
+            result = estimator.fit(data)
+            result.diagnostic_results = estimator.diagnostics(result)
+            return result
+
+        Parameters
+        ----------
+        data:
+            Wide-format panel DataFrame.
+
+        Returns
+        -------
+        EstimationResult
+            Fully populated result with diagnostic results attached.
+        """
+        self.validate(data)
+        result = self.fit(data)
+        result.diagnostic_results = self.diagnostics(result)
+        return result
+
+    # ------------------------------------------------------------------
+    # Shared helpers available to all subclasses
+    # ------------------------------------------------------------------
+
+    def _require_params(self, *keys: str) -> None:
+        """
+        Assert that all *keys* are present and non-empty in ``self.params``.
 
         Raises
         ------
-        econflow.core.exceptions.EstimationError
-            If any column is missing.
+        EstimatorError
+            With a list of missing keys.
         """
-        raise NotImplementedError
+        missing = [k for k in keys if not self.params.get(k)]
+        if missing:
+            raise EstimatorError(
+                f"Missing required parameters: {missing}",
+                estimator_id=self.estimator_id,
+            )
+
+    def _require_columns(self, data: pd.DataFrame, *cols: str) -> None:
+        """
+        Assert that all *cols* are present in *data*.
+
+        Raises
+        ------
+        EstimatorError
+            With the list of missing column names.
+        """
+        missing = [c for c in cols if c not in data.columns]
+        if missing:
+            raise EstimatorError(
+                f"Missing columns in data: {missing}",
+                estimator_id=self.estimator_id,
+            )
+
+    def _to_panel(
+        self,
+        data: pd.DataFrame,
+        entity_col: str,
+        time_col: str,
+    ) -> pd.DataFrame:
+        """
+        Set a (entity, time) MultiIndex required by linearmodels.
+
+        Returns a copy of *data* with the MultiIndex set and columns
+        sorted for determinism.
+        """
+        return data.set_index([entity_col, time_col]).sort_index()
+
+    def _provenance_stamp(self) -> dict[str, Any]:
+        """Return a provenance dict with current UTC timestamp, version, and params."""
+        from econflow import __version__
+        return {
+            "estimator_id":    self.estimator_id,
+            "econflow_version": __version__,
+            "timestamp_utc":   datetime.now(tz=timezone.utc).isoformat(),
+            "params": {k: v for k, v in self.params.items()
+                       if isinstance(v, (str, int, float, bool, list, type(None)))},
+        }
 
     def __repr__(self) -> str:
-        return (
-            f"<{self.__class__.__name__} "
-            f"dep='{self.dependent}' regressors={self.regressors}>"
-        )
+        return f"<{self.__class__.__name__} params={self.params!r}>"

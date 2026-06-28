@@ -1,9 +1,8 @@
 """
-econflow.estimation.random_effects — Random effects (GLS) estimator.
+econflow.estimation.first_difference — First-difference estimator.
 
-Uses ``linearmodels.RandomEffects`` (Swamy-Arora GLS).  The Hausman test
-should be run first to verify that random effects is consistent for the
-data at hand; rejection favours the FE estimator.
+Eliminates entity fixed effects by differencing consecutive observations.
+Uses ``linearmodels.FirstDifferenceOLS``.
 """
 
 from __future__ import annotations
@@ -16,15 +15,15 @@ from econflow.estimation.result import DiagnosticResult
 
 
 @register(
-    "re",
-    label="Random Effects (GLS)",
+    "fd",
+    label="First Difference",
     status="implemented",
-    notes="linearmodels.RandomEffects (Swamy-Arora); use Hausman test to validate",
+    notes="linearmodels.FirstDifferenceOLS; eliminates entity FE by differencing",
     supported_data=["balanced_panel", "unbalanced_panel"],
 )
-class RandomEffects(BaseEstimator):
+class FirstDifference(BaseEstimator):
     """
-    Random-effects GLS estimator (Swamy-Arora variance decomposition).
+    First-difference estimator.
 
     Parameters (``params`` dict keys)
     -----------------------------------
@@ -32,14 +31,15 @@ class RandomEffects(BaseEstimator):
     regressors : list[str]   Required.
     entity_col : str   Default ``"entity"``.
     time_col : str   Default ``"time"``.
-    cov_type : str   ``"robust"`` (default) or ``"clustered"``.
+    cov_type : str   Default ``"robust"``.
     """
 
-    estimator_id = "re"
-    name = "Random Effects (GLS)"
+    estimator_id = "fd"
+    name = "First Difference"
     description = (
-        "Random-effects GLS estimator assuming individual effects are "
-        "uncorrelated with the regressors.  Run Hausman test to validate."
+        "First-difference estimator.  Eliminates entity fixed effects by "
+        "differencing consecutive time periods.  Consistent under strict "
+        "exogeneity; less efficient than FE when T > 2."
     )
     supported_data = ["balanced_panel", "unbalanced_panel"]
     required_parameters = ["dependent", "regressors"]
@@ -58,7 +58,7 @@ class RandomEffects(BaseEstimator):
         self._require_columns(data, dep, entity_col, time_col, *regs)
 
     def fit(self, data: pd.DataFrame) -> EstimationResult:
-        from linearmodels import RandomEffects as _RE  # noqa: PLC0415
+        from linearmodels import FirstDifferenceOLS as _FD  # noqa: PLC0415
 
         dep = self.params["dependent"]
         regs = self.params["regressors"]
@@ -72,11 +72,11 @@ class RandomEffects(BaseEstimator):
         X = panel[regs]
 
         try:
-            mod = _RE(y, X)
+            mod = _FD(y, X)
             res = mod.fit(cov_type=cov_type)
         except Exception as exc:
             raise EstimatorError(
-                f"RandomEffects fitting failed: {exc}",
+                f"FirstDifferenceOLS fitting failed: {exc}",
                 estimator_id=self.estimator_id, cause=exc,
             ) from exc
 

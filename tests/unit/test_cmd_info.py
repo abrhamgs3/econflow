@@ -24,9 +24,11 @@ from typer.testing import CliRunner
 
 from econflow.cli import app
 from econflow.commands.info import (
-    DATA_CONNECTOR_REGISTRY,
     ESTIMATOR_REGISTRY,
+    _load_connector_registry,
 )
+
+DATA_CONNECTOR_REGISTRY = _load_connector_registry()
 
 runner = CliRunner()
 
@@ -254,8 +256,8 @@ def test_info_shows_provenance_when_metadata_exists(tmp_path: Path) -> None:
 
 def test_estimator_registry_has_ols_and_fe() -> None:
     ids = {e["id"] for e in ESTIMATOR_REGISTRY}
-    assert "OLS" in ids
-    assert "FE" in ids
+    assert "ols" in ids
+    assert "fe" in ids
 
 
 def test_estimator_registry_all_have_required_keys() -> None:
@@ -280,7 +282,7 @@ def test_connector_registry_all_have_required_keys() -> None:
 
 def test_ols_and_fe_are_implemented() -> None:
     for est in ESTIMATOR_REGISTRY:
-        if est["id"] in ("OLS", "FE"):
+        if est["id"] in ("ols", "fe"):
             assert est["status"] == "implemented", (
                 f"Estimator {est['id']} should be implemented"
             )

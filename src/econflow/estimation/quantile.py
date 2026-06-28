@@ -1,101 +1,76 @@
 """
-econflow.estimation.quantile — Panel quantile regression.
+econflow.estimation.quantile — Panel quantile regression (stub).
 
-Estimates conditional quantile functions for panel data, allowing
-heterogeneous AI-productivity effects across the TFP growth distribution.
-
-Implementation approaches (once implemented)
----------------------------------------------
-* **Powell (2016)** — Panel quantile regression via instrumental-variables
-  approach (consistent with fixed effects).
-* **Machado-Santos Silva (2019)** — Method of moments quantile regression
-  (MMQR) via ``linearmodels`` (if supported).
-* **Koenker (2004)** — Penalised fixed-effects quantile regression.
-
-Usage (once implemented)
--------------------------
-    from econflow.estimation.quantile import PanelQuantile
-    model = PanelQuantile(
-        dependent="tfp_growth",
-        regressors=["aipi", "log_hc"],
-        quantiles=[0.1, 0.25, 0.5, 0.75, 0.9],
-    )
-    results = model.fit(panel)   # returns dict[float, EstimationResult]
+Implementation plan:
+* Use ``statsmodels.regression.quantile_regression.QuantReg`` for pooled
+  quantile regression as a first step.
+* A full panel quantile estimator (Koenker 2004, or Canay 2011) requires
+  additional implementation work.
 """
 
 from __future__ import annotations
 
-from typing import Literal
-
 import pandas as pd
 
 from econflow.estimation.base import BaseEstimator, EstimationResult
+from econflow.estimation.registry import register
+from econflow.estimation.result import DiagnosticResult
 
-QuantileMethod = Literal["powell", "mmqr", "koenker"]
 
-
+@register(
+    "quantile",
+    label="Panel Quantile Regression",
+    status="stub",
+    notes="Koenker (2004) / Canay (2011); not yet implemented",
+    supported_data=["balanced_panel", "unbalanced_panel"],
+)
 class PanelQuantile(BaseEstimator):
     """
     Panel quantile regression estimator.
 
-    Parameters
-    ----------
-    dependent:
-        Dependent variable column name.
-    regressors:
-        Explanatory variable column names.
-    quantiles:
-        Target quantiles in (0, 1).  Defaults to deciles [0.1, …, 0.9].
-    method:
-        Estimation method.
-    entity_col / time_col:
-        Panel dimension identifiers.
-    n_bootstrap:
-        Bootstrap replications for SE estimation (0 disables bootstrap SEs).
+    **Status: stub.**  Interface is complete; estimation logic is not yet
+    implemented.  Calling :meth:`fit` raises ``NotImplementedError``.
+
+    Parameters (``params`` dict keys)
+    -----------------------------------
+    dependent : str   Required.
+    regressors : list[str]   Required.
+    quantile : float   Quantile to estimate (e.g. ``0.5`` for median).  Default ``0.5``.
+    entity_col : str   Default ``"entity"``.
+    time_col : str   Default ``"time"``.
     """
 
-    estimator_name = "panel_quantile"
+    estimator_id = "quantile"
+    name = "Panel Quantile Regression"
+    description = (
+        "Panel quantile regression (Koenker 2004 / Canay 2011).  "
+        "Estimates conditional quantiles of the dependent variable.  "
+        "Not yet implemented."
+    )
+    supported_data = ["balanced_panel", "unbalanced_panel"]
+    required_parameters = ["dependent", "regressors"]
+    optional_parameters = {
+        "quantile": 0.5,
+        "entity_col": "entity",
+        "time_col": "time",
+    }
 
-    def __init__(
-        self,
-        dependent: str,
-        regressors: list[str],
-        quantiles: list[float] | None = None,
-        method: QuantileMethod = "mmqr",
-        entity_col: str = "iso3",
-        time_col: str = "year",
-        n_bootstrap: int = 200,
-    ) -> None:
-        super().__init__(dependent, regressors, entity_col, time_col, cluster=None)
-        self.quantiles = quantiles or [0.1, 0.25, 0.5, 0.75, 0.9]
-        self.method = method
-        self.n_bootstrap = n_bootstrap
+    def validate(self, data: pd.DataFrame) -> None:
+        self._require_params("dependent", "regressors")
+        q = self.params.get("quantile", 0.5)
+        if not (0 < q < 1):
+            from econflow.estimation.base import EstimatorError  # noqa: PLC0415
+            raise EstimatorError(
+                f"quantile must be in (0, 1), got {q}.",
+                estimator_id=self.estimator_id,
+            )
 
-    # ------------------------------------------------------------------
-    # BaseEstimator interface
-    # ------------------------------------------------------------------
+    def fit(self, data: pd.DataFrame) -> EstimationResult:
+        raise NotImplementedError(
+            "PanelQuantile.fit() is not yet implemented.  "
+            "This estimator is a documented stub.  "
+            "See the module docstring for the implementation plan."
+        )
 
-    def fit(self, df: pd.DataFrame) -> dict[float, EstimationResult]:  # type: ignore[override]
-        """
-        Estimate quantile models for all requested *quantiles*.
-
-        Returns
-        -------
-        dict[float, EstimationResult]
-            Mapping of quantile → result.
-
-        Raises
-        ------
-        econflow.core.exceptions.ConvergenceError
-            If any quantile optimisation fails.
-        """
-        raise NotImplementedError
-
-    def coefficient_plot_data(
-        self, results: dict[float, EstimationResult], variable: str
-    ) -> pd.DataFrame:
-        """
-        Extract per-quantile estimates for *variable* into a tidy DataFrame
-        suitable for a coefficient path plot.
-        """
-        raise NotImplementedError
+    def diagnostics(self, result: EstimationResult) -> list[DiagnosticResult]:
+        return []
