@@ -23,6 +23,10 @@ econflow info
 econflow run [OPTIONS]
     Execute the analysis pipeline (generic or legacy mode).
 
+econflow report [OUTPUT_DIR]
+    Render estimation results into a publication-ready bundle
+    (tables in CSV / LaTeX / Markdown / HTML, figures as JSON).
+
 Examples
 --------
     $ econflow --version
@@ -455,6 +459,63 @@ def run(
     console.print()
 
     _output_summary(tables_dir, figures_dir, paper_dir, elapsed)
+
+
+# ---------------------------------------------------------------------------
+# report
+# ---------------------------------------------------------------------------
+
+@app.command()
+def report(
+    output_dir: Path = typer.Argument(
+        None,
+        help="Directory where output files are written.  "
+             "Defaults to outputs/econflow/ inside the project directory.",
+    ),
+    formats: str = typer.Option(
+        "csv,latex,markdown,html",
+        "--formats",
+        help="Comma-separated renderer ids to apply to tables.",
+        show_default=True,
+    ),
+    overwrite: bool = typer.Option(
+        True,
+        "--overwrite/--no-overwrite",
+        help="Overwrite an existing output directory.",
+        show_default=True,
+    ),
+    config: Path = typer.Option(
+        None,
+        "--config", "-c",
+        help="Path to project config.yaml.",
+    ),
+) -> None:
+    """Render a PublicationBundle from the last pipeline run.
+
+    Writes tables (CSV, LaTeX, Markdown, HTML) and figures (JSON) into
+    a structured directory.  Run 'econflow run' first to generate
+    estimation results.
+
+    Examples:
+
+        # Render with all default formats
+        econflow report
+
+        # Render to a custom directory with LaTeX + CSV only
+        econflow report outputs/paper --formats csv,latex
+    """
+    from econflow.commands.report import run_report
+
+    resolved_dir = output_dir or Path.cwd() / "outputs" / "econflow"
+    exit_code = run_report(
+        output_dir=resolved_dir,
+        formats=formats,
+        overwrite=overwrite,
+        config_path=config,
+        console=console,
+    )
+    if exit_code != 0:
+        raise typer.Exit(code=exit_code)
 
 
 def _output_summary(

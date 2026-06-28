@@ -9,6 +9,68 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Sprint 6 — Reporting & Publication Engine (2026-06-28)
+
+#### Added
+- `src/econflow/outputs/model.py`: `ReportTable` and `ReportFigure` dataclasses
+  with full serialisation (`to_dict` / `to_json` / `from_dict`).  `TableRow`
+  carries pre-formatted strings — renderers handle structure, not content.
+- `src/econflow/outputs/registry.py`: `@register_renderer()` decorator,
+  `get_renderer()`, `list_renderers()`, `unregister_renderer()`.  Raises
+  `RegistryError` on duplicate or unknown id.
+- `src/econflow/outputs/base.py`: `BaseRenderer` ABC with abstract `render()`
+  and concrete `render_to_file()`.  `RendererError` for typed failure reporting.
+- `src/econflow/outputs/renderers/`: 5 built-in renderers — `CSVRenderer`,
+  `JSONRenderer`, `MarkdownRenderer` (GFM), `HTMLRenderer`, `LaTeXRenderer`
+  (booktabs).  All self-register at import via `@register_renderer()`.
+- `src/econflow/outputs/tables/regression.py`: `build_regression_table()` —
+  full implementation.  Coefficient rows with SE sub-rows, significance stars
+  (configurable thresholds), footer stats (N, R², estimator, FE indicators),
+  column labels, variable ordering and display labels.
+- `src/econflow/outputs/tables/summary_stats.py`: `build_summary_stats_table()`
+  — full implementation.  N, Mean, Std Dev, Min, configurable percentiles, Max.
+  Excludes non-numeric columns automatically.
+- `src/econflow/outputs/tables/`: 6 complete-interface stubs — `balance.py`,
+  `correlation.py`, `robustness.py`, `sensitivity.py`, `falsification.py`,
+  `heterogeneity.py`.  Each module documents the full intended interface.
+- `src/econflow/outputs/figures/base.py`: `FigureBuilder` ABC.
+- `src/econflow/outputs/figures/coefficient_plot.py`: `CoefficientPlot` — full
+  implementation.  Forest-style coefficient plot data with CI bounds from
+  configurable z-score, sort options, variable subset and label mapping.
+- `src/econflow/outputs/figures/ci_plot.py`: `CIPlot` — full implementation.
+  Focal-variable CI comparison across specifications.
+- `src/econflow/outputs/figures/`: 4 stubs — `ResidualFigure`,
+  `DistributionFigure`, `EventStudyFigure`, `RobustnessComparisonFigure`.
+- `src/econflow/outputs/diagnostics_report.py`: `build_diagnostics_report()` —
+  converts `list[DiagnosticResult]` to a `ReportTable` with Pass/Fail/N/A
+  conclusions, optional grouping by estimator.
+- `src/econflow/outputs/bundle.py`: `PublicationBundle` — chainable API for
+  collecting tables and figures and writing them to a structured output
+  directory with `manifest.json`.
+- `src/econflow/outputs/__init__.py` (rewrite): complete public API re-exporting
+  all model objects, registry functions, table builders, figure builders,
+  diagnostics builder, and `PublicationBundle`.
+- `src/econflow/commands/report.py`: `run_report()` backing function for the
+  `econflow report` CLI command.
+- `src/econflow/cli.py`: `econflow report` command registered via
+  `@app.command()`.
+- `docs/architecture/REPORTING_ENGINE.md`: full architecture documentation for
+  Sprint 6 (454 lines).
+- **158 new tests** across 5 new test modules:
+  `tests/unit/test_report_model.py`,
+  `tests/unit/test_renderer_registry.py`,
+  `tests/unit/test_renderers.py`,
+  `tests/unit/test_table_builders.py`,
+  `tests/unit/test_figure_builders.py`,
+  `tests/integration/test_outputs_pipeline.py`.
+
+#### Fixed
+- `src/econflow/outputs/diagnostics_report.py`: `_conclusion()` uses
+  `DiagnosticResult.level` (not the non-existent `passed`/`message` fields);
+  estimator grouping uses `extra["estimator_id"]` instead of missing
+  `estimator_id` attribute.
+
+
 ### Sprint 5 — Estimation Framework (2026-06-28)
 
 #### Added

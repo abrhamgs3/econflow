@@ -1,13 +1,15 @@
 """
-econflow.outputs.base — Abstract output renderer interface.
+econflow.outputs.base — BaseRenderer abstract class and RendererError.
 
-All APRP renderers subclass :class:`BaseRenderer` and implement
-:meth:`render`.  This uniform interface allows the pipeline to drive output
-generation without knowing the concrete renderer type.
+Every renderer must:
 
-Renderers receive typed inputs (DataFrames, EstimationResult objects) and
-write artefacts (files) to a project output directory, returning the paths of
-the files created.
+1. Inherit from :class:`BaseRenderer`.
+2. Implement :meth:`render` which converts a :class:`ReportTable` to a
+   string in the renderer's format.
+3. Register itself with ``@register_renderer("id")``.
+
+:meth:`render_to_file` is provided as a concrete helper — subclasses
+should not need to override it.
 """
 
 from __future__ import annotations
@@ -16,66 +18,116 @@ import abc
 from pathlib import Path
 from typing import Any
 
+from econflow.outputs.model import ReportTable
+
+
+class RendererError(Exception):
+    """Raised when a renderer fails to produce output."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        renderer_id: str = "",
+        cause: Exception | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.renderer_id = renderer_id
+        self.cause = cause
+
+    def __str__(self) -> str:
+        base = super().__str__()
+        if self.renderer_id:
+            base = f"[{self.renderer_id}] {base}"
+        return base
+
 
 class BaseRenderer(abc.ABC):
     """
-    Abstract base class for output renderers.
+    Abstract base class for all EconFlow table renderers.
 
-    Parameters
-    ----------
-    output_dir:
-        Root directory for rendered output artefacts.
-    overwrite:
-        Whether to overwrite existing files.  Default ``True``.
+    Subclasses implement :meth:`render` to convert a :class:`ReportTable`
+    into a string.  The default :meth:`render_to_file` writes that string
+    to disk.
+
+    Class attributes
+    ----------------
+    renderer_id:
+        Set automatically by ``@register_renderer()``.
+    name:
+        Human-readable renderer name.
+    file_extension:
+        Default output file extension (e.g. ``".csv"``).
     """
 
-    #: Human-readable renderer name (set by subclasses).
-    renderer_name: str = ""
-
-    def __init__(self, output_dir: str | Path, overwrite: bool = True) -> None:
-        self.output_dir = Path(output_dir)
-        self.overwrite = overwrite
+    renderer_id: str = "base"
+    name: str = "BaseRenderer"
+    file_extension: str = ".txt"
 
     # ------------------------------------------------------------------
     # Abstract interface
     # ------------------------------------------------------------------
 
     @abc.abstractmethod
-    def render(self, data: Any, filename: str, **kwargs: Any) -> Path:
+    def render(self, table: ReportTable, **kwargs: Any) -> str:
         """
-        Render *data* and write to ``output_dir / filename``.
+        Convert *table* to a formatted string.
 
         Parameters
         ----------
-        data:
-            Input data to render (type depends on the concrete renderer).
-        filename:
-            Output filename (without directory prefix).
+        table:
+            The table to render.
         **kwargs:
             Renderer-specific options.
 
         Returns
         -------
-        Path
-            Absolute path to the written artefact.
+        str
+            The rendered table as a string in the renderer's format.
 
         Raises
         ------
-        econflow.core.exceptions.OutputError
-            If rendering or writing fails.
-        FileExistsError
-            If the file already exists and ``overwrite=False``.
+        RendererError
+            If rendering fails.
         """
 
     # ------------------------------------------------------------------
     # Concrete helpers
     # ------------------------------------------------------------------
 
-    def _resolve_path(self, filename: str) -> Path:
-        """Return ``output_dir / filename``, creating parent directories."""
-        path = self.output_dir / filename
+    def render_to_file(
+        self,
+        table: ReportTable,
+        path: Path,
+        *,
+        encoding: str = "utf-8",
+        **kwargs: Any,
+    ) -> Path:
+        """
+        Render *table* and write the result to *path*.
+
+        Parameters
+        ----------
+        table:
+            The table to render.
+        path:
+            Destination file path.  Parent directories are created if
+            they do not exist.
+        encoding:
+            File encoding.  Default ``"utf-8"``.
+        **kwargs:
+            Passed through to :meth:`render`.
+
+        Returns
+        -------
+        Path
+            The resolved absolute path of the written file.
+        """
+        path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        return path
+        content = self.render(table, **kwargs)
+        path.write_text(content, encoding=encoding)
+        return path.resolve()
 
     def __repr__(self) -> str:
-        return f"<{self.__class__.__name__} output_dir='{self.output_dir}'>"
+        return f"<{self.__class__.__name__} id={self.renderer_id!r}>"
