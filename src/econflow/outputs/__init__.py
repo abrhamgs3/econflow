@@ -7,9 +7,9 @@ Model objects::
 
     from econflow.outputs import ReportTable, ReportFigure, TableRow
 
-Renderer registry::
+Renderer registry and errors::
 
-    from econflow.outputs import get_renderer, list_renderers, register_renderer
+    from econflow.outputs import get_renderer, list_renderers, register_renderer, RendererError
 
 Table builders::
 
@@ -33,9 +33,11 @@ Diagnostics & bundling::
     from econflow.outputs import build_diagnostics_report, PublicationBundle
 """
 
-# --- Model ------------------------------------------------------------------
 # --- Renderer registry (triggers side-effect imports) -----------------------
 import econflow.outputs.renderers  # noqa: F401  — registers all renderers
+
+# --- Base classes and errors ------------------------------------------------
+from econflow.outputs.base import RendererError
 
 # --- Diagnostics + bundle ---------------------------------------------------
 from econflow.outputs.bundle import PublicationBundle
@@ -68,6 +70,8 @@ __all__ = [
     "ReportTable",
     "ReportFigure",
     "TableRow",
+    # errors
+    "RendererError",
     # registry
     "get_renderer",
     "list_renderers",

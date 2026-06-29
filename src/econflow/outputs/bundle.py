@@ -33,6 +33,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from econflow.core.exceptions import RegistryError
 from econflow.outputs.model import ReportFigure, ReportTable
 from econflow.outputs.registry import get_renderer
 
@@ -109,7 +110,9 @@ class PublicationBundle:
         self.metadata = metadata or {}
 
         self._tables: list[TableEntry] = []
+        self._table_slugs: set[str] = set()
         self._figures: list[FigureEntry] = []
+        self._figure_slugs: set[str] = set()
         self._diagnostics: ReportTable | None = None
 
     # ------------------------------------------------------------------
@@ -139,10 +142,22 @@ class PublicationBundle:
         -------
         PublicationBundle
             *self*, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the resolved slug is already in use.
         """
+        resolved_slug = slug or _slugify(table.title)
+        if resolved_slug in self._table_slugs:
+            raise ValueError(
+                f"Duplicate table slug: {resolved_slug!r}. "
+                "Provide an explicit slug= to distinguish tables with the same title."
+            )
+        self._table_slugs.add(resolved_slug)
         self._tables.append(TableEntry(
             table=table,
-            slug=slug or _slugify(table.title),
+            slug=resolved_slug,
             formats=formats or self.table_formats,
         ))
         return self
@@ -163,10 +178,22 @@ class PublicationBundle:
         -------
         PublicationBundle
             *self*, for chaining.
+
+        Raises
+        ------
+        ValueError
+            If the resolved slug is already in use.
         """
+        resolved_slug = slug or _slugify(figure.title)
+        if resolved_slug in self._figure_slugs:
+            raise ValueError(
+                f"Duplicate figure slug: {resolved_slug!r}. "
+                "Provide an explicit slug= to distinguish figures with the same title."
+            )
+        self._figure_slugs.add(resolved_slug)
         self._figures.append(FigureEntry(
             figure=figure,
-            slug=slug or _slugify(figure.title),
+            slug=resolved_slug,
         ))
         return self
 
@@ -200,11 +227,32 @@ class PublicationBundle:
         ------
         FileExistsError
             If ``output_dir`` already exists and ``overwrite=False``.
+        ValueError
+            If any renderer id in the bundle is not registered.  Raised
+            before any files are written so no partial output is created.
         """
         if self.output_dir.exists() and not self.overwrite:
             raise FileExistsError(
                 f"output_dir already exists: {self.output_dir}. "
                 "Pass overwrite=True to allow overwriting."
+            )
+
+        # --- Pre-validate all renderer IDs before touching the filesystem ---
+        all_formats: set[str] = set()
+        for entry in self._tables:
+            all_formats.update(entry.formats)
+        if self._diagnostics is not None:
+            all_formats.update(("markdown", "latex"))
+        unknown: list[str] = []
+        for fmt in sorted(all_formats):
+            try:
+                get_renderer(fmt)
+            except RegistryError:
+                unknown.append(fmt)
+        if unknown:
+            raise ValueError(
+                f"Unknown renderer id(s): {unknown!r}. "
+                "Register them with @register_renderer() before calling write()."
             )
 
         tables_dir = self.output_dir / "tables"

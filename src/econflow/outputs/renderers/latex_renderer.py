@@ -46,7 +46,10 @@ def _esc(text: str) -> str:
     "latex",
     label="LaTeX (booktabs)",
     file_extension=".tex",
-    notes="Publication-quality LaTeX using booktabs; requires \\usepackage{booktabs}",
+    notes=(
+        "Publication-quality LaTeX using booktabs; requires \\usepackage{booktabs}. "
+        "Footer notes use a plain flushleft block — no extra packages needed."
+    ),
 )
 class LaTeXRenderer(BaseRenderer):
     """
@@ -55,6 +58,9 @@ class LaTeXRenderer(BaseRenderer):
     The output is a complete ``table`` environment with a ``tabular``
     body.  Labels and notes are escaped but significance stars (``*``)
     are preserved verbatim.
+
+    Footer notes are rendered inside a ``flushleft`` environment placed
+    after the ``tabular`` body — no additional packages are required.
 
     Parameters (passed via **kwargs to render())
     -------------------------------------------
@@ -137,15 +143,16 @@ class LaTeXRenderer(BaseRenderer):
         if label:
             lines.append(f"  \\label{{{label}}}")
 
-        # Notes
+        # Notes — plain flushleft block; no threeparttable package required.
         if table.footer or table.notes:
-            lines.append("  \\begin{tablenotes}")
-            lines.append("    \\small")
+            lines.append("  \\begin{flushleft}")
+            lines.append("    \\footnotesize")
             for note in table.footer:
-                lines.append(f"    \\item {_escape_latex(note)}")
+                lines.append(f"    {_escape_latex(note)} \\\\")
             if table.notes:
-                lines.append(f"    \\item \\textit{{Note:}} {_escape_latex(table.notes)}")
-            lines.append("  \\end{tablenotes}")
+                note_text = _escape_latex(table.notes)
+                lines.append(f"    \\textit{{Note:}} {note_text} \\\\")
+            lines.append("  \\end{flushleft}")
 
         lines.append("\\end{table}")
         return "\n".join(lines) + "\n"

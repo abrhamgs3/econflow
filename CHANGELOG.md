@@ -9,6 +9,173 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Sprint 10 — Replication Engine (2026-06-29)
+
+#### Added
+- `src/econflow/replication/` — new package implementing a three-command
+  automatic replication engine: `inspect` → `reproduce` → `compare`.
+- `src/econflow/replication/models.py`: shared dataclasses — `ProjectCheck`,
+  `InspectionReport`, `ExecutionStep`, `ExecutionPlan`, `StepResult`,
+  `ReplicationResult`, `OutputComparison`, `ComparisonReport`.
+- `src/econflow/replication/inspector.py`: `inspect_project()` — 8-point
+  pre-flight check (Python version, config files, data file, SHA-256 checksum,
+  estimator registry, dependencies).  Resolves data paths relative to the
+  config file's directory (CWD-independent).
+- `src/econflow/replication/planner.py`: `build_plan()` — deterministic
+  `ExecutionPlan` of validate + run steps.
+- `src/econflow/replication/executor.py`: `execute_plan()` — subprocess
+  isolation; captures stdout/stderr per step; times each step.
+- `src/econflow/replication/comparator.py`: `compare_outputs()` — toleranced
+  file-type-aware comparison (CSV numeric, LaTeX structural, JSON deep).
+  New `baseline_only` parameter: when `True`, extra replica files are silently
+  ignored (used by `reproduce` to avoid spurious warnings from intermediate
+  files).
+- `src/econflow/replication/reporter.py`: `ReproducibilityReport` — bundles
+  inspection + execution + comparison into Markdown + JSON outputs.
+- `src/econflow/commands/inspect.py`: `run_inspect()` — `econflow inspect`.
+- `src/econflow/commands/reproduce.py`: `run_reproduce()` — `econflow
+  reproduce`; 4-step workflow (inspect → plan → execute → compare); cleans
+  replica tables before each run for idempotent comparison; compares
+  `original_outputs/tables/` against `outputs/tables/`.
+- `src/econflow/commands/compare.py`: `run_compare()` — `econflow compare`.
+- `src/econflow/cli.py`: three new commands — `inspect`, `reproduce`, `compare`.
+- `examples/blind_replication/` — self-contained blind replication example:
+  6 firms × 15 years synthetic investment panel (DGP: invest = 1.8×market_value
+  + 0.6×capital_stock + firm FE + ε, seed=7); three estimators (pooled OLS,
+  entity FE, two-way FE); reference outputs; `econflow reproduce` returns PASS.
+- `docs/architecture/REPLICATION_ENGINE.md` — 313-line architecture document.
+- `tests/replication/` — 93 unit/integration tests + 15 CLI tests covering all
+  replication modules (971 total tests).
+
+#### Fixed
+- `src/econflow/pipeline_generic.py`: resolved `data.path` and `outputs.base_dir`
+  relative to their respective config files' directories rather than CWD.
+  This makes `econflow run` reproducible from any working directory.
+- `src/econflow/pipeline_generic.py`: fixed double-extension bug where
+  `comparison_table.csv.csv` was written instead of `comparison_table.csv`
+  when the filename in `outputs.yaml` already included the `.csv` extension.
+- `src/econflow/commands/validate.py`: estimator IDs now compared
+  case-insensitively (registry uses lowercase; YAML may use uppercase `OLS`,
+  `FE`).  Data path resolved relative to config file directory.
+- `src/econflow/replication/inspector.py`: data path resolved relative to
+  config file directory (same convention as pipeline_generic).
+- `examples/getting_started/config/config.yaml`: data path changed from
+  repo-root-relative `examples/getting_started/data/grunfeld.csv` to
+  config-dir-relative `../data/grunfeld.csv`.
+- `examples/getting_started/config/outputs.yaml`: `base_dir` changed from
+  `examples/getting_started/outputs` to `../outputs`.
+- `examples/blind_replication/config/config.yaml`: data path changed to
+  `../data/investment_panel.csv` (config-dir-relative).
+- `examples/blind_replication/config/outputs.yaml`: `base_dir` changed to
+  `../outputs`.
+- `tests/replication/test_planner.py`: updated `test_run_command_contains_output_dir`
+  → `test_run_command_contains_config_paths` to reflect that `econflow run`
+  does not accept `--output-dir`.
+
+### Sprint 8 — Data Ecosystem & Connector Framework (2026-06-28)
+
+#### Added
+- `src/econflow/ingestion/connectors/fred.py`: `FREDConnector` — new connector
+  for the St. Louis Fed FRED API.  Supports multiple series IDs, date ranges,
+  frequency aggregation, and missing-value normalisation (`"."` → `""`).
+  API key via `params["api_key"]` or `FRED_API_KEY` environment variable.
+  Registered as `"fred"` with `status="implemented"`.
+- `src/econflow/ingestion/manifest.py`: `DatasetManifest` + `ManifestEntry` —
+  project-level registry of all datasets acquired during a pipeline run.
+  Records connector ID, cache key, parameters, metadata, validation outcome,
+  citation string, and dataset version for each entry.  Atomic JSON writes.
+  Schema version `"1.0.0"`.
+- `AbstractConnector.citation()` and `AbstractConnector.version()` — new
+  concrete methods on the base class backed by class-level `_CITATION` and
+  `_VERSION` attributes.  All built-in connectors now expose these.
+- `src/econflow/commands/fetch_cmd.py`: `run_fetch()` — `econflow fetch`
+  command logic.  Connects, downloads, validates, prints metadata summary,
+  optionally writes manifest entry.
+- `src/econflow/commands/cache_cmd.py`: `run_cache_list()`,
+  `run_cache_inspect()`, `run_cache_clear()`, `run_cache_purge()` — full cache
+  management CLI backend.
+- `src/econflow/commands/datasets_cmd.py`: `run_datasets()` — lists all
+  registered connectors with status and notes.
+- `src/econflow/cli.py` — three new top-level commands: `econflow fetch`,
+  `econflow datasets`; one new sub-app: `econflow cache {list,inspect,clear,purge}`.
+- `docs/architecture/DATA_ECOSYSTEM.md` — 332-line architecture document
+  covering connector interface, registry, cache, manifest, validation, citation
+  system, technical debt, and Sprint 9 recommendations.
+- `tests/unit/test_ingestion_connectors.py` — 40+ unit tests covering all five
+  connectors, `AbstractConnector` citation/version interface, registry
+  integration, and `DatasetManifest`.
+- `tests/integration/test_ingestion_pipeline.py` — 20+ integration tests:
+  offline cache cycle, checksum verification, corruption detection, manifest
+  building, CLI fetch integration, regression (cache key stability).
+
+#### Changed
+- `src/econflow/ingestion/connectors/oecd.py`: replaced `NotImplementedError`
+  stub with full SDMX-JSON implementation.  Parses dimension metadata to decode
+  country/time/measure keys from series key strings.
+- `src/econflow/ingestion/connectors/pwt.py`: replaced `NotImplementedError`
+  stub with full Excel-download implementation.  Streams `.xlsx` from Harvard
+  Dataverse, parses `data` sheet via `openpyxl`, writes wide-format CSV,
+  optionally subsets to requested variable codes.
+- `src/econflow/ingestion/connectors/__init__.py`: added `FREDConnector` import.
+- `src/econflow/ingestion/__init__.py`: added `DatasetManifest`, `ManifestEntry`
+  to public API and `__all__`.
+
+
+
+### Sprint 7 — Research Integrity & Reproducibility Framework (2026-06-28)
+
+#### Added
+- `src/econflow/integrity/` — new sub-package providing the full Research
+  Integrity & Reproducibility Framework.
+- `src/econflow/integrity/fingerprint.py`: `EnvironmentFingerprint` (git,
+  Python, platform, package versions), `DataFingerprint` (SHA-256, row/column
+  counts for CSV/Parquet), `ConfigFingerprint` (SHA-256 + preview).
+  Re-uses existing helpers from `provenance.py` — no duplication.
+- `src/econflow/integrity/certificate.py`: `ReproducibilityCertificate`
+  dataclass — bundles all fingerprints and integrity check results into a
+  JSON-serialisable record.  `overall_status` is aggregated from check results
+  (`"pass"` / `"warn"` / `"fail"`).  Schema version `"1.0.0"`.  Atomic writes
+  via `os.fsync()` + `Path.replace()`.  `CertificateError` on I/O failure.
+- `src/econflow/integrity/drift.py`: `DriftItem`, `DriftReport`,
+  `detect_drift()`.  Compares two certificate dicts (or JSON paths) on 8 axes:
+  git commit, dirty flag, package versions, data SHA-256, data row count, data
+  file presence, and config SHA-256.  Severity: `"none"` / `"warn"` / `"fail"`.
+- `src/econflow/integrity/package.py`: `ReplicationPackage` — chainable builder
+  that writes a journal-ready directory (`certificate.json`,
+  `environment.txt`, `config/`, `scripts/`, auto-generated `README.md`,
+  `manifest.json`).
+- `src/econflow/integrity/checks/base.py`: `BaseIntegrityCheck` ABC and
+  `IntegrityCheckResult` dataclass.  Same pattern as `BaseDiagnostic`.
+- `src/econflow/integrity/checks/registry.py`: `@register_integrity_check()`,
+  `get_check()`, `list_checks()`, `unregister_check()`.  Raises `RegistryError`
+  on duplicate or unknown id.
+- `src/econflow/integrity/checks/plugins/coefficient_stability.py`:
+  `CoefficientStabilityCheck` — flags extreme (`> fail_threshold`) or non-finite
+  coefficient values.
+- `src/econflow/integrity/checks/plugins/sample_size.py`:
+  `SampleSizeCheck` — verifies `nobs` meets minimum thresholds.
+- `src/econflow/integrity/checks/plugins/pvalue_distribution.py`:
+  `PvalueDistributionCheck` — flags identical p-values, all < 0.001,
+  all > 0.99, or suspiciously high fraction significant.
+- `src/econflow/commands/certify.py`: `run_certify()` — builds and saves a
+  certificate, optionally running all integrity checks.
+- `src/econflow/commands/verify.py`: `run_verify()` — loads baseline certificate
+  and compares against current certificate or live environment.
+- `src/econflow/commands/package_cmd.py`: `run_package()` — builds a replication
+  package directory.
+- `src/econflow/cli.py`: three new commands — `econflow certify`,
+  `econflow verify`, `econflow package`.
+- `src/econflow/core/exceptions.py`: `IntegrityError` and `CertificateError`
+  added to the exception hierarchy under `EconFlowCoreError`.
+- **90 new tests** across 5 new test modules:
+  `tests/unit/test_integrity_fingerprint.py` (25 tests),
+  `tests/unit/test_integrity_certificate.py` (18 tests),
+  `tests/unit/test_integrity_drift.py` (15 tests),
+  `tests/unit/test_integrity_checks.py` (22 tests),
+  `tests/integration/test_integrity_pipeline.py` (10 tests).
+- `docs/architecture/INTEGRITY_FRAMEWORK.md`: architecture documentation
+  for Sprint 7 (296 lines).
+
 ### Sprint 6 — Reporting & Publication Engine (2026-06-28)
 
 #### Added

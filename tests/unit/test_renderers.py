@@ -241,6 +241,22 @@ class TestLaTeXRenderer:
         # underscore in label should be escaped
         assert r"\_" in tex or "x_1" in tex  # renderer may escape or not
 
+    def test_footer_uses_flushleft_not_tablenotes(self, simple_table):
+        """C1 regression: tablenotes requires threeparttable; flushleft does not."""
+        tex = get_renderer("latex")().render(simple_table)
+        assert "tablenotes" not in tex
+        assert r"\begin{flushleft}" in tex
+        assert r"\footnotesize" in tex
+
+    def test_footer_content_present(self, simple_table):
+        tex = get_renderer("latex")().render(simple_table)
+        assert "p<0.01" in tex
+
+    def test_notes_present_in_flushleft(self, simple_table):
+        tex = get_renderer("latex")().render(simple_table)
+        assert r"\textit{Note:}" in tex
+        assert "OLS estimates" in tex
+
     def test_render_to_file(self, simple_table, tmp_path):
         path = get_renderer("latex")().render_to_file(simple_table, tmp_path / "out.tex")
         assert path.exists()

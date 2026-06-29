@@ -1,7 +1,7 @@
 # Output configuration — Getting Started tutorial
 
 outputs:
-  base_dir: "examples/getting_started/outputs"
+  base_dir: "../outputs"
 
   tables:
     dir: "outputs/tables"

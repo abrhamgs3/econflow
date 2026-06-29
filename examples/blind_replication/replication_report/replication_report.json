@@ -1,0 +1,123 @@
+{
+  "timestamp_utc": "2026-06-29T04:37:09.496595+00:00",
+  "overall_status": "pass",
+  "inspection": {
+    "project_dir": "/sessions/trusting-amazing-keller/mnt/AI and Productivity/econflow/examples/blind_replication",
+    "timestamp_utc": "2026-06-29T04:37:09.556762+00:00",
+    "overall_status": "pass",
+    "checks": [
+      {
+        "check_id": "python_version",
+        "name": "Python version",
+        "status": "pass",
+        "message": "Python 3.10.12",
+        "detail": ""
+      },
+      {
+        "check_id": "config_found",
+        "name": "Config file",
+        "status": "pass",
+        "message": "config/config.yaml",
+        "detail": ""
+      },
+      {
+        "check_id": "models_found",
+        "name": "Models config",
+        "status": "pass",
+        "message": "config/models.yaml",
+        "detail": ""
+      },
+      {
+        "check_id": "outputs_cfg_found",
+        "name": "Outputs config",
+        "status": "pass",
+        "message": "config/outputs.yaml",
+        "detail": ""
+      },
+      {
+        "check_id": "data_found",
+        "name": "Data file",
+        "status": "pass",
+        "message": "investment_panel.csv (3 KB)",
+        "detail": ""
+      },
+      {
+        "check_id": "data_checksum",
+        "name": "Data checksum",
+        "status": "pass",
+        "message": "SHA-256 verified: c0afa5b354c61000…",
+        "detail": ""
+      },
+      {
+        "check_id": "estimators_registered",
+        "name": "Estimator registry",
+        "status": "pass",
+        "message": "3 estimator(s) registered: ols, fe, fe",
+        "detail": ""
+      },
+      {
+        "check_id": "dependencies",
+        "name": "Dependencies",
+        "status": "pass",
+        "message": "econflow 0.1.0  pandas 2.3.3  linearmodels 7.0  statsmodels 0.14.6  numpy 2.2.6  pyyaml 6.0.3",
+        "detail": ""
+      }
+    ]
+  },
+  "execution": {
+    "run_id": "30663610-0b99-44dc-8ccf-5eef0886bea2",
+    "project_dir": "/sessions/trusting-amazing-keller/mnt/AI and Productivity/econflow/examples/blind_replication",
+    "timestamp_utc": "2026-06-29T04:37:11.117912+00:00",
+    "status": "success",
+    "elapsed_seconds": 1.451,
+    "outputs_dir": "examples/blind_replication",
+    "outputs": [
+      "examples/blind_replication/outputs/provenance/run_metadata.json",
+      "examples/blind_replication/outputs/replication_report.json",
+      "examples/blind_replication/outputs/replication_report.md",
+      "examples/blind_replication/outputs/tables/comparison_table.csv",
+      "examples/blind_replication/outputs/tables/comparison_table.csv.csv"
+    ],
+    "provenance_path": "examples/blind_replication/outputs/provenance/run_metadata.json",
+    "error": null,
+    "step_results": [
+      {
+        "step_id": "validate",
+        "description": "Validate project configuration",
+        "status": "success",
+        "exit_code": 0,
+        "elapsed_seconds": 0.445,
+        "stdout": "\nEconFlow validate\n\n\n    Code    Check                             Message                           \n✔   C-01    config.yaml  parseable            Loaded:                           \n                                              /sessions/trusting-amazing-kell…  \n                                              and                               \n                                              Productivity/econflow/examples/…  \n✔   C-02    models.yaml  parseable            Loaded: config/models.yaml        \n✔   C-03    outputs.yaml parseable            Loaded: config/outputs.yaml       \n✔   S-01    data.path present                                                   \n✔   S-02    data.entity_col present                                             \n✔   S-03    data.time_col present                                               \n✔   S-04    variables.dependent present                                         \n✔   S-05    variables.regressors non-empty                                      \n            list                                                                \n✔   M-01    models list non-empty             3 model(s) defined                \n⚠   M-04    Model 'pooled_ols': estimator     Estimator 'OLS' not in generic    \n            recognised                        pipeline set frozenset({'twfe',   \n                                              'iv', 'fd', 'fe', 're', 'ols'}).  \n                                              Will fail at runtime unless a     \n                                              custom estimator is registered.   \n✔   M-03    Model ID 'pooled_ols' unique                                        \n⚠   M-04    Model 'entity_fe': estimator      Estimator 'FE' not in generic     \n            recognised                        pipeline set frozenset({'twfe',   \n                                              'iv', 'fd', 'fe', 're', 'ols'}).  \n                                              Will fail at runtime unless a     \n                                              custom estimator is registered.   \n✔   M-03    Model ID 'entity_fe' unique                                         \n⚠   M-04    Model 'twoway_fe': estimator      Estimator 'FE' not in generic     \n            recognised                        pipeline set frozenset({'twfe',   \n                                              'iv', 'fd', 'fe', 're', 'ols'}).  \n                                              Will fail at runtime unless a     \n                                              custom estimator is registered.   \n✔   M-03    Model ID 'twoway_fe' unique                                         \n✔   O-01    outputs.base_dir present                                            \n✔   O-02    comparison_table.filename                                           \n            present                                                             \n\n⚠ 14 passed · 3 warning(s) · 0 errors.\n\n",
+        "stderr": "",
+        "skip_reason": ""
+      },
+      {
+        "step_id": "run",
+        "description": "Execute analysis pipeline",
+        "status": "success",
+        "exit_code": 0,
+        "elapsed_seconds": 1.006,
+        "stdout": "\n──────────────────────────────── EconFlow 0.1.0 ────────────────────────────────\n\n2026-06-29 04:37:10  INFO      econflow.pipeline_generic  Reading configuration from /sessions/trusting-amazing-keller/mnt/AI and Productivity/econflow/examples/blind_replication/config/config.yaml\n2026-06-29 04:37:10  INFO      econflow.pipeline_generic  [1/5] Loading data: /sessions/trusting-amazing-keller/mnt/AI and Productivity/econflow/examples/blind_replication/data/investment_panel.csv\n2026-06-29 04:37:10  INFO      econflow.pipeline_generic        90 obs | 6 firms | 15 years\n2026-06-29 04:37:10  INFO      econflow.pipeline_generic  [2/5] Validating panel structure\n2026-06-29 04:37:10  INFO      econflow.pipeline_generic        No missing values in analysis columns\n2026-06-29 04:37:10  INFO      econflow.pipeline_generic  [3/5] Running models\n2026-06-29 04:37:10  INFO      econflow.pipeline_generic  Estimating pooled_ols            estimator=OLS  obs=90  entities=6  entity_fe=False  time_fe=False  cluster=None\n2026-06-29 04:37:10  INFO      econflow.pipeline_generic      market_value  coef=+1.7908  p=0.0000\n2026-06-29 04:37:10  INFO      econflow.pipeline_generic      capital_stock  coef=+0.6098  p=0.0000\n2026-06-29 04:37:10  INFO      econflow.pipeline_generic  Estimating entity_fe             estimator=FE   obs=90  entities=6  entity_fe=True  time_fe=False  cluster=None\n2026-06-29 04:37:10  INFO      econflow.pipeline_generic      market_value  coef=+1.7947  p=0.0000\n2026-06-29 04:37:10  INFO      econflow.pipeline_generic      capital_stock  coef=+0.6013  p=0.0000\n2026-06-29 04:37:10  INFO      econflow.pipeline_generic  Estimating twoway_fe             estimator=FE   obs=90  entities=6  entity_fe=True  time_fe=True  cluster=None\n2026-06-29 04:37:10  INFO      econflow.pipeline_generic      market_value  coef=+1.7965  p=0.0000\n2026-06-29 04:37:10  INFO      econflow.pipeline_generic      capital_stock  coef=+0.6019  p=0.0000\n2026-06-29 04:37:10  INFO      econflow.pipeline_generic  [4/5] Exporting tables\n2026-06-29 04:37:10  INFO      econflow.pipeline_generic  CSV table written: /sessions/trusting-amazing-keller/mnt/AI and Productivity/econflow/examples/blind_replication/outputs/tables/comparison_table.csv\n2026-06-29 04:37:10  INFO      econflow.pipeline_generic  [5/5] Recording provenance\n2026-06-29 04:37:10  INFO      econflow.pipeline_generic  Provenance written: /sessions/trusting-amazing-keller/mnt/AI and Productivity/econflow/examples/blind_replication/outputs/provenance/run_metadata.json\n2026-06-29 04:37:10  INFO      econflow.pipeline_generic  Pipeline complete.\n\n────────────────────────────── Pipeline complete ───────────────────────────────\n  Completed in 0.8 s\n\n",
+        "stderr": "",
+        "skip_reason": ""
+      }
+    ]
+  },
+  "comparison": {
+    "baseline_dir": "/sessions/trusting-amazing-keller/mnt/AI and Productivity/econflow/examples/blind_replication/original_outputs/tables",
+    "replica_dir": "/sessions/trusting-amazing-keller/mnt/AI and Productivity/econflow/examples/blind_replication/outputs/tables",
+    "timestamp_utc": "2026-06-29T04:37:11.141091+00:00",
+    "overall_status": "pass",
+    "numeric_tolerance": 1e-06,
+    "comparisons": [
+      {
+        "filename": "comparison_table.csv",
+        "status": "match",
+        "max_abs_diff": 0.0,
+        "rows_differ": 0,
+        "columns_differ": [],
+        "message": "All 8 rows match (max |Δ| = 0.00e+00)"
+      }
+    ]
+  }
+}

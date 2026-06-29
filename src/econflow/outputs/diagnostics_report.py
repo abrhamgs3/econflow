@@ -30,15 +30,25 @@ def _fmt_stat(value: float | None, fmt: str = "{:.3f}") -> str:
 
 
 def _conclusion(result: DiagnosticResult) -> str:
-    """Return a short human-readable conclusion string."""
+    """
+    Return a short human-readable conclusion string.
+
+    Priority: use ``result.conclusion`` when available (it contains the
+    canonical test interpretation set by the diagnostic plugin).
+    Fall back to level-inferred language only when the conclusion is empty.
+    """
     if result.level == "skip":
         return "N/A"
-    # Infer pass/fail from level
-    if result.level in ("error", "warning"):
-        return "Fail"
-    if result.level == "info":
-        return "Pass"
-    return result.conclusion[:40] if result.conclusion else "—"
+    if result.level == "error":
+        return "Error"
+    # Prefer the plugin-supplied conclusion (e.g. "Reject H0: heteroskedasticity detected")
+    if result.conclusion:
+        # Truncate long conclusions for table readability
+        return result.conclusion[:60] if len(result.conclusion) > 60 else result.conclusion
+    # Fallback when the plugin did not set a conclusion
+    if result.level == "warning":
+        return "Reject H0"
+    return "Fail to reject H0"
 
 
 def build_diagnostics_report(
@@ -67,6 +77,9 @@ def build_diagnostics_report(
         ``str.format`` template for the test statistic.
     group_by_estimator:
         If ``True``, insert a separator row between estimator groups.
+        Groups are determined by :attr:`DiagnosticResult.estimator_id`
+        (populated by
+        :meth:`~econflow.diagnostics.base.BaseDiagnostic.run_with_context`).
     notes:
         Free-text methodological note.
     metadata:
@@ -92,7 +105,7 @@ def build_diagnostics_report(
         # Group by estimator_id preserving insertion order
         groups: dict[str, list[DiagnosticResult]] = {}
         for r in results:
-            groups.setdefault(r.extra.get("estimator_id", ""), []).append(r)
+            groups.setdefault(r.estimator_id, []).append(r)
 
         first_group = True
         for estimator_id, group in groups.items():
@@ -101,15 +114,15 @@ def build_diagnostics_report(
             first_group = False
 
             for r in group:
-                _add_row(table, r, stat_fmt)
+                _add_row(table, r, stat_fmt, estimator_id)
     else:
         for r in results:
-            _add_row(table, r, stat_fmt)
+            _add_row(table, r, stat_fmt, r.estimator_id)
 
     # Footer
     table.footer.append(
-        "Pass = null hypothesis not rejected at α=0.05; "
-        "Fail = null hypothesis rejected; N/A = diagnostic not applicable."
+        "Conclusion column shows the diagnostic plugin's interpretation. "
+        "N/A = diagnostic not applicable to this estimator."
     )
 
     return table
@@ -119,6 +132,7 @@ def _add_row(
     table: ReportTable,
     result: DiagnosticResult,
     stat_fmt: str,
+    estimator_id: str = "",
 ) -> None:
     """Append a single diagnostic row to *table*."""
     pval_str = _fmt_stat(result.pvalue, stat_fmt) if result.pvalue is not None else "—"
@@ -127,7 +141,7 @@ def _add_row(
     table.add_row(TableRow(
         label=result.diagnostic_name,
         cells={
-            "Estimator": result.extra.get("estimator_id", ""),
+            "Estimator": estimator_id or result.estimator_id,
             "Statistic": stat_str,
             "p-value": pval_str,
             "Conclusion": _conclusion(result),

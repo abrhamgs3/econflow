@@ -2,13 +2,14 @@
 econflow.ingestion.base — Abstract connector interface.
 
 All data-source connectors must subclass :class:`AbstractConnector` and
-implement its five abstract methods.  This contract ensures:
+implement its abstract methods.  This contract ensures:
 
 * A uniform call signature so the pipeline can swap connectors without
   touching downstream code.
 * Deterministic caching via :meth:`cache_key`.
 * Self-describing metadata via :meth:`metadata`.
 * Configurable validation via :meth:`validate`.
+* Citation and versioning via :meth:`citation` and :meth:`version`.
 
 Connector lifecycle
 -------------------
@@ -19,6 +20,8 @@ Connector lifecycle
     path = connector.download()            # 2. fetch & cache -> local CSV path
     report = connector.validate(path)      # 3. structural + quality checks
     meta = connector.metadata()            # 4. provenance metadata
+    cit = connector.citation()             # 5. academic citation string
+    ver = connector.version()              # 6. dataset version identifier
 
 Or use the convenience wrapper::
 
@@ -86,10 +89,23 @@ class AbstractConnector(abc.ABC):
     """
     Abstract base class for all EconFlow data-source connectors.
 
-    Subclass this and implement all five abstract methods.  Register the
+    Subclass this and implement all abstract methods.  Register the
     subclass with :func:`~econflow.ingestion.registry.register` to make it
-    available via ``econflow info`` and
+    available via ``econflow datasets`` and
     :func:`~econflow.ingestion.registry.get_connector`.
+
+    Class attributes to override
+    ----------------------------
+    connector_id : str
+        Short identifier; set automatically by @register().
+    label : str
+        Human-readable label.
+    _CITATION : str
+        Default academic citation string returned by :meth:`citation`.
+        Override in subclasses with the actual source citation.
+    _VERSION : str
+        Default version string returned by :meth:`version`.
+        Override in subclasses or compute dynamically by overriding the method.
 
     Parameters
     ----------
@@ -106,6 +122,10 @@ class AbstractConnector(abc.ABC):
     connector_id: str = ""
     #: Human-readable label.
     label: str = ""
+    #: Default citation string.  Override in subclasses.
+    _CITATION: str = ""
+    #: Default version string.  Override in subclasses.
+    _VERSION: str = "unknown"
 
     def __init__(
         self,
@@ -204,8 +224,38 @@ class AbstractConnector(abc.ABC):
         """
 
     # ------------------------------------------------------------------
-    # Concrete convenience method
+    # Concrete methods — override for custom behaviour
     # ------------------------------------------------------------------
+
+    def citation(self) -> str:
+        """
+        Return the academic citation string for this data source.
+
+        Subclasses should override the class attribute ``_CITATION`` with
+        the correct citation for the data source, or override this method
+        to compute it dynamically (e.g. from ``self.metadata()``).
+
+        Returns
+        -------
+        str
+            Citation suitable for inclusion in a paper's reference list.
+        """
+        return self._CITATION
+
+    def version(self) -> str:
+        """
+        Return a version identifier for the dataset this connector targets.
+
+        Subclasses should override the class attribute ``_VERSION`` with
+        a fixed version string (e.g. ``"10.01"`` for PWT), or override this
+        method to return a dynamic version derived from the API.
+
+        Returns
+        -------
+        str
+            Version string (e.g. ``"2024-Q1"``, ``"10.01"``, ``"unknown"``).
+        """
+        return self._VERSION
 
     def fetch(self, *, force: bool = False) -> tuple[Path, DatasetMetadata]:
         """

@@ -1,0 +1,33 @@
+# Model specifications for the blind replication example
+#
+# Three standard panel estimators.
+# Each model spec must include dependent and regressors (used by pipeline_generic).
+
+models:
+  - id: pooled_ols
+    estimator: OLS
+    label: "Pooled OLS"
+    dependent: "invest"
+    regressors:
+      - "market_value"
+      - "capital_stock"
+
+  - id: entity_fe
+    estimator: FE
+    label: "Entity Fixed Effects"
+    dependent: "invest"
+    regressors:
+      - "market_value"
+      - "capital_stock"
+    entity_effects: true
+    time_effects: false
+
+  - id: twoway_fe
+    estimator: FE
+    label: "Two-way Fixed Effects"
+    dependent: "invest"
+    regressors:
+      - "market_value"
+      - "capital_stock"
+    entity_effects: true
+    time_effects: true

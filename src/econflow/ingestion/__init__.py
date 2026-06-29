@@ -17,6 +17,7 @@ Built-in connectors
 .. autoclass:: econflow.ingestion.connectors.world_bank.WorldBankConnector
 .. autoclass:: econflow.ingestion.connectors.oecd.OECDConnector
 .. autoclass:: econflow.ingestion.connectors.pwt.PennWorldTablesConnector
+.. autoclass:: econflow.ingestion.connectors.fred.FREDConnector
 
 Cache
 ~~~~~
@@ -26,6 +27,11 @@ Cache
 Metadata
 ~~~~~~~~
 .. autoclass:: econflow.ingestion.metadata.DatasetMetadata
+
+Manifest
+~~~~~~~~
+.. autoclass:: econflow.ingestion.manifest.DatasetManifest
+.. autoclass:: econflow.ingestion.manifest.ManifestEntry
 
 Validation
 ~~~~~~~~~~
@@ -38,7 +44,6 @@ Validation
 from __future__ import annotations
 
 # Import all built-in connectors so they self-register via @register().
-# This must come after the registry is imported.
 import econflow.ingestion.connectors  # noqa: E402, F401
 
 # Core abstractions
@@ -46,6 +51,9 @@ from econflow.ingestion.base import AbstractConnector, ConnectorError
 
 # Cache layer
 from econflow.ingestion.cache import CacheCorruptionError, CacheManager
+
+# Manifest
+from econflow.ingestion.manifest import DatasetManifest, ManifestEntry
 
 # Dataset metadata
 from econflow.ingestion.metadata import DatasetMetadata
@@ -70,6 +78,9 @@ __all__ = [
     "CacheCorruptionError",
     # Metadata
     "DatasetMetadata",
+    # Manifest
+    "DatasetManifest",
+    "ManifestEntry",
     # Registry
     "register",
     "get_connector",

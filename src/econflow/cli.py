@@ -27,6 +27,24 @@ econflow report [OUTPUT_DIR]
     Render estimation results into a publication-ready bundle
     (tables in CSV / LaTeX / Markdown / HTML, figures as JSON).
 
+econflow certify
+    Generate a reproducibility certificate for the current run.
+
+econflow verify
+    Compare two certificates and report environment / data drift.
+
+econflow package
+    Build a journal-ready replication package directory.
+
+econflow fetch <CONNECTOR_ID>
+    Download a dataset using a registered connector.
+
+econflow cache list|inspect|clear|purge
+    Inspect and manage the local dataset cache.
+
+econflow datasets
+    List all registered data connectors.
+
 Examples
 --------
     $ econflow --version
@@ -48,6 +66,21 @@ Examples
           --config  config/config.yaml \\
           --models  config/models.yaml \\
           --outputs config/outputs.yaml
+
+    $ econflow certify \\
+          --project-name "My Study" \\
+          --data data/processed/panel.csv \\
+          --config config/config.yaml
+
+    $ econflow verify --baseline outputs/certificate.json
+
+    $ econflow package --certificate outputs/certificate.json
+
+    $ econflow fetch world_bank --param indicators=IT.NET.USER.ZS --param year_start=2000
+
+    $ econflow cache list
+
+    $ econflow datasets
 """
 
 from __future__ import annotations
@@ -516,6 +549,617 @@ def report(
     )
     if exit_code != 0:
         raise typer.Exit(code=exit_code)
+
+
+# ---------------------------------------------------------------------------
+# certify
+# ---------------------------------------------------------------------------
+
+@app.command()
+def certify(
+    project_name: str = typer.Option(
+        "",
+        "--project-name", "-p",
+        help="Human-readable project name stored in the certificate.",
+    ),
+    data: list[Path] = typer.Option(
+        [],
+        "--data", "-d",
+        help="Input dataset path(s) to fingerprint.  Repeat for multiple files.",
+    ),
+    config: Path = typer.Option(
+        None,
+        "--config", "-c",
+        help="Path to project config.yaml (SHA-256 is recorded).",
+    ),
+    output: Path = typer.Option(
+        Path("outputs/certificate.json"),
+        "--output", "-o",
+        help="Destination for the JSON certificate.",
+        show_default=True,
+    ),
+    checks: bool = typer.Option(
+        False,
+        "--checks/--no-checks",
+        help="Run integrity checks (requires --results).  Off by default.",
+        show_default=True,
+    ),
+    repo_root: Path = typer.Option(
+        None,
+        "--repo-root",
+        help="Git repository root.  Defaults to the current directory.",
+    ),
+) -> None:
+    """Generate a reproducibility certificate for the current pipeline run.
+
+    Records the git commit, Python version, package versions, SHA-256
+    fingerprints of all input datasets, and the config file checksum.
+    Optionally runs all registered integrity checks.
+
+    Examples:
+
+        # Minimal certificate
+        econflow certify --project-name "My Study"
+
+        # With data and config fingerprints
+        econflow certify \\
+            --project-name "Panel Growth Study" \\
+            --data data/processed/panel.csv \\
+            --config config/config.yaml \\
+            --output outputs/certificate.json
+    """
+    from econflow.commands.certify import run_certify
+
+    exit_code = run_certify(
+        project_name=project_name,
+        data_paths=list(data),
+        config_path=config,
+        output_path=output,
+        run_checks=checks,
+        estimator_results=None,
+        repo_root=repo_root,
+        console=console,
+    )
+    if exit_code != 0:
+        raise typer.Exit(code=exit_code)
+
+
+# ---------------------------------------------------------------------------
+# verify
+# ---------------------------------------------------------------------------
+
+@app.command()
+def verify(
+    baseline: Path = typer.Option(
+        ...,
+        "--baseline", "-b",
+        help="Path to the baseline certificate JSON.",
+    ),
+    current: Path = typer.Option(
+        None,
+        "--current",
+        help=(
+            "Path to the current certificate JSON.  "
+            "When omitted, the live environment is captured and compared."
+        ),
+    ),
+    output: Path = typer.Option(
+        None,
+        "--output", "-o",
+        help="Optional destination for the JSON drift report.",
+    ),
+) -> None:
+    """Compare two reproducibility certificates and report drift.
+
+    When --current is omitted, the live environment is captured and
+    compared against the baseline.
+
+    Exit code is 0 when status is 'pass' or 'warn'; 1 when 'fail'.
+
+    Examples:
+
+        # Compare live environment against a stored certificate
+        econflow verify --baseline outputs/certificate.json
+
+        # Compare two stored certificates
+        econflow verify \\
+            --baseline outputs/baseline_cert.json \\
+            --current outputs/current_cert.json \\
+            --output outputs/drift_report.json
+    """
+    from econflow.commands.verify import run_verify
+
+    exit_code = run_verify(
+        baseline_path=baseline,
+        current_path=current,
+        output_path=output,
+        console=console,
+    )
+    if exit_code != 0:
+        raise typer.Exit(code=exit_code)
+
+
+# ---------------------------------------------------------------------------
+# package
+# ---------------------------------------------------------------------------
+
+@app.command(name="package")
+def package_cmd(
+    certificate: Path = typer.Option(
+        None,
+        "--certificate", "--cert",
+        help="Path to the reproducibility certificate to include.",
+    ),
+    config: list[Path] = typer.Option(
+        [],
+        "--config", "-c",
+        help="Config file(s) to copy into config/.  Repeat for multiple files.",
+    ),
+    script: list[Path] = typer.Option(
+        [],
+        "--script", "-s",
+        help="Replication script(s) to copy into scripts/.  Repeat for multiple.",
+    ),
+    output_dir: Path = typer.Option(
+        Path("replication_package"),
+        "--output-dir", "-o",
+        help="Destination directory for the replication package.",
+        show_default=True,
+    ),
+    overwrite: bool = typer.Option(
+        True,
+        "--overwrite/--no-overwrite",
+        help="Overwrite an existing output directory.",
+        show_default=True,
+    ),
+    data_readme: str = typer.Option(
+        "",
+        "--data-readme",
+        help="Data availability note included in the package README.",
+    ),
+) -> None:
+    """Build a journal-ready replication package.
+
+    Collects the reproducibility certificate, configuration files, and
+    replication scripts into a structured directory suitable for archival
+    or journal submission.
+
+    Output layout:
+
+        replication_package/
+            README.md
+            certificate.json
+            environment.txt
+            config/
+            scripts/
+            manifest.json
+
+    Examples:
+
+        # Minimal package
+        econflow package --certificate outputs/certificate.json
+
+        # Full package with configs and scripts
+        econflow package \\
+            --certificate outputs/certificate.json \\
+            --config config/config.yaml \\
+            --config config/models.yaml \\
+            --script scripts/01_download.py \\
+            --script scripts/02_run.py \\
+            --output-dir replication_package/
+    """
+    from econflow.commands.package_cmd import run_package
+
+    exit_code = run_package(
+        certificate_path=certificate,
+        config_paths=list(config),
+        script_paths=list(script),
+        output_dir=output_dir,
+        overwrite=overwrite,
+        data_readme=data_readme,
+        console=console,
+    )
+    if exit_code != 0:
+        raise typer.Exit(code=exit_code)
+
+
+# ---------------------------------------------------------------------------
+# fetch
+# ---------------------------------------------------------------------------
+
+@app.command()
+def fetch(
+    connector_id: str = typer.Argument(
+        ...,
+        help="Connector registry ID (e.g. 'world_bank', 'csv', 'fred', 'oecd', 'pwt').",
+    ),
+    param: list[str] = typer.Option(
+        [],
+        "--param", "-p",
+        help=(
+            "Connector parameter as key=value.  Repeat for multiple params.  "
+            "Values are auto-parsed: comma-separated strings become lists, "
+            "integers and booleans are coerced.  "
+            "Examples: --param indicators=IT.NET.USER.ZS  "
+            "--param year_start=2000  --param series_ids=GDPPC,UNRATE"
+        ),
+    ),
+    cache_dir: Path = typer.Option(
+        Path(".cache/econflow"),
+        "--cache-dir",
+        help="Root directory for the dataset cache.",
+        show_default=True,
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Re-download even if a cached copy exists.",
+    ),
+    no_validate: bool = typer.Option(
+        False,
+        "--no-validate",
+        help="Skip validation after download.",
+    ),
+    manifest: Path = typer.Option(
+        None,
+        "--manifest", "-m",
+        help="Write/update a dataset manifest JSON file.",
+    ),
+    project: str = typer.Option(
+        "",
+        "--project",
+        help="Project name recorded in the manifest.",
+    ),
+) -> None:
+    """Download a dataset using a registered connector.
+
+    Connects to the data source, downloads to the local cache, runs
+    validation, prints metadata, and optionally records a manifest entry.
+
+    Examples:
+
+        # Download World Bank internet usage indicator
+        econflow fetch world_bank \\
+            --param indicators=IT.NET.USER.ZS \\
+            --param year_start=2000 \\
+            --param year_end=2022
+
+        # Download FRED series
+        econflow fetch fred \\
+            --param series_ids=GDPPC,UNRATE \\
+            --param start_date=2000-01-01 \\
+            --param frequency=a
+
+        # Download local CSV (no network)
+        econflow fetch csv --param path=data/raw/panel.csv
+
+        # Force re-download and update manifest
+        econflow fetch world_bank \\
+            --param indicators=NY.GDP.MKTP.CD \\
+            --force \\
+            --manifest outputs/manifest.json
+    """
+    from econflow.commands.fetch_cmd import _parse_param_value, run_fetch
+
+    # Parse --param key=value pairs
+    params: dict = {}
+    for kv in param:
+        if "=" not in kv:
+            console.print(f"[red]Error:[/red] --param must be key=value, got: {kv!r}")
+            raise typer.Exit(code=1)
+        k, _, v = kv.partition("=")
+        params[k.strip()] = _parse_param_value(v.strip())
+
+    exit_code = run_fetch(
+        connector_id=connector_id,
+        params=params,
+        cache_dir=cache_dir,
+        force=force,
+        no_validate=no_validate,
+        output_manifest=manifest,
+        project=project,
+        console=console,
+    )
+    if exit_code != 0:
+        raise typer.Exit(code=exit_code)
+
+
+# ---------------------------------------------------------------------------
+# cache
+# ---------------------------------------------------------------------------
+
+cache_app = typer.Typer(
+    name="cache",
+    help="Inspect and manage the local dataset cache.",
+    no_args_is_help=True,
+)
+app.add_typer(cache_app)
+
+
+@cache_app.command("list")
+def cache_list(
+    cache_dir: Path = typer.Option(
+        Path(".cache/econflow"),
+        "--cache-dir",
+        help="Root cache directory.",
+        show_default=True,
+    ),
+) -> None:
+    """List all cached datasets."""
+    from econflow.commands.cache_cmd import run_cache_list
+
+    exit_code = run_cache_list(cache_dir=cache_dir, console=console)
+    if exit_code != 0:
+        raise typer.Exit(code=exit_code)
+
+
+@cache_app.command("inspect")
+def cache_inspect(
+    key: str = typer.Argument(..., help="Cache key (hex string from 'econflow cache list')."),
+    cache_dir: Path = typer.Option(
+        Path(".cache/econflow"),
+        "--cache-dir",
+        help="Root cache directory.",
+        show_default=True,
+    ),
+) -> None:
+    """Show detailed metadata for one cache slot."""
+    from econflow.commands.cache_cmd import run_cache_inspect
+
+    exit_code = run_cache_inspect(key=key, cache_dir=cache_dir, console=console)
+    if exit_code != 0:
+        raise typer.Exit(code=exit_code)
+
+
+@cache_app.command("clear")
+def cache_clear(
+    cache_dir: Path = typer.Option(
+        Path(".cache/econflow"),
+        "--cache-dir",
+        help="Root cache directory.",
+        show_default=True,
+    ),
+    yes: bool = typer.Option(
+        False,
+        "--yes",
+        help="Confirm deletion without prompt.",
+    ),
+) -> None:
+    """Delete all cached datasets.
+
+    Requires --yes to confirm.
+
+    Example:
+
+        econflow cache clear --yes
+    """
+    from econflow.commands.cache_cmd import run_cache_clear
+
+    exit_code = run_cache_clear(cache_dir=cache_dir, confirm=yes, console=console)
+    if exit_code != 0:
+        raise typer.Exit(code=exit_code)
+
+
+@cache_app.command("purge")
+def cache_purge(
+    key: str = typer.Argument(..., help="Cache key to delete."),
+    cache_dir: Path = typer.Option(
+        Path(".cache/econflow"),
+        "--cache-dir",
+        help="Root cache directory.",
+        show_default=True,
+    ),
+) -> None:
+    """Delete one cache slot by key."""
+    from econflow.commands.cache_cmd import run_cache_purge
+
+    exit_code = run_cache_purge(key=key, cache_dir=cache_dir, console=console)
+    if exit_code != 0:
+        raise typer.Exit(code=exit_code)
+
+
+# ---------------------------------------------------------------------------
+# datasets
+# ---------------------------------------------------------------------------
+
+@app.command()
+def datasets(
+    filter_id: str = typer.Option(
+        "",
+        "--filter", "-f",
+        help="Filter connector list by ID substring.",
+    ),
+) -> None:
+    """List all registered data connectors.
+
+    Shows connector ID, label, implementation status, and notes.
+
+    Examples:
+
+        econflow datasets                # list all connectors
+        econflow datasets --filter world # show only connectors matching 'world'
+    """
+    from econflow.commands.datasets_cmd import run_datasets
+
+    exit_code = run_datasets(filter_str=filter_id, console=console)
+    if exit_code != 0:
+        raise typer.Exit(code=exit_code)
+
+
+
+# ---------------------------------------------------------------------------
+# inspect
+# ---------------------------------------------------------------------------
+
+
+@app.command()
+def inspect(
+    project_dir: Path = typer.Argument(
+        Path("."),
+        help="EconFlow project directory to inspect.",
+        show_default=True,
+    ),
+    output: Path = typer.Option(
+        None,
+        "--output", "-o",
+        help="Write InspectionReport JSON to this path.",
+    ),
+    strict: bool = typer.Option(
+        False,
+        "--strict",
+        help="Treat warnings as failures.",
+    ),
+) -> None:
+    """Run pre-flight checks on a project directory.
+
+    Verifies that a project can be reproduced: checks configuration files,
+    data file presence and integrity, estimator registration, and installed
+    dependencies.
+
+    Examples:
+
+        econflow inspect .
+        econflow inspect examples/my_study/ --strict
+        econflow inspect examples/my_study/ --output inspection.json
+    """
+    from econflow.commands.inspect import run_inspect
+
+    exit_code = run_inspect(
+        project_dir=project_dir,
+        output_path=output,
+        strict=strict,
+        console=console,
+    )
+    if exit_code != 0:
+        raise typer.Exit(code=exit_code)
+
+
+# ---------------------------------------------------------------------------
+# reproduce
+# ---------------------------------------------------------------------------
+
+
+@app.command()
+def reproduce(
+    project_dir: Path = typer.Argument(
+        Path("."),
+        help="EconFlow project directory to reproduce.",
+        show_default=True,
+    ),
+    output_dir: Path = typer.Option(
+        None,
+        "--output-dir", "-o",
+        help="Destination for reproduced outputs (default: <project_dir>/replication_outputs/).",
+    ),
+    skip_inspect: bool = typer.Option(
+        False,
+        "--skip-inspect",
+        help="Skip pre-flight checks.",
+    ),
+    no_compare: bool = typer.Option(
+        False,
+        "--no-compare",
+        help="Skip output comparison even if original_outputs/ exists.",
+    ),
+    tolerance: float = typer.Option(
+        1e-6,
+        "--tolerance",
+        help="Absolute tolerance for numeric output comparison.",
+    ),
+    timeout: int = typer.Option(
+        600,
+        "--timeout",
+        help="Per-step subprocess timeout in seconds.",
+    ),
+    report_dir: Path = typer.Option(
+        None,
+        "--report-dir",
+        help="Where to write the reproducibility report (default: output-dir).",
+    ),
+) -> None:
+    """Reproduce an EconFlow project from its configuration.
+
+    Runs the full analysis pipeline in an isolated subprocess and optionally
+    compares outputs against original_outputs/ if present.  Produces a
+    reproducibility report (Markdown + JSON).
+
+    Examples:
+
+        econflow reproduce .
+        econflow reproduce examples/blind_replication/
+        econflow reproduce examples/my_study/ --output-dir /tmp/replica/
+        econflow reproduce examples/my_study/ --tolerance 1e-4
+        econflow reproduce examples/my_study/ --skip-inspect --no-compare
+    """
+    from econflow.commands.reproduce import run_reproduce
+
+    exit_code = run_reproduce(
+        project_dir=project_dir,
+        output_dir=output_dir,
+        skip_inspect=skip_inspect,
+        compare=not no_compare,
+        tolerance=tolerance,
+        timeout=timeout,
+        report_dir=report_dir,
+        console=console,
+    )
+    if exit_code != 0:
+        raise typer.Exit(code=exit_code)
+
+
+# ---------------------------------------------------------------------------
+# compare
+# ---------------------------------------------------------------------------
+
+
+@app.command()
+def compare(
+    baseline_dir: Path = typer.Argument(
+        ...,
+        help="Directory containing the original (baseline) outputs.",
+    ),
+    replica_dir: Path = typer.Argument(
+        ...,
+        help="Directory containing the reproduced outputs.",
+    ),
+    tolerance: float = typer.Option(
+        1e-6,
+        "--tolerance",
+        help="Absolute tolerance for floating-point comparison.",
+    ),
+    output: Path = typer.Option(
+        None,
+        "--output", "-o",
+        help="Write ComparisonReport JSON to this path.",
+    ),
+) -> None:
+    """Compare two output directories and report differences.
+
+    Performs toleranced comparison of CSV, LaTeX, and JSON files.  Reports
+    per-file status (match / mismatch / missing) and overall pass/fail.
+
+    Examples:
+
+        econflow compare examples/my_study/original_outputs/ /tmp/replica/tables/
+        econflow compare baseline/ replica/ --tolerance 1e-4
+        econflow compare baseline/ replica/ --output comparison.json
+    """
+    from econflow.commands.compare import run_compare
+
+    exit_code = run_compare(
+        baseline_dir=baseline_dir,
+        replica_dir=replica_dir,
+        tolerance=tolerance,
+        output_path=output,
+        console=console,
+    )
+    if exit_code != 0:
+        raise typer.Exit(code=exit_code)
+
+
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
 
 
 def _output_summary(

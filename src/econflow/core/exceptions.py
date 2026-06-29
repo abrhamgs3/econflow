@@ -23,7 +23,9 @@ EconFlowCoreError
 ├── EstimationError
 │   └── ConvergenceError
 ├── DiagnosticsError
-└── OutputError
+├── OutputError
+└── IntegrityError
+    └── CertificateError
 
 Backward compatibility
 ----------------------
@@ -188,3 +190,16 @@ class DiagnosticsError(EconFlowCoreError):
 
 class OutputError(EconFlowCoreError):
     """Raised when an output renderer fails to produce its artifact."""
+
+
+# ---------------------------------------------------------------------------
+# Integrity
+# ---------------------------------------------------------------------------
+
+
+class IntegrityError(EconFlowCoreError):
+    """Raised for research integrity and reproducibility failures."""
+
+
+class CertificateError(IntegrityError):
+    """Raised when a ReproducibilityCertificate cannot be read or written."""

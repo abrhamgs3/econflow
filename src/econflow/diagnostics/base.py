@@ -103,6 +103,36 @@ class BaseDiagnostic(abc.ABC):
     # Concrete helpers
     # ------------------------------------------------------------------
 
+    def run_with_context(
+        self,
+        result: EstimationResult,
+        **kwargs: Any,
+    ) -> DiagnosticResult:
+        """
+        Run the diagnostic and stamp ``estimator_id`` from *result*.
+
+        This is the preferred entry-point for pipeline code.  It calls
+        :meth:`run` and then sets ``diagnostic_result.estimator_id =
+        result.estimator_id`` so that
+        :func:`~econflow.outputs.diagnostics_report.build_diagnostics_report`
+        can group rows by estimator.
+
+        Parameters
+        ----------
+        result:
+            A fitted :class:`~econflow.estimation.result.EstimationResult`.
+        **kwargs:
+            Forwarded verbatim to :meth:`run`.
+
+        Returns
+        -------
+        DiagnosticResult
+            The result returned by :meth:`run`, with ``estimator_id`` set.
+        """
+        diag_result = self.run(result, **kwargs)
+        diag_result.estimator_id = result.estimator_id
+        return diag_result
+
     def supports(self, estimator_id: str) -> bool:
         """
         Return ``True`` if this diagnostic supports *estimator_id*.

@@ -2,259 +2,404 @@
 
 **EconFlow — Foundational Document**
 
-*This document describes why EconFlow exists, who it is for, and what it aims
-to contribute to empirical economic research. It is a long-term statement of
-intent, not a marketing document. It should be revised only when the
-fundamental direction of the project changes.*
+*This document is the long-term philosophical statement of the project.
+It is not a feature list, a marketing document, or a product roadmap.
+It should be revised only when the project's fundamental beliefs change.
+When architectural decisions are contested, this document is consulted first.*
+
+*Written by the founders. Intended to remain relevant in ten years.*
 
 ---
 
-## The Problem
+## The Problem We Were Handed
 
-Empirical economics produces knowledge through a sequence of steps: data
-acquisition, cleaning, transformation, estimation, diagnostics, and reporting.
-In most research workflows today, these steps are executed through a collection
-of independent scripts, notebooks, and manual operations held together by
-institutional memory and researcher habit.
+Empirical economics has a methodology problem it does not acknowledge as one.
 
-This arrangement produces several persistent problems.
+Economists hold statistical inference to exacting standards. Identification
+strategies are scrutinised. Standard errors are clustered with care.
+Specification choices are justified in footnotes that span pages. The
+intellectual apparatus of causal inference — potential outcomes, exclusion
+restrictions, parallel trends — is applied with rigour developed over decades.
 
-**Fragmented workflows.** A typical project might acquire data from three
-sources using different scripts, clean it in a notebook, estimate models in
-another script, and assemble tables manually. There is no central record of
-how these pieces connect. Changing one step requires tracing its effects
-through the rest by hand.
+And then the results are moved into a table by hand.
 
-**Weak provenance.** The computational path from raw data to published
-coefficient is rarely documented with enough precision to be reconstructed
-by a different person, on a different machine, in a different year. Dataset
-versions, software versions, random seeds, and filtering decisions are often
-implicit in the code and undiscoverable without running it.
+The computational path from raw data to published coefficient is, in most
+published work, opaque. Not fraudulently opaque — the opacity is structural.
+It is the accumulated consequence of workflows that evolved before
+reproducibility was considered a first-class scientific requirement.
+Scripts are the unit of research. Notebooks are assembled ad hoc.
+Data transformations live in memory and are never recorded. Statistical
+assumptions are encoded in configuration variables whose names appear only
+in the code that reads them.
 
-**Poor reproducibility.** Independent replication of published findings
-requires not only the original data but the original workflow in its
-original computational environment. In practice, replication packages are
-frequently incomplete, dependent on undocumented file paths, or reliant on
-software that is no longer available.
+A reader of a published paper can evaluate the statistical theory.
+She cannot, in general, verify the computation. She cannot know whether the
+"balanced panel of 43 countries, 1990–2018" was assembled by the code
+she is reading or by a prior cleanup script that was discarded. She cannot
+know whether the standard errors would change if she ran the same code
+on a machine with a different version of the estimation library. She cannot
+know, without contacting the authors, whether the replication package is
+complete.
 
-**Inconsistent documentation.** Assumptions embedded in estimation code —
-which entities are excluded, which time periods are used, how missing values
-are handled — are rarely documented at the point of the decision. They appear
-in footnotes if at all. A reader cannot verify what was done without reading
-the full codebase.
-
-**Manual reporting.** Moving results from estimation to published tables
-involves manual transcription or one-off scripts that are discarded after the
-paper is submitted. This introduces transcription errors and makes the
-estimation-to-report path unrepeatable.
-
-**Disconnected tools.** The tools that economists use for data acquisition,
-estimation, and reporting were not designed to work together. Combining them
-requires glue code that is bespoke to each project and not reused.
-
-None of these problems are new. They are structural features of a research
-practice that evolved before reproducibility was treated as a first-class
-requirement. The academic incentive structure rewards novel findings more than
-reproducible process. The software ecosystem provides powerful tools for
-individual steps but not for the workflow as a whole.
-
----
-
-## Why EconFlow Exists
-
-EconFlow is a Python framework for configurable, reproducible empirical
-economic research. It exists because the problems described above are
-tractable. They do not require changing academic incentives or research
-culture. They require better workflow infrastructure.
-
-EconFlow's contribution is to provide:
-
-**A common workflow structure.** A project in EconFlow is defined by
-configuration files that specify data sources, variable definitions, model
-specifications, and output targets. The configuration is version-controlled,
-human-readable, and independent of the code that executes it.
-
-**Provenance by default.** Every run records its computational context —
-software versions, dataset identifiers, configuration state, output hashes —
-without requiring the researcher to take any additional action. Provenance is
-not an afterthought; it is embedded in the execution path.
-
-**Auditable assumptions.** Variable transformations, sample selections,
-estimation specifications, and diagnostic thresholds are declared in
-configuration, not hidden in scripts. A reader can verify what was done
-without running the code.
-
-**A plugin architecture for estimators and diagnostics.** Econometric
-methods are registered components with stable interfaces. Adding an estimator
-does not require modifying the framework core. Removing one does not break
-other components.
-
-**Reproducible outputs.** The path from configuration to published table
-is executed by the framework, not assembled by hand. The same configuration
-produces the same outputs in the same order on any compatible system.
-
-EconFlow does not claim to solve the reproducibility problem in empirical
-economics. Reproducibility depends on practices, culture, and incentives
-that extend far beyond any software tool. What EconFlow does is make
-reproducible practice significantly easier than the alternative, so that
+This is the problem EconFlow exists to address. Not to solve — software
+alone cannot solve a problem whose roots are cultural and incentive-driven.
+But to make reproducible practice easier than its absence, so that
 researchers who want to practice it do not have to build the infrastructure
 themselves.
 
 ---
 
-## Long-term Vision
+## What We Believe
 
-### Five years
+**Reproducibility is not a feature. It is a property of the execution model.**
 
-Within five years, EconFlow should be a credible tool for research groups
-conducting applied panel econometrics. A researcher starting a new project
-should be able to adopt EconFlow's workflow without significant friction.
-The framework should have a stable, well-documented public API. Its core
-abstractions — the project configuration, the estimator interface, the
-provenance record, the output pipeline — should have demonstrated stability
-across at least two major releases without breaking changes.
+A framework that treats provenance recording as an optional module has
+misunderstood the problem. Provenance must be embedded in the execution
+path — produced automatically, every time, whether or not the researcher
+thinks about it. A researcher who never reads the provenance documentation
+should still produce a complete provenance record.
 
-The community should be large enough to sustain itself: external contributors
-should have added connectors, estimators, and diagnostic plugins without
-assistance from the core team. There should be at least one published
-research paper that uses EconFlow and makes its replication package publicly
-available through the framework.
+**The computational path is part of the methodology.**
 
-### Ten years
+When a paper reports its identification strategy, it reports its methodology.
+When it omits the computational path from raw data to published result,
+it omits part of its methodology. EconFlow is built on the belief that this
+omission is correctable — not through culture change, but through workflow
+infrastructure that records the path automatically.
 
-Within ten years, EconFlow should be part of a broader ecosystem of
-open science tools for economics. Replication packages produced with EconFlow
-should be self-describing: a reader should be able to reconstruct the full
-computational environment and reproduce all results from a single archive.
+**Configuration is a scientific document.**
 
-The framework should integrate with scientific repositories, preprint servers,
-and data archives at the level of metadata and provenance, not just file
-formats. A graduate student learning empirical methods should encounter
-reproducible workflow practice as a standard part of their training, not a
-specialised skill.
+A YAML file that specifies which variables enter a model, which entities are
+excluded, and which time periods are analysed is a statement of methodology.
+It should be version-controlled, peer-reviewable, and human-readable by an
+economist who does not know Python. Code that embeds these decisions as
+literals is a methodology that can only be audited by reading the code.
 
-EconFlow should remain a tool for serious empirical work. It is not a
-goal to become the most-used econometrics package in Python, to compete with
-Stata or R as a general statistical environment, or to be adopted by
-practitioners outside applied economic research. Depth within a defined scope
-is preferable to breadth across a wide field.
+**The framework does not make scientific decisions.**
 
----
+What to estimate. Which results to report. Whether to reject a null
+hypothesis. These are decisions made by the researcher. EconFlow executes
+them faithfully and records what it did. It does not select models, optimise
+specifications, or suggest interpretations. Scientific authority belongs to
+the researcher, not to the framework or to anything the framework might embed.
 
-## Who EconFlow Is For
+**An open ecosystem is a scientific requirement, not an engineering preference.**
 
-EconFlow is designed for:
+Commercial software creates access inequality. A graduate student at a
+well-funded institution uses the same tools as a researcher at a university
+with no site licence. An open-source, openly documented framework is not just
+a technical choice — it is a commitment to the principle that the ability to
+do credible empirical work should not depend on institutional wealth.
 
-**Empirical economists** conducting applied research with panel data, cross-
-sectional data, or time series. The primary use case is research that produces
-published findings: working papers, journal articles, policy reports.
+**Simple, explicit, and correct. In that order.**
 
-**Applied researchers** in adjacent fields — political science, sociology,
-public health — who use the econometric methods EconFlow supports and who
-face the same workflow problems.
+A framework that is sophisticated but opaque does not serve empirical economics.
+A framework that is fast but non-deterministic does not serve empirical economics.
+A framework that is ergonomic but makes hidden assumptions does not serve
+empirical economics. When these values conflict, simplicity and correctness
+outrank sophistication and ergonomics. An economist who can understand what the
+framework did is better served than one who can do it faster but cannot explain
+how.
 
-**Research groups** that produce multiple papers from related datasets and
-benefit from a shared, consistent workflow infrastructure.
+**Failures should be loud and precise.**
 
-**Graduate students** learning empirical methods. EconFlow provides a
-structured environment in which good practice — configuration management,
-reproducibility, provenance — is the path of least resistance.
+A workflow that completes silently despite a misconfiguration has done the
+researcher a disservice. She will discover the error when she reads the output
+or when a reviewer asks. EconFlow fails immediately, with an error that names
+the specific value that caused the failure, the expected value, and where it
+was set. Warnings are for conditions that do not affect correctness. Everything
+else is an exception.
 
-**Policy analysts** who need to document their analytical process for audit
-or replication by external reviewers.
+**Stability is a feature with scientific stakes.**
 
-EconFlow is **not** designed for:
-
-**Statisticians** working with methods outside panel econometrics. EconFlow
-is not a general statistical computing environment.
-
-**Machine learning practitioners.** The framework has no machinery for
-cross-validation, hyperparameter search, neural networks, or prediction
-pipelines. These are different problems requiring different tools.
-
-**Data engineers** building production data pipelines. EconFlow is designed
-for research workflows, not operational systems.
-
-**Researchers who do not need reproducibility.** If a project is genuinely
-exploratory, one-off, and not intended for publication or replication,
-EconFlow's structure may be more overhead than benefit. Simple scripts are
-sometimes the right tool.
+A replication package written today should run without modification five years
+from now. This is not merely an engineering standard — it is a scientific
+requirement. Replication across time is as important as replication across
+machines. When EconFlow breaks backward compatibility, it breaks replication
+packages, and the researchers who cannot replicate their own published results
+are not the ones who will report this. Stability is maintained conservatively,
+with deprecation periods, migration guides, and explicit version commitments.
 
 ---
 
-## Scope
+## What Distinguishes EconFlow
 
-### What belongs in EconFlow
+The landscape of econometric software is rich. EconFlow exists within it, not
+instead of it. Understanding what it does differently requires understanding
+what the existing tools do — and what they do not.
 
-- Panel data acquisition, caching, and validation through a unified connector
-  interface
-- Data harmonisation, transformation, and sample selection with auditable
-  configuration
-- Panel econometric estimation through a plugin-based estimator registry
-- Post-estimation diagnostics as registered plugins
-- Sensitivity and robustness analysis
-- Provenance recording: dataset versions, software state, output checksums
-- Tabular and graphical output generation driven by configuration
-- A command-line interface for project management and workflow execution
-- A project configuration format that is version-controllable and human-readable
-- Documentation, testing infrastructure, and contribution tooling
+### statsmodels and linearmodels
 
-### What does not belong in EconFlow
+Both are excellent libraries for statistical and panel econometric estimation.
+Neither treats the research workflow as its concern. They accept a DataFrame
+and return results. How the DataFrame was assembled, which entities were
+excluded, what version of the source data was used, and where the results go
+afterward are explicitly out of scope.
 
-- Manuscript writing, word processing, or reference management
-- Literature search or bibliographic analysis
-- Structural economic modelling (DSGE, CGE, agent-based models)
-- Bayesian computation as a primary workflow
-- Natural language processing or text analysis as core functionality
-- General-purpose AI assistants or chatbots
-- Data visualisation for communication rather than diagnosis
-- Statistical theory or econometric pedagogy
-- Operational data pipelines for production systems
-- Any component that requires an active internet connection to function
-  correctly (data connectors are optional and fail gracefully offline)
+This is not a flaw. It is a design decision appropriate to general-purpose
+libraries. But it means that reproducibility — the gap between "running code"
+and "reproducible science" — is left for the researcher to bridge. Most do
+not bridge it, not because they do not care, but because building the bridge
+on each project is expensive and not rewarded.
 
-This boundary is not fixed permanently. As the framework matures, the
-community will identify adjacent capabilities that belong inside EconFlow.
-Changes to scope should be deliberate, documented, and reversible.
+EconFlow is built around `linearmodels` and `statsmodels`. It uses them for
+what they are excellent at and adds the workflow layer they deliberately omit.
+
+### pyfixest
+
+`pyfixest` is fast, elegant, and increasingly the tool of choice for
+high-dimensional fixed-effects estimation in Python. It is designed for
+exploratory analysis at the REPL. The researcher imports it, passes a formula
+and a DataFrame, and has results in milliseconds.
+
+EconFlow is not designed for exploratory analysis. It is designed for the
+transition from exploration to the reproducible pipeline — the point where
+"I found something interesting" becomes "I need to be able to replicate this
+result in two years." These are different problems. Both deserve good tools.
+
+### Stata
+
+Stata do-files are reproducible pipelines. In this sense, Stata understands
+the problem better than most of its Python counterparts. A do-file specifies
+the full sequence of operations; running it reproduces the results.
+
+EconFlow admires this. It does not admire the closed ecosystem, the commercial
+licence, the platform-specific binary format for datasets, or the limited
+interoperability with the broader scientific Python stack. And Stata's
+reproducibility is reproducibility within Stata's world — it does not extend
+to the data acquisition layer, does not produce machine-readable provenance,
+and does not compose with version control in a way that makes the full
+computational path auditable.
+
+### R
+
+The R ecosystem — `fixest`, `plm`, `lme4`, the tidyverse — represents the
+closest intellectual ancestor to what EconFlow is trying to do. `fixest` in
+particular is faster and richer in estimation methods than anything currently
+in EconFlow's estimator registry. The tidyverse pipeline (`|>`) is a genuine
+contribution to the idea that data transformations should be composable and
+auditable.
+
+EconFlow's distinction from R is not superiority of estimation. It is the
+addition of a structured configuration layer, a provenance record, a plugin
+architecture that allows the framework to be extended without forking, and an
+integrity certification step that makes reproducibility a verifiable property
+of a run rather than an aspiration.
+
+EconFlow also operates in Python, which is where the data ecosystem — pandas,
+xarray, dask, the scientific stack — increasingly lives. This is not a
+statement that Python is better than R. It is a statement that researchers
+who already work in Python should not have to leave it to get workflow
+infrastructure.
 
 ---
 
-## Success Criteria
+## What EconFlow Will Never Become
 
-EconFlow's success cannot be measured by software metrics alone. The following
-criteria reflect the scientific purpose of the project.
+These boundaries are deliberate. They are not limitations to be overcome
+in a future version. They are properties that define the project's identity.
+Crossing them would require a new project, not a new version.
 
-**Scientific replication.** A researcher using only an EconFlow replication
-package — the configuration, the data, and the framework — should be able to
-reproduce every result in a published paper without contacting the original
-authors. When this is possible, the framework has contributed to scientific
-reproducibility in practice, not just in principle.
+**EconFlow will never make scientific decisions.**
 
-**Workflow adoption.** Research groups conducting applied empirical work should
-adopt EconFlow's configuration and provenance conventions because they find
-them useful, not because they are required to. Adoption driven by utility is
-more durable than adoption driven by mandate.
+The framework will not select the best model, choose among specification
+alternatives, or recommend whether to report a result. These are scientific
+judgments that belong to the researcher. Tools that automate scientific
+judgment create the appearance of rigour without its substance. We do not
+build those tools.
 
-**Graduate training.** Graduate students in applied economics programs should
-encounter EconFlow or workflows modelled on it as part of their training.
-Good practice should be taught as a normal part of empirical work, not as an
-advanced specialisation.
+**EconFlow will never be a general statistical computing environment.**
 
-**Community contributions.** External contributors — researchers, not core
-developers — should add estimators, connectors, and diagnostic plugins that
-the core team did not design. This demonstrates that the plugin architecture
-is accessible and that the project serves needs beyond those of its authors.
+It is not statsmodels. It is not R. It is not a competitor to scipy. It is
+a workflow framework for applied empirical economics, and the moment it
+tries to be everything, it becomes nothing. Features that expand scope
+beyond this boundary require explicit consensus and a documented reason.
 
-**Credible replication packages.** Papers with EconFlow replication packages
-should be noticeably easier to replicate than papers with ad hoc replication
-packages. This should be verifiable by anyone who attempts it.
+**EconFlow will never be a machine learning framework.**
 
-**Longevity.** The framework should be maintainable by a small team over a
-long period. Code written for EconFlow v0.1 should continue to work without
-modification through v1.x releases. A researcher returning to a project
-after several years should not find the framework has changed out from under
-their work.
+Cross-validation, hyperparameter search, prediction pipelines, neural
+networks, and ensemble methods serve different purposes than causal inference
+from observational panel data. They can live alongside EconFlow. They do
+not live inside it.
 
-EconFlow will be considered successful when researchers choose it not because
-it is new or fashionable, but because it makes their work more reliable,
-more reproducible, and easier to share.
+**EconFlow will never be a Jupyter notebook.**
+
+Notebooks are excellent for exploration. They are poor units of reproducible
+research. A notebook's execution is ordered by the researcher's history, not
+by a declared dependency graph. EconFlow's configuration-driven pipeline is
+a deliberate alternative. We will build good notebook integrations. We will
+not absorb the notebook as our primary interface.
+
+**EconFlow will never prioritise performance over correctness or clarity.**
+
+If there is a trade-off between a fast implementation that requires careful
+use and a slower implementation that always does the right thing, we choose
+the slower one. Estimation is not a hot path. The time a researcher spends
+waiting for results is small compared to the time spent interpreting them.
+Correct and clear results delivered slowly are more valuable than fast results
+delivered with hidden caveats.
+
+**EconFlow will never make reproducibility optional.**
+
+Provenance recording is not a flag. Integrity checking is not a feature to
+be enabled. The moment reproducibility becomes a configuration choice,
+researchers will configure it away under deadline pressure. The framework
+protects the researcher from herself by making the reproducible path the
+only path.
+
+---
+
+## How We Think About AI
+
+Artificial intelligence is already part of research practice. It will become
+more so. EconFlow must have a considered position.
+
+Our position: AI assists. The researcher decides.
+
+Concretely, this means several things.
+
+AI tools integrated into EconFlow may flag potential specification problems,
+suggest additional diagnostic tests, identify unusual data patterns, or
+summarise estimation output. These are accelerants. They reduce the cost of
+good practice. They do not substitute for it.
+
+AI tools integrated into EconFlow do not modify configuration, alter
+provenance records, or change what the framework reports without explicit
+researcher instruction. A suggestion that is acted upon becomes a decision —
+and decisions are made by researchers.
+
+When AI is used in a workflow, the provenance record says so. It records
+which tool was consulted, what it suggested, and what the researcher did
+with the suggestion. AI-assisted and manual workflows produce equivalent
+provenance records with an additional AI provenance field.
+
+We are sceptical of "AI-first" research workflows in which the researcher
+is a supervisor rather than a practitioner. Not because the outputs are
+necessarily wrong, but because the accountability is obscured. When a
+model fails to replicate, or a coefficient is questioned, the researcher
+who understands every step of her own workflow can defend it. The researcher
+who delegated to an AI cannot.
+
+Over the long term, AI will likely become better at econometric inference
+than individual researchers are. This does not change our position. The
+question is not whether AI can produce correct estimates — it may well —
+but whether the research enterprise as a whole benefits from workflows in
+which scientific judgment is atomised and distributed across opaque models
+that cannot be interrogated. We believe it does not.
+
+EconFlow's AI stance in one sentence: use AI to make researchers faster at
+doing their job, not to change whose job it is.
+
+---
+
+## Reproducibility as Architecture
+
+The deepest design commitment in EconFlow is that reproducibility is not
+a module. It is a property of the execution model.
+
+This distinction matters. A module can be skipped. A property of the
+execution model cannot be skipped without changing the execution model.
+
+**In practice this means:**
+
+Every public function that transforms data records what it did. Not in a
+log that can be disabled — in a data structure that is returned alongside
+the result and becomes part of the provenance record automatically.
+
+Configuration is the authoritative source of all scientific parameters.
+Code that contains literals representing country names, variable definitions,
+model specifications, or sample selection criteria is a bug. These belong
+in the configuration file, where they can be versioned, compared, and
+audited without reading code.
+
+Output files are not the product of a run. Verified, hash-confirmed output
+files accompanied by a complete provenance record are the product of a run.
+An output file without a provenance record is unverifiable. We do not produce
+unverifiable outputs by default.
+
+The integrity check is not an audit step that runs after the research is
+done. It runs as part of the pipeline. A result that has not been integrity-
+checked is a result that has not been completed.
+
+Non-determinism is a reproducibility defect. Any component that produces
+different outputs given identical inputs — due to random seeds, iteration
+order over hash maps, floating-point accumulation order in parallel execution
+— is treated as a bug, not a feature. Where non-determinism cannot be
+eliminated, it is documented as a known deviation and its effect on outputs
+is bounded.
+
+**The architectural implication:**
+
+When a new feature is proposed, the first question is not "does this make
+the framework more powerful?" It is "does this make results more or less
+reproducible?" Features that add capability at the cost of reproducibility
+are not additions — they are regressions.
+
+---
+
+## The Decade Ahead
+
+In five years, EconFlow should be a credible infrastructure choice for
+research groups conducting applied empirical work. Its plugin architecture
+should be populated by estimators and connectors written by researchers
+who are not its core developers. Its provenance records should be accepted
+by journals and data repositories as sufficient documentation of computational
+methodology. A paper with an EconFlow replication package should be
+meaningfully easier to replicate than one without.
+
+In ten years, the goal is more ambitious and less certain.
+
+We believe that the way empirical research is documented will change. Not
+because journals will mandate it, though some may, but because the tools
+to do it correctly will have become the path of least resistance. EconFlow
+wants to be part of that infrastructure — the layer between the researcher's
+scientific judgment and the published record that ensures the connection
+between them is complete, auditable, and reproducible.
+
+We do not expect EconFlow to be the only such framework. We expect it to
+be one of several, each optimised for different research communities. We
+hope the ideas it embeds — configuration-first workflows, automatic provenance,
+plugin-based extensibility, integrity certification — become common enough
+that they need not be explained to newcomers.
+
+We will consider the project successful when a graduate student starting a
+new panel econometrics project reaches for a workflow framework as naturally
+as she reaches for an estimator library — when the infrastructure of
+reproducibility is assumed, not heroically constructed.
+
+We will consider the project finished when that infrastructure is so embedded
+in research practice that EconFlow can be replaced by its successors without
+loss. Tools should outlive their implementations.
+
+---
+
+## What This Document Is Not
+
+This is not a roadmap. Specific milestones, release criteria, and sprints
+are documented elsewhere.
+
+This is not a design specification. Technical choices are documented in
+Architecture Decision Records, which are binding on the code but temporary.
+This document is not.
+
+This is not a promise. It is a statement of intent, as clear and honest as
+we can make it about what we are building and why. We may be wrong about
+some of it. Where we are wrong, we will say so and revise.
+
+This is not a contribution guide. CONTRIBUTING.md documents how to
+participate in the project.
+
+This is the answer to the question: *If you had to explain why EconFlow exists
+to a skeptical colleague who already uses Stata and sees no reason to change,
+what would you say?*
+
+We would say: EconFlow exists because the methodology of empirical economics
+is incomplete without a reproducible record of its computation, and no existing
+tool makes producing that record as easy as not producing it. We are trying
+to close that gap.
+
+---
+
+*This document supersedes the previous VISION.md dated prior to 2026-06-29.
+The founding intent has not changed; this version states it with more
+precision.*

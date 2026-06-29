@@ -74,6 +74,9 @@ class WorldBankConnector(AbstractConnector):
         Column name for the time dimension in output.  Default ``"year"``.
     """
 
+    _CITATION = _CITATION
+    _VERSION = "unknown"
+
     def __init__(
         self,
         params: dict[str, Any] | None = None,

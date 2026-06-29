@@ -6,7 +6,7 @@ project:
   description: "Firm investment and fixed effects — Grunfeld panel (1935–1954)"
 
 data:
-  path: "examples/getting_started/data/grunfeld.csv"
+  path: "../data/grunfeld.csv"
   entity_col: "firm"
   time_col: "year"
   required_columns:

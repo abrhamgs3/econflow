@@ -38,6 +38,10 @@ class DiagnosticResult:
         One-sentence plain-English interpretation (e.g. "Reject H0: ...").
     level:
         Severity level: ``"info"``, ``"warning"``, or ``"error"``.
+    estimator_id:
+        Registry ID of the estimator that was diagnosed (e.g. ``"fe"``).
+        Populated automatically by
+        :meth:`~econflow.diagnostics.base.BaseDiagnostic.run_with_context`.
     extra:
         Diagnostic-specific supplementary data (degrees of freedom,
         bandwidth, etc.).
@@ -49,6 +53,7 @@ class DiagnosticResult:
     pvalue: float | None = None
     conclusion: str = ""
     level: str = "info"
+    estimator_id: str = ""
     extra: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -72,6 +77,7 @@ class DiagnosticResult:
             pvalue=data.get("pvalue"),
             conclusion=data.get("conclusion", ""),
             level=data.get("level", "info"),
+            estimator_id=data.get("estimator_id", ""),
             extra=dict(data.get("extra", {})),
         )
 
@@ -131,7 +137,7 @@ class EstimationResult:
     warnings:
         Human-readable warnings generated during estimation.
     provenance:
-        Dict of provenance metadata (timestamp, git commit, params used, …).
+        Dict of provenance metadata (timestamp, git commit, params used, ...).
     extra:
         Estimator-specific supplementary statistics (J-stat, etc.).
     """
@@ -203,7 +209,7 @@ class EstimationResult:
     # ------------------------------------------------------------------
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a JSON-serializable dict (Series → list, DataFrame → list of dicts)."""
+        """Return a JSON-serializable dict (Series -> list, DataFrame -> list of dicts)."""
         return {
             "estimator_id":   self.estimator_id,
             "estimator_name": self.estimator_name,
@@ -236,6 +242,6 @@ class EstimationResult:
     def __str__(self) -> str:
         return (
             f"EstimationResult({self.estimator_name!r}, "
-            f"nobs={self.nobs}, R²={self.rsquared:.4f}, "
+            f"nobs={self.nobs}, R2={self.rsquared:.4f}, "
             f"vars={list(self.params.index)})"
         )

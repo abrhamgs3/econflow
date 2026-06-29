@@ -136,7 +136,17 @@ class ReportTable:
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ReportTable:
-        rows = [TableRow(**r) for r in data.get("rows", [])]
+        rows = [
+            TableRow(
+                label=r.get("label", ""),
+                cells=dict(r.get("cells", {})),
+                sub_cells=dict(r["sub_cells"]) if r.get("sub_cells") is not None else None,
+                row_type=r.get("row_type", "data"),
+                bold=bool(r.get("bold", False)),
+                italic=bool(r.get("italic", False)),
+            )
+            for r in data.get("rows", [])
+        ]
         return cls(
             title=data["title"],
             table_type=data["table_type"],

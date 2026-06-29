@@ -1,0 +1,8 @@
+# Output configuration for blind replication example
+
+outputs:
+  base_dir: "../outputs"
+  tables:
+    dir: "tables"
+    comparison_table:
+      filename: "comparison_table.csv"

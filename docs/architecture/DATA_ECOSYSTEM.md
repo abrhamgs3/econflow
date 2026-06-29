@@ -1,287 +1,332 @@
-# Data Ecosystem Architecture
+# Data Ecosystem & Connector Framework
 
-**EconFlow Sprint 4**
-
-This document describes the data acquisition, caching, validation, and
-provenance subsystem introduced in Sprint 4.  It covers the design goals,
-module responsibilities, data flow, and extension points.
+**EconFlow Sprint 8 — Architecture Document**
 
 ---
 
-## Goals
+## Overview
 
-1. **Unified interface** — every data source, regardless of transport or format,
-   exposes the same five-method API so pipeline code never knows whether it is
-   talking to a local CSV, the World Bank API, or the OECD SDMX endpoint.
-
-2. **Deterministic caching** — a dataset is keyed by a SHA-256 of the connector
-   ID and download parameters.  The same parameters always resolve to the same
-   cache slot; changing any parameter automatically invalidates and re-fetches.
-
-3. **Automatic provenance** — every download is recorded with source URL,
-   download timestamp, dataset version, citation string, file hash, and row/col
-   counts.  The record is written alongside the cached CSV and can be injected
-   into `ProvenanceRecorder` with a single call.
-
-4. **Configurable validation** — six structural checks run on every downloaded
-   CSV.  Checks are configurable per connector and produce a structured report
-   rather than raising exceptions, so callers decide how to handle warnings
-   vs. errors.
-
-5. **Extensibility** — third-party connectors register with a one-line decorator.
-   No modification to existing EconFlow code is required.
+The data ecosystem layer provides a generic, plugin-based data acquisition pipeline for
+EconFlow.  It replaces ad-hoc download scripts with a uniform interface that handles
+caching, provenance, validation, citation, and versioning automatically.
 
 ---
 
-## Package Layout
+## Core Components
 
-```
-src/econflow/ingestion/
-├── __init__.py          Public API re-exports (CacheManager, DatasetMetadata,
-│                        AbstractConnector, DataValidator, register, …)
-├── base.py              AbstractConnector + ConnectorError
-├── registry.py          @register() decorator + get_connector() / list_connectors()
-├── metadata.py          DatasetMetadata dataclass + JSON serialization
-├── cache.py             CacheManager — slot-based filesystem cache
-├── validation.py        DataValidator + DataValidationConfig + DataValidationReport
-└── connectors/
-    ├── __init__.py      Imports all built-in connectors (triggers @register())
-    ├── csv_connector.py LocalCSVConnector  [status: implemented]
-    ├── world_bank.py    WorldBankConnector [status: implemented]
-    ├── oecd.py          OECDConnector      [status: stub]
-    └── pwt.py           PennWorldTablesConnector [status: stub]
-```
+### 1. `AbstractConnector` (base.py)
 
----
+Every data source is represented as a concrete subclass of `AbstractConnector`.  The
+interface requires six methods:
 
-## Module Responsibilities
+| Method | Purpose |
+|---|---|
+| `connect()` | Verify the source is reachable (lightweight ping) |
+| `download(force=False)` | Fetch data and return path to a local CSV |
+| `validate(path)` | Run structural checks; return `DataValidationReport` |
+| `metadata()` | Return `DatasetMetadata` after download |
+| `cache_key()` | Return a deterministic, collision-resistant cache key |
+| `citation()` | Return academic citation string for the data source |
+| `version()` | Return dataset version identifier |
 
-### `base.py` — `AbstractConnector`
+`citation()` and `version()` are concrete methods backed by class-level `_CITATION` and
+`_VERSION` attributes.  Subclasses either set these attributes or override the methods for
+dynamic behavior.
 
-Defines the contract every connector must implement:
+The `fetch()` convenience method runs steps 1–4 in sequence and returns `(path, metadata)`.
 
-| Method | Responsibility |
-|--------|----------------|
-| `connect()` | Verify the data source is reachable (e.g. HTTP ping, file exists check). |
-| `download(*, force)` | Fetch the raw data and write it to the cache slot (or return the source path directly). |
-| `validate(path)` | Run structural checks on the downloaded file; return a `DataValidationReport`. |
-| `metadata()` | Return the `DatasetMetadata` record for the last download. |
-| `cache_key()` | Return the deterministic cache slot key (a 64-char SHA-256 hex string). |
+### 2. ConnectorRegistry (registry.py)
 
-The concrete `fetch()` method chains these five methods in order and returns
-`(path, metadata)`.  Pipeline code calls `fetch()` rather than the individual
-methods unless it needs fine-grained control.
-
-`_make_cache_key(extra=None)` is a protected helper that computes a SHA-256
-of `{"connector_id": ..., "params": {sorted params}}` plus any `extra` dict.
-Subclasses call this from `cache_key()`.
-
-### `registry.py` — Connector Registry
+Connectors self-register via the `@register(connector_id, label=…)` class decorator.
+Registration happens at import time.  The `connectors/__init__.py` imports all built-in
+modules, so `import econflow.ingestion` is sufficient to populate the registry.
 
 ```python
-_REGISTRY: dict[str, type[AbstractConnector]]
-_REGISTRY_META: dict[str, dict[str, str]]
+from econflow.ingestion.registry import get_connector, list_connectors
+
+ConnClass = get_connector("world_bank")
+all_connectors = list_connectors()   # sorted list of metadata dicts
 ```
 
-`@register(connector_id, *, label, status, notes)` is a class decorator that
-populates both dicts at import time and stamps `cls.connector_id`.
+Third-party connectors register themselves with the same decorator — no changes to
+EconFlow core are required.
 
-`get_connector(id)` raises `KeyError` with the list of available IDs if the
-connector is not registered.
+### 3. CacheManager (cache.py)
 
-`list_connectors()` returns a sorted list of dicts (id, label, status, notes)
-suitable for `econflow info`.
+`CacheManager` provides a filesystem-backed key/value store for downloaded datasets.
+Each cache slot is a directory `<cache_dir>/<key>/` containing:
 
-`unregister(id)` is provided for testing; not intended for production use.
+- `data.csv` — the downloaded dataset (UTF-8, header row)
+- `meta.json` — serialized `DatasetMetadata`
 
-### `metadata.py` — `DatasetMetadata`
+SHA-256 verification runs on every `retrieve()` call.  A mismatch raises
+`CacheCorruptionError` so the caller can force a re-download rather than silently using
+corrupt data.
 
-An immutable dataclass capturing the full provenance of a download:
+Cache keys are deterministic hex digests of the connector ID and sorted parameters.
+Identical queries always map to the same cache slot.
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `connector_id` | `str` | Registry ID of the producing connector |
-| `source` | `str` | Human-readable source name |
-| `download_date` | `str` | ISO-8601 UTC timestamp |
-| `url` | `str` | Canonical source URL or file path |
-| `version` | `str` | Dataset version from the source API |
-| `citation` | `str` | Academic citation string |
-| `sha256_hash` | `str` | SHA-256 of the cached CSV (64 hex chars) |
-| `row_count` | `int` | Data rows (excluding header) |
-| `col_count` | `int` | Column count |
-| `columns` | `list[str]` | Ordered column names |
-| `params` | `dict` | Connector parameters used for this download |
+### 4. DatasetMetadata (metadata.py)
 
-`DatasetMetadata.now(*, connector_id, source, url, ...)` is the primary factory;
-it stamps `download_date` with the current UTC time.
+`DatasetMetadata` is a dataclass recording full provenance for one downloaded dataset:
 
-Full JSON round-trip: `to_json()` / `from_json()` / `to_dict()` / `from_dict()`.
-
-### `cache.py` — `CacheManager`
-
-Slot-based filesystem cache.  Layout:
-
-```
-<cache_dir>/
-└── <64-char-key>/
-    ├── data.csv
-    └── meta.json
+```python
+@dataclass
+class DatasetMetadata:
+    connector_id: str
+    source: str
+    download_date: str          # ISO-8601 UTC
+    url: str
+    version: str
+    citation: str
+    sha256_hash: str
+    row_count: int
+    col_count: int
+    columns: list[str]
+    params: dict[str, Any]
 ```
 
-| Method | Description |
-|--------|-------------|
-| `store(key, source_path, metadata)` | Copy `source_path` into the slot, compute SHA-256, populate row/col counts, write `meta.json`. Returns the cached `data.csv` path. |
-| `retrieve(key)` | Verify SHA-256 (raises `CacheCorruptionError` on mismatch); return `(data_path, DatasetMetadata)`. |
-| `is_cached(key)` | True iff `data.csv` and `meta.json` both exist in the slot. |
-| `list_cached()` | Return all slot keys present on disk. |
-| `invalidate(key)` | Delete the slot; return `True` if it existed. |
-| `clear()` | Delete all slots; return count. |
-| `compute_hash(path)` | Static method; return SHA-256 hex of a file. |
+`DatasetMetadata.now(...)` is the factory for new records.  Full JSON round-trip via
+`to_json()` / `from_json()`.
 
-### `validation.py` — `DataValidator`
+### 5. DatasetManifest (manifest.py)
 
-Runs up to six checks on a CSV file or pandas DataFrame:
+`DatasetManifest` is a project-level registry of every dataset a pipeline run acquired.
+It records connector ID, cache key, parameters, metadata, validation outcome, citation,
+and dataset version for each entry.
 
-| Code | Check | Level | Trigger |
-|------|-------|-------|---------|
-| V-00 | File exists | error | File not found at path |
-| V-01 | Required columns | error | Any `required_columns` missing from header |
-| V-02 | Duplicate rows | warning | (`entity_col`, `time_col`) pair appears more than once |
-| V-03 | Missing identifiers | warning | Blank or null `entity_col` or `time_col` |
-| V-05 | Missing years | warning | `check_missing_years=True` and a year in `expected_years` is absent for any entity |
-| V-06 | Missing value % | warning | Any column has `>max_missing_pct` fraction of blank cells |
+```python
+manifest = DatasetManifest(project="growth_study")
+manifest.add_entry(
+    connector_id="world_bank",
+    cache_key=connector.cache_key(),
+    params=connector.params,
+    metadata=meta,
+    validation_passed=True,
+    citation=connector.citation(),
+    dataset_version=connector.version(),
+)
+manifest.save(Path("outputs/manifest.json"))
+```
 
-`DataValidationConfig` controls which checks run and with what thresholds.
-`DataValidationReport` accumulates `ValidationIssue` objects; callers inspect
-`report.has_errors` to decide whether to abort.
+Manifests are written atomically (write to `.tmp`, `fsync`, `rename`) to prevent partial
+writes.  `ManifestEntry.to_dict()` is JSON-serializable.
+
+### 6. DataValidator (validation.py)
+
+`DataValidator` runs configurable checks on panel CSVs:
+
+| Check | Code | Default |
+|---|---|---|
+| Required columns present | V-01 | on (columns list = `[]`) |
+| No duplicate (entity, time) keys | V-02 | on |
+| No null identifiers | V-03 | on |
+| Expected years present | V-05 | off |
+| Missing-value % under threshold | V-06 | off (threshold=1.0) |
+
+Returns a `DataValidationReport` with `.has_errors`, `.n_errors`, `.n_warnings`, and
+`.issues` list.
 
 ---
 
-## Data Flow
+## Built-in Connectors
 
-```
-researcher code
-     │
-     ▼
-connector.fetch(force=False)
-     │
-     ├─► connect()          ── verify source reachable
-     ├─► download(force)    ── check CacheManager.is_cached(key)
-     │       │                    hit:  CacheManager.retrieve(key) → path, meta
-     │       │                    miss: fetch raw data → CacheManager.store(key, ...) → path
-     ├─► validate(path)     ── DataValidator.validate_path(path) → DataValidationReport
-     └─► metadata()         ── return DatasetMetadata
-          │
-          ▼
-     (path, DatasetMetadata)
-          │
-          ├─► ProvenanceRecorder.record_dataset(metadata)
-          │        └── appended to metadata["datasets"] in run_metadata.json
-          └─► pipeline code uses path
-```
+### `csv` — LocalCSVConnector
 
----
+Reads any UTF-8 panel CSV from the local filesystem.  No network access.  The simplest
+connector for starting a new project or testing pipeline code offline.
 
-## Cache Key Design
+**Required params:** `path` (path to source CSV)
+**Optional params:** `encoding`, `citation`, `required_columns`, `entity_col`, `time_col`
 
-The cache key is the SHA-256 hex of:
+### `world_bank` — WorldBankConnector
 
-```json
-{
-  "connector_id": "<id>",
-  "params": { "<sorted param keys>": "<values>" }
-}
-```
+Fetches indicator time series from the World Bank Open Data API v2.  No API key required.
+Downloads all pages automatically and writes a tidy long-format CSV with columns
+`[country, year, indicator, value]`.
 
-Computed deterministically so the same download parameters always map to the
-same slot across machines and sessions.  Connectors may pass an `extra` dict
-to `_make_cache_key()` to include additional dimensions (e.g. `LocalCSVConnector`
-includes the resolved absolute source path so that two files at different
-absolute paths never collide even if they have the same base name).
+**Required params:** `indicators` (list of WB indicator codes)
+**Optional params:** `countries`, `year_start`, `year_end`, `entity_col`, `time_col`
 
----
+### `oecd` — OECDConnector
 
-## Provenance Integration
+Fetches data from the OECD SDMX-JSON API.  No API key required for public dataflows.
+Parses the SDMX-JSON envelope (series dimension keys, observation time indices) and
+writes long-format CSV.
 
-`ProvenanceRecorder.record_dataset(metadata: DatasetMetadata)` appends a
-`DatasetMetadata.to_dict()` snapshot to `metadata["datasets"]` in the
-run provenance JSON.  The JSON schema is additive: the new `datasets` key is
-an array of dataset provenance records, each matching the `DatasetMetadata`
-field set.
+**Required params:** `dataflow` (OECD dataflow ID)
+**Optional params:** `filter`, `start_period`, `end_period`, `entity_col`, `time_col`
 
-Example provenance output:
+### `pwt` — PennWorldTablesConnector
 
-```json
-{
-  "schema_version": "1.0.0",
-  "run_id": "f47ac10b-...",
-  "datasets": [
-    {
-      "connector_id": "world_bank",
-      "source": "World Bank Open Data",
-      "download_date": "2026-06-27T12:00:00+00:00",
-      "url": "https://api.worldbank.org/v2",
-      "version": "2024-Q2",
-      "citation": "World Bank (2024). World Development Indicators.",
-      "sha256_hash": "a3f5...",
-      "row_count": 4320,
-      "col_count": 4,
-      "columns": ["country", "year", "indicator", "value"],
-      "params": {"indicators": ["IT.NET.USER.ZS"], "year_start": 2000}
-    }
-  ],
-  ...
-}
-```
+Downloads the Penn World Tables Excel workbook from Harvard Dataverse and converts to
+a wide-format CSV.  Optionally subsets to the requested variable codes.
+
+**Required params:** none (defaults to version `"10.01"`)
+**Optional params:** `version`, `variables`, `entity_col`, `time_col`
+**Dependencies:** `requests`, `openpyxl`
+
+### `fred` — FREDConnector
+
+Downloads time-series observations from the St. Louis Fed FRED API.  Supports multiple
+series in one call.  Missing values (`"."`) are converted to empty strings.
+
+**Required params:** `series_ids` (list of FRED series IDs)
+**Optional params:** `api_key` (or `FRED_API_KEY` env var), `start_date`, `end_date`,
+`frequency`, `aggregation_method`
+
+API key available at: https://fred.stlouisfed.org/docs/api/api_key.html
 
 ---
 
-## Writing a New Connector
+## CLI Commands
 
-1. Create `src/econflow/ingestion/connectors/my_source.py`.
-2. Implement all five abstract methods and `cache_key()`.
-3. Decorate the class with `@register("my_source", label="My Source")`.
-4. Add the import to `src/econflow/ingestion/connectors/__init__.py`.
-5. Write tests in `tests/unit/test_ingestion_my_source.py` and
-   `tests/integration/test_my_source_connector.py`.
+### `econflow fetch <connector_id>`
 
-No other code changes are required.  The connector will appear automatically
-in `econflow info` and be available via `get_connector("my_source")`.
-
----
-
-## Testing
+Download a dataset using a registered connector.
 
 ```bash
-# Unit tests (no network required)
-pytest tests/unit/test_ingestion_metadata.py
-pytest tests/unit/test_ingestion_cache.py
-pytest tests/unit/test_ingestion_validation.py
-pytest tests/unit/test_ingestion_registry.py
+# World Bank internet penetration
+econflow fetch world_bank \
+    --param indicators=IT.NET.USER.ZS \
+    --param year_start=2000 \
+    --param year_end=2022
 
-# Integration tests (local files only — no network)
-pytest tests/integration/test_csv_connector.py
+# FRED annual GDP per capita
+econflow fetch fred \
+    --param series_ids=GDPPC,UNRATE \
+    --param frequency=a \
+    --param start_date=2000-01-01
 
-# All ingestion tests
-pytest tests/unit/test_ingestion_*.py tests/integration/test_csv_connector.py -v
+# Local CSV (no network)
+econflow fetch csv --param path=data/raw/panel.csv
+
+# Force re-download; record manifest
+econflow fetch world_bank \
+    --param indicators=NY.GDP.MKTP.CD \
+    --force \
+    --manifest outputs/manifest.json
 ```
 
-World Bank, OECD, and PWT connector integration tests are not included in the
-default suite because they require live network access.  They will be added
-under `tests/integration/` and marked with `@pytest.mark.network` when the
-stub implementations are completed.
+`--param` values are auto-parsed: comma-separated strings become lists; integers,
+floats, and booleans are coerced to their native types.
+
+### `econflow cache`
+
+Inspect and manage the local dataset cache.
+
+```bash
+econflow cache list               # list all cached datasets
+econflow cache inspect <key>      # show metadata + hash status
+econflow cache clear --yes        # delete everything
+econflow cache purge <key>        # delete one slot
+```
+
+### `econflow datasets`
+
+List all registered connectors.
+
+```bash
+econflow datasets                 # list all
+econflow datasets --filter world  # filter by ID substring
+```
 
 ---
 
-## Known Limitations and Future Work
+## Integration with Provenance & Integrity Frameworks
 
-- **OECD connector** (`status: stub`) — interface complete; download and parsing
-  logic not yet implemented.  See module docstring for the implementation plan.
-- **PWT connector** (`status: stub`) — interface complete; Excel download and
-  reshaping not yet implemented.  Requires `openpyxl` or `pandas[excel]`.
-- **Streaming large files** — `CacheManager.store()` currently reads the source
-  file into memory to count rows/cols.  A future version should stream the file
-  to disk and parse the header separately.
-- **Cache size limits** — no eviction policy is implemented.  For large
-  datasets, callers should call `cache.invalidate(key)` or `cache.clear()`
-  manually.
+The data ecosystem integrates with Sprint 7's integrity framework:
+
+1. **DatasetManifest → ReproducibilityCertificate**: `DatasetMetadata.sha256_hash` can
+   be recorded in a `DataFingerprint` and included in the certificate.
+
+2. **Citation chain**: `manifest.citations()` returns all dataset citation strings for
+   inclusion in a replication package README.
+
+3. **Drift detection**: `detect_drift()` compares SHA-256 hashes and row counts between
+   two certificate runs.  The manifest records the connector parameters so the exact
+   download can be reproduced.
+
+```python
+from econflow.integrity.certificate import ReproducibilityCertificate
+from econflow.integrity.fingerprint import DataFingerprint
+
+cert = ReproducibilityCertificate.build(
+    project_name="My Study",
+    data_fingerprints=[DataFingerprint.from_path(path)],
+)
+```
+
+---
+
+## Extension: Writing a New Connector
+
+1. Create `src/econflow/ingestion/connectors/my_source.py`
+2. Subclass `AbstractConnector`
+3. Set `_CITATION` and `_VERSION` class attributes
+4. Implement all six abstract methods
+5. Decorate with `@register("my_source", label="…")`
+6. Add the import to `connectors/__init__.py`
+
+```python
+from econflow.ingestion.base import AbstractConnector, ConnectorError
+from econflow.ingestion.registry import register
+
+@register("my_source", label="My Data Source", status="implemented")
+class MySourceConnector(AbstractConnector):
+    _CITATION = "Author (2024). My Dataset. https://example.com"
+    _VERSION = "2024-Q1"
+
+    def connect(self) -> None: ...
+    def download(self, *, force=False): ...
+    def validate(self, path): ...
+    def metadata(self): ...
+    def cache_key(self): return self._make_cache_key()
+```
+
+---
+
+## Technical Debt
+
+| Item | Severity | Notes |
+|---|---|---|
+| OECD connector uses generic SDMX-JSON parser | Medium | The dimension key parsing assumes specific ordering; some dataflows use different dimension arrangements |
+| PWT downloads full Excel workbook | Low | ~40 MB download; no streaming; could use `pandas` for faster parse |
+| FRED no offline fallback hint | Low | `connect()` requires live key validation; could support offline mode with `--offline` flag |
+| `validate_dataframe()` type hint uses `pd.DataFrame` without import | Low | Type annotation uses string forward reference; actual pandas import only in method body |
+| Root-level stubs `oecd.py`, `pwt.py`, `world_bank.py` | Medium | Old Sprint 4 stubs still exist alongside connectors/; should be removed |
+| No streaming download for large datasets | Medium | WorldBank and FRED fetch entire response into memory |
+
+---
+
+## Sprint 9 Recommendations
+
+1. **Remove root-level stubs**: Delete `src/econflow/ingestion/oecd.py`,
+   `pwt.py`, `world_bank.py` (Sprint 4 artifacts now superseded by `connectors/`).
+
+2. **Add `econflow fetch --offline` mode**: Check cache without attempting network,
+   raise `ConnectorError` with clear message if not cached.
+
+3. **Dataset schema discovery**: Add `schema()` method to `AbstractConnector` that
+   returns the expected output columns and dtypes, enabling downstream validation.
+
+4. **OECD full implementation**: Test against live OECD SDMX-JSON API across several
+   public dataflows; harden dimension-key parsing for non-standard structures.
+
+5. **PWT streaming**: Replace full-workbook load with sheet-level streaming via
+   `openpyxl` `read_only=True` (already used) but add chunk-based row iteration.
+
+6. **API key management**: Integrate with system keyring (via `keyring` library) so
+   FRED API keys are not stored in plain-text config files.
+
+7. **`econflow fetch --dry-run`**: Preview what would be downloaded (cache key, URL,
+   estimated size) without executing the download.
+
+8. **Panel-aware validation**: Add V-07 check that detects balanced vs unbalanced panels
+   and reports the fraction of missing (entity, year) cells.
+
+9. **Citation export**: Add `econflow package --include-manifest` to embed the dataset
+   manifest and a formatted references section in the replication package README.
+
+10. **Async downloads**: For multi-indicator World Bank fetches, parallelize across
+    indicators using `asyncio` + `aiohttp` or `concurrent.futures.ThreadPoolExecutor`.

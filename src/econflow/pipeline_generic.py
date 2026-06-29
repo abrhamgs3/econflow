@@ -423,7 +423,13 @@ def run_from_config(
     out_cfg = _load_yaml(outputs_path)
 
     data_cfg = cfg["data"]
-    data_path = Path(data_cfg["path"])
+    _raw_data_path = Path(data_cfg["path"])
+    # Resolve relative paths against the config file's directory so the project
+    # is self-contained regardless of the working directory the CLI is called from.
+    if not _raw_data_path.is_absolute():
+        data_path = (config_path.parent / _raw_data_path).resolve()
+    else:
+        data_path = _raw_data_path
     entity_col = data_cfg["entity_col"]
     time_col = data_cfg["time_col"]
     dependent = cfg["variables"]["dependent"]
@@ -473,7 +479,12 @@ def run_from_config(
     # --------------------------------------------------------------- [4/5] Export tables
     log.info("[4/5] Exporting tables")
     out_section = out_cfg["outputs"]
-    base_dir = Path(out_section["base_dir"])
+    _raw_base_dir = Path(out_section["base_dir"])
+    # Resolve relative paths against the outputs config file's directory.
+    if not _raw_base_dir.is_absolute():
+        base_dir = (outputs_path.parent / _raw_base_dir).resolve()
+    else:
+        base_dir = _raw_base_dir
     tables_section = out_section["tables"]
     tables_dir = base_dir / "tables"
     table_filename = tables_section["comparison_table"]["filename"]
@@ -487,12 +498,14 @@ def run_from_config(
     )
 
     if "csv" in formats:
-        _write_csv(table_df, tables_dir / f"{table_filename}.csv")
+        # Strip extension if already present (e.g. config declares "table.csv")
+        _stem = table_filename.removesuffix(".csv").removesuffix(".CSV")
+        _write_csv(table_df, tables_dir / f"{_stem}.csv")
     if "latex" in formats:
         project_name = cfg.get("project", {}).get("name", "panel regression")
         _write_latex(
             table_df,
-            tables_dir / f"{table_filename}.tex",
+            tables_dir / f"{_stem}.tex",
             regressors,
             caption=f"Panel regression results -- {project_name}",
         )

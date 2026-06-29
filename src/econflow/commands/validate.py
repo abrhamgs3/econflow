@@ -230,7 +230,7 @@ def _check_models_schema(
                            "fail", f"Add `{field_name}:` to model '{mid}'")
 
         # Estimator from supported set
-        est = str(spec.get("estimator", "")).upper()
+        est = str(spec.get("estimator", "")).lower()
         if est and est not in _SUPPORTED_ESTIMATORS:
             report.add("M-04", f"{prefix}: estimator recognised",
                        "warn",
@@ -307,7 +307,7 @@ def _check_cross_consistency(
                            f"variables.regressors. This is allowed but may indicate a typo.")
 
 
-def _check_data_file(cfg: dict, report: ValidationReport) -> None:
+def _check_data_file(cfg: dict, report: ValidationReport, config_path: Path | None = None) -> None:
     """Validate the data file (only when --data flag is set)."""
     data_path_str = _deep_get(cfg, "data", "path")
     if data_path_str is None:
@@ -315,7 +315,11 @@ def _check_data_file(cfg: dict, report: ValidationReport) -> None:
                    "data.path not set in config.yaml — skipping data checks")
         return
 
-    data_path = Path(str(data_path_str))
+    _raw = Path(str(data_path_str))
+    if not _raw.is_absolute() and config_path is not None:
+        data_path = (config_path.parent / _raw).resolve()
+    else:
+        data_path = _raw
 
     if not data_path.exists():
         report.add("D-01", "data file exists", "fail",
@@ -494,7 +498,7 @@ def run_validate(
 
     # ------------------------------------------------------------------ Data file
     if check_data and cfg is not None:
-        _check_data_file(cfg, report)
+        _check_data_file(cfg, report, config_path=config_path)
     elif check_data:
         report.add("D-01", "data checks", "skip",
                    "Skipped — config.yaml could not be parsed")
