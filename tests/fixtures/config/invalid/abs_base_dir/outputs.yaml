@@ -1,0 +1,7 @@
+outputs:
+  base_dir: "/absolute/path/outputs"
+  tables:
+    formats:
+      - "csv"
+    comparison_table:
+      filename: "table_main"

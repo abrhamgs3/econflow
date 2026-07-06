@@ -1,437 +1,529 @@
 """
 econflow.commands.validate — ``econflow validate`` command implementation.
 
-Validates an EconFlow project's configuration files, directory structure,
-variable declarations, and (optionally) the processed data file.
+Architecture Stabilization Milestone 4.
 
-Checks performed
-----------------
-Config files
-  [C-01]  config.yaml  is present and parseable YAML
-  [C-02]  models.yaml  is present and parseable YAML
-  [C-03]  outputs.yaml is present and parseable YAML
+Produces a three-phase validation report:
 
-config.yaml schema
-  [S-01]  data.path       is present
-  [S-02]  data.entity_col is present
-  [S-03]  data.time_col   is present
-  [S-04]  variables.dependent  is present and non-empty
-  [S-05]  variables.regressors is a non-empty list
+    Phase 1 — Schema validation   (Pydantic v2 models)
+    Phase 2 — Semantic validation (config linter rules)
+    Phase 3 — Cross-file checks   (cross-file consistency)
 
-models.yaml schema
-  [M-01]  models list is present and non-empty
-  [M-02]  each model has id, estimator, dependent, regressors
-  [M-03]  no duplicate model IDs
-  [M-04]  model estimators are from the supported set (OLS | FE)
-  [M-05]  model dependents match variables.dependent in config.yaml
+Optionally Phase 4 — Data file validation (opt-in via ``--data`` flag).
 
-outputs.yaml schema
-  [O-01]  outputs.base_dir is present
-  [O-02]  outputs.tables.comparison_table.filename is present
+Output format
+-------------
+::
 
-Cross-file consistency
-  [X-01]  model IDs referenced in outputs.models_order exist in models.yaml
-  [X-02]  model regressors are a subset of variables.regressors (warn if not)
+    EconFlow validate  config/
 
-Data file (only when --data flag is set)
-  [D-01]  data file exists
-  [D-02]  data file is a valid CSV
-  [D-03]  entity_col and time_col are present in the CSV
-  [D-04]  dependent and regressors are present in the CSV
-  [D-05]  no duplicate (entity, time) rows
+    Phase 1: Schema validation
+      ✓ config.yaml   — schema valid
+      ✓ models.yaml   — schema valid
+      ✓ outputs.yaml  — schema valid
+
+    Phase 2: Semantic validation
+      ✓ semantic validation passed
+
+    Phase 3: Cross-file validation
+      ✓ cross-file validation passed
+
+    ✔ All checks passed.
+
+If errors are found::
+
+    Phase 1: Schema validation
+      ✓ config.yaml   — schema valid
+      ✗ models.yaml   — schema errors
+
+        models.yaml:
+          [models → 0 → estimator]
+            Value error: Unknown estimator 'badname'
+            Fix: Use one of: ols, fe, twfe, re, fd, iv, gmm, quantile
+
+    ...
 
 Exit codes
 ----------
-0   All checks passed (or only warnings)
-1   One or more FAIL checks
+0   All checks passed (errors = 0, warnings allowed)
+1   One or more errors
 """
 
 from __future__ import annotations
 
 import csv
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from rich.console import Console
-from rich.table import Table
+from rich.markup import escape
 
-from econflow.commands._shared import STATUS_ICONS, deep_get, load_yaml_safe
-
-# ESTIMATOR_REGISTRY import removed — derive from live registry instead
-from econflow.estimation.registry import list_estimators as _list_estimators
+from econflow.commands._shared import deep_get, load_yaml_safe
 
 # ---------------------------------------------------------------------------
-# Result model
+# Registry-driven supported estimator IDs (backward-compat with existing tests)
 # ---------------------------------------------------------------------------
 
-Status = Literal["pass", "warn", "fail", "skip"]
+from econflow.estimation.registry import list_estimators as _list_est
 
 
-@dataclass
-class CheckResult:
-    """Outcome of a single validation check."""
-
-    code: str
-    name: str
-    status: Status
-    message: str
-    detail: str = ""
-
-
-@dataclass
-class ValidationReport:
-    """Aggregated results from all checks."""
-
-    checks: list[CheckResult] = field(default_factory=list)
-
-    # ------------------------------------------------------------------
-    # Helpers
-
-    def add(
-        self,
-        code: str,
-        name: str,
-        status: Status,
-        message: str,
-        detail: str = "",
-    ) -> None:
-        self.checks.append(CheckResult(code, name, status, message, detail))
-
-    def passed(self, code: str) -> bool:
-        """Return True if *code* has status 'pass'."""
-        return any(c.code == code and c.status == "pass" for c in self.checks)
-
-    @property
-    def n_fail(self) -> int:
-        return sum(1 for c in self.checks if c.status == "fail")
-
-    @property
-    def n_warn(self) -> int:
-        return sum(1 for c in self.checks if c.status == "warn")
-
-    @property
-    def n_pass(self) -> int:
-        return sum(1 for c in self.checks if c.status == "pass")
-
-    @property
-    def ok(self) -> bool:
-        return self.n_fail == 0
-
-
-# ---------------------------------------------------------------------------
-# Internal helpers
-# ---------------------------------------------------------------------------
-
-# Status icons imported from ._shared (STATUS_ICONS)
-# Alias for backward compat with render function that uses _STATUS_ICON
-_STATUS_ICON = STATUS_ICONS
-
-# Derived from live estimator registry — adding a new @register()ed estimator
-# automatically makes econflow validate accept it.
-def _get_supported_estimators() -> frozenset[str]:
+def _get_supported_estimators() -> "frozenset[str]":
     try:
-        import econflow.estimation  # noqa: F401 — triggers @register() calls
-        return frozenset(
-            e["id"] for e in _list_estimators() if e["status"] == "implemented"
-        )
+        import econflow.estimation  # noqa: F401
+        return frozenset(e["id"] for e in _list_est() if e["status"] == "implemented")
     except Exception:
         return frozenset()
 
 
-_SUPPORTED_ESTIMATORS: frozenset[str] = _get_supported_estimators()
-
-
-# _load_yaml_safe imported from ._shared as load_yaml_safe
-_load_yaml_safe = load_yaml_safe
-
-
-# deep_get imported from ._shared
-_deep_get = deep_get
+_SUPPORTED_ESTIMATORS: "frozenset[str]" = _get_supported_estimators()
 
 
 # ---------------------------------------------------------------------------
-# Check suites
+# Status type
 # ---------------------------------------------------------------------------
 
-def _check_config_files(
+Status = Literal["pass", "warn", "fail", "skip"]
+
+_ICONS: dict[Status, str] = {
+    "pass": "[green]✓[/green]",
+    "warn": "[yellow]⚠[/yellow]",
+    "fail": "[red]✗[/red]",
+    "skip": "[dim]-[/dim]",
+}
+
+
+# ---------------------------------------------------------------------------
+# Internal result types
+# ---------------------------------------------------------------------------
+
+@dataclass
+class _Issue:
+    source: str         # "config.yaml", "models.yaml", "outputs.yaml"
+    location: str       # human-readable key path, e.g. "variables → dependent"
+    message: str
+    fix: str = ""
+    severity: str = "error"   # "error" | "warning" | "info"
+
+
+@dataclass
+class _PhaseResult:
+    name: str
+    issues: list[_Issue] = field(default_factory=list)
+
+    @property
+    def ok(self) -> bool:
+        return not any(i.severity == "error" for i in self.issues)
+
+    @property
+    def n_errors(self) -> int:
+        return sum(1 for i in self.issues if i.severity == "error")
+
+    @property
+    def n_warnings(self) -> int:
+        return sum(1 for i in self.issues if i.severity == "warning")
+
+
+# ---------------------------------------------------------------------------
+# Phase 1 — Schema validation via Pydantic
+# ---------------------------------------------------------------------------
+
+def _pydantic_loc_to_str(loc: tuple) -> str:
+    """Convert a Pydantic error location tuple to a readable key path."""
+    parts = []
+    for part in loc:
+        if isinstance(part, int):
+            parts.append(f"[{part}]")
+        else:
+            parts.append(str(part))
+    return " → ".join(parts)
+
+
+def _schema_validate(
     config_path: Path,
     models_path: Path,
     outputs_path: Path,
-    report: ValidationReport,
-) -> tuple[dict | None, dict | None, dict | None]:
-    """Parse all three config files.  Returns (cfg, models_cfg, out_cfg)."""
-    results = []
-    for code, label, path in [
-        ("C-01", "config.yaml  parseable", config_path),
-        ("C-02", "models.yaml  parseable", models_path),
-        ("C-03", "outputs.yaml parseable", outputs_path),
-    ]:
-        data, err = _load_yaml_safe(path)
-        if data is not None:
-            report.add(code, label, "pass", f"Loaded: {path}")
-        else:
-            report.add(code, label, "fail", err, f"Path: {path}")
-        results.append(data)
+) -> tuple[_PhaseResult, Any, Any, Any, dict | None, dict | None, dict | None]:
+    """
+    Parse YAML and validate with Pydantic models.
 
-    return tuple(results)  # type: ignore[return-value]
+    Returns (phase, project_cfg, models_cfg, outputs_cfg, raw_config, raw_models, raw_outputs).
+    All config objects may be None if parsing / validation failed.
+    """
+    from econflow.config.models import ProjectConfig, ModelsConfig, OutputsConfig
 
+    try:
+        from pydantic import ValidationError
+    except ImportError:
+        ValidationError = Exception  # fallback
 
-def _check_config_schema(cfg: dict, report: ValidationReport) -> None:
-    """Validate required keys in config.yaml."""
-    _req(report, "S-01", "data.path present",
-         _deep_get(cfg, "data", "path") is not None,
-         "Add `data.path: \"data/processed/panel.csv\"` to config.yaml")
+    phase = _PhaseResult(name="Schema validation")
+    results_cfg = (None, None, None)
+    raw_config: dict | None = None
+    raw_models: dict | None = None
+    raw_outputs: dict | None = None
 
-    _req(report, "S-02", "data.entity_col present",
-         _deep_get(cfg, "data", "entity_col") is not None,
-         "Add `data.entity_col: \"entity\"` to config.yaml")
+    def _validate_file(path: Path, model_class: Any, label: str):
+        raw, err = load_yaml_safe(path)
+        if raw is None:
+            phase.issues.append(_Issue(
+                source=label,
+                location="(YAML parse)",
+                message=f"Cannot parse YAML: {err}",
+                fix=(
+                    f"Check {label} for syntax errors.  Common causes: "
+                    "wrong indentation, missing quotes around special characters."
+                ),
+                severity="error",
+            ))
+            return None, None
 
-    _req(report, "S-03", "data.time_col present",
-         _deep_get(cfg, "data", "time_col") is not None,
-         "Add `data.time_col: \"time\"` to config.yaml")
+        try:
+            obj = model_class.model_validate(raw)
+            return obj, raw
+        except ValidationError as exc:
+            for e in exc.errors():
+                loc = _pydantic_loc_to_str(e.get("loc", ()))
+                msg = e.get("msg", "")
+                # Generate a helpful fix hint based on error type
+                fix = _pydantic_fix_hint(label, loc, msg, e)
+                phase.issues.append(_Issue(
+                    source=label,
+                    location=loc,
+                    message=msg,
+                    fix=fix,
+                    severity="error",
+                ))
+            return None, raw
 
-    dep = _deep_get(cfg, "variables", "dependent")
-    _req(report, "S-04", "variables.dependent present",
-         dep is not None and dep != "",
-         "Add `variables.dependent: \"outcome\"` to config.yaml")
+    config_obj, raw_config = _validate_file(config_path, ProjectConfig, "config.yaml")
+    models_obj, raw_models = _validate_file(models_path, ModelsConfig, "models.yaml")
+    outputs_obj, raw_outputs = _validate_file(outputs_path, OutputsConfig, "outputs.yaml")
 
-    regressors = _deep_get(cfg, "variables", "regressors")
-    _req(report, "S-05", "variables.regressors non-empty list",
-         isinstance(regressors, list) and len(regressors) > 0,
-         "Add at least one regressor under `variables.regressors:`")
-
-
-def _check_models_schema(
-    models_cfg: dict,
-    cfg: dict,
-    report: ValidationReport,
-) -> list[dict]:
-    """Validate models.yaml and return model list."""
-    specs = models_cfg.get("models")
-    if not isinstance(specs, list) or len(specs) == 0:
-        report.add("M-01", "models list non-empty", "fail",
-                   "models.yaml must contain a `models:` list with at least one entry")
-        return []
-
-    report.add("M-01", "models list non-empty", "pass",
-               f"{len(specs)} model(s) defined")
-
-    # Check each spec
-    seen_ids: set[str] = set()
-    for i, spec in enumerate(specs):
-        mid = spec.get("id", f"[{i}]")
-        prefix = f"Model '{mid}'"
-
-        # Required fields
-        for field_name in ("id", "estimator", "dependent", "regressors"):
-            if field_name not in spec:
-                report.add("M-02", f"{prefix}: field `{field_name}` present",
-                           "fail", f"Add `{field_name}:` to model '{mid}'")
-
-        # Estimator from supported set
-        est = str(spec.get("estimator", "")).lower()
-        if est and est not in _SUPPORTED_ESTIMATORS:
-            report.add("M-04", f"{prefix}: estimator recognised",
-                       "warn",
-                       f"Estimator '{est}' not in generic pipeline set {_SUPPORTED_ESTIMATORS}. "
-                       "Will fail at runtime unless a custom estimator is registered.")
-        elif est:
-            report.add("M-04", f"{prefix}: estimator recognised", "pass", est)
-
-        # Duplicate IDs
-        actual_id = spec.get("id")
-        if actual_id is not None:
-            if actual_id in seen_ids:
-                report.add("M-03", f"Model ID '{actual_id}' unique", "fail",
-                           f"Duplicate model ID '{actual_id}'.")
-            else:
-                seen_ids.add(actual_id)
-                report.add("M-03", f"Model ID '{actual_id}' unique", "pass", "")
-
-        # dependent matches config
-        cfg_dep = _deep_get(cfg, "variables", "dependent")
-        spec_dep = spec.get("dependent")
-        if cfg_dep and spec_dep and spec_dep != cfg_dep:
-            report.add("M-05", f"{prefix}: dependent matches config",
-                       "warn",
-                       f"Model dependent '{spec_dep}' differs from config.yaml "
-                       f"variables.dependent '{cfg_dep}'.")
-
-    return specs
+    return phase, config_obj, models_obj, outputs_obj, raw_config, raw_models, raw_outputs
 
 
-def _check_outputs_schema(out_cfg: dict, report: ValidationReport) -> None:
-    """Validate required keys in outputs.yaml."""
-    base_dir = _deep_get(out_cfg, "outputs", "base_dir")
-    _req(report, "O-01", "outputs.base_dir present",
-         base_dir is not None,
-         "Add `outputs.base_dir: \"outputs\"` to outputs.yaml")
+def _pydantic_fix_hint(source: str, loc: str, msg: str, err_dict: dict) -> str:
+    """Generate an actionable fix hint for a Pydantic validation error."""
+    etype = err_dict.get("type", "")
 
-    filename = _deep_get(out_cfg, "outputs", "tables", "comparison_table", "filename")
-    _req(report, "O-02", "comparison_table.filename present",
-         filename is not None,
-         "Add `outputs.tables.comparison_table.filename:` to outputs.yaml")
+    if etype == "missing":
+        return f"Add the required field `{loc.split(' → ')[-1]}:` to {source}."
+
+    if etype == "string_type":
+        return f"The value of `{loc}` must be a string.  Wrap it in quotes if needed."
+
+    if etype in ("int_type", "int_parsing"):
+        return f"The value of `{loc}` must be an integer."
+
+    if etype == "bool_type":
+        return f"The value of `{loc}` must be true or false (no quotes)."
+
+    if etype in ("list_type", "too_short"):
+        return f"The field `{loc}` must be a non-empty list."
+
+    if etype == "extra_forbidden":
+        field_key = loc.split(" → ")[-1]
+        return (
+            f"Unknown key `{field_key}` in {source}.  "
+            "Remove it or check for a typo.  Run `econflow docs config` for allowed keys."
+        )
+
+    if "value_error" in etype or "assertion_error" in etype:
+        return f"Check the value at `{loc}` in {source}: {msg}."
+
+    if etype == "literal_error":
+        expected = err_dict.get("ctx", {}).get("expected", "")
+        return f"`{loc}` must be one of: {expected}."
+
+    return f"Check `{loc}` in {source}."
 
 
-def _check_cross_consistency(
-    out_cfg: dict,
-    specs: list[dict],
-    cfg: dict,
-    report: ValidationReport,
-) -> None:
-    """Cross-file checks."""
-    model_ids = {s["id"] for s in specs if "id" in s}
-    cfg_regressors = set(_deep_get(cfg, "variables", "regressors") or [])
+# ---------------------------------------------------------------------------
+# Phase 2 — Semantic validation via ConfigLinter
+# ---------------------------------------------------------------------------
 
-    # Check models referenced in outputs.models exist
-    out_models = _deep_get(out_cfg, "outputs", "tables", "comparison_table", "models") or []
-    if isinstance(out_models, list) and out_models:
-        missing = [m for m in out_models if m not in model_ids]
+def _semantic_validate(
+    project_cfg: Any,
+    models_cfg: Any,
+    outputs_cfg: Any,
+    raw_config: dict | None,
+    raw_models: dict | None,
+    raw_outputs: dict | None,
+) -> _PhaseResult:
+    """Run ConfigLinter and collect semantic issues."""
+    from econflow.config.linter import ConfigLinter
+
+    phase = _PhaseResult(name="Semantic validation")
+
+    linter = ConfigLinter()
+    lint_issues = linter.lint(
+        project_cfg=project_cfg,
+        models_cfg=models_cfg,
+        outputs_cfg=outputs_cfg,
+        raw_config=raw_config,
+        raw_models=raw_models,
+        raw_outputs=raw_outputs,
+    )
+
+    _sev_map = {"error": "error", "warning": "warning", "info": "info"}
+
+    for issue in lint_issues:
+        # Skip info-only items in main flow (surfaced separately)
+        sev = _sev_map.get(issue.severity, "info")
+        if sev == "info":
+            sev = "warning"  # demote to warning for display
+        source = issue.location.split(":")[0] if ":" in issue.location else "config"
+        phase.issues.append(_Issue(
+            source=source,
+            location=issue.location,
+            message=f"[{issue.code}] {issue.message}",
+            fix=issue.fix,
+            severity=sev,
+        ))
+
+    return phase
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 — Cross-file consistency
+# ---------------------------------------------------------------------------
+
+def _cross_file_validate(
+    project_cfg: Any,
+    models_cfg: Any,
+    outputs_cfg: Any,
+    raw_config: dict | None,
+    raw_models: dict | None,
+    raw_outputs: dict | None,
+) -> _PhaseResult:
+    """Cross-file checks that span multiple config files."""
+    phase = _PhaseResult(name="Cross-file validation")
+
+    # Gather data from typed objects first, fall back to raw dicts
+    cfg_regressors: set[str] = set()
+    model_ids: list[str] = []
+    output_model_refs: list[str] = []
+
+    if project_cfg is not None:
+        try:
+            cfg_regressors = set(project_cfg.variables.regressors or [])
+        except AttributeError:
+            pass
+    elif raw_config:
+        cfg_regressors = set((raw_config.get("variables") or {}).get("regressors") or [])
+
+    if models_cfg is not None:
+        try:
+            model_ids = [m.id for m in models_cfg.models]
+        except AttributeError:
+            pass
+    elif raw_models:
+        model_ids = [s.get("id", "") for s in (raw_models.get("models") or [])]
+
+    if outputs_cfg is not None:
+        try:
+            output_model_refs = list(
+                outputs_cfg.outputs.tables.comparison_table.models or []
+            )
+        except AttributeError:
+            pass
+    elif raw_outputs:
+        output_model_refs = list(
+            deep_get(raw_outputs, "outputs", "tables", "comparison_table", "models") or []
+        )
+
+    # X-01: model IDs referenced in outputs.comparison_table.models exist
+    if output_model_refs:
+        model_id_set = set(model_ids)
+        missing = [mid for mid in output_model_refs if mid not in model_id_set]
         if missing:
-            report.add("X-01", "outputs model IDs exist in models.yaml",
-                       "fail",
-                       f"outputs.yaml references unknown model ID(s): {missing}")
-        else:
-            report.add("X-01", "outputs model IDs exist in models.yaml", "pass", "")
+            phase.issues.append(_Issue(
+                source="outputs.yaml",
+                location="outputs.tables.comparison_table.models",
+                message=f"References unknown model ID(s): {missing}",
+                fix=(
+                    f"Add model(s) {missing} to models.yaml, or remove them "
+                    "from outputs.tables.comparison_table.models."
+                ),
+                severity="error",
+            ))
 
-    # Check each model's regressors are in config regressors
-    if cfg_regressors:
-        for spec in specs:
-            spec_regs = set(spec.get("regressors") or [])
-            extra = spec_regs - cfg_regressors
-            if extra:
-                report.add("X-02", f"Model '{spec.get('id')}' regressors in config",
-                           "warn",
-                           f"Regressors {sorted(extra)} not listed in config.yaml "
-                           f"variables.regressors. This is allowed but may indicate a typo.")
+    # X-02: model regressors vs config regressors (already done in linter L-05,
+    #        but we re-check here as a cross-file gate)
+    if cfg_regressors and models_cfg is not None:
+        try:
+            for m in models_cfg.models:
+                spec_regs = set(m.regressors or [])
+                extra = spec_regs - cfg_regressors
+                if extra:
+                    phase.issues.append(_Issue(
+                        source="models.yaml",
+                        location=f"models → {m.id} → regressors",
+                        message=(
+                            f"Model '{m.id}' uses {sorted(extra)} which are not in "
+                            "config.yaml variables.regressors"
+                        ),
+                        fix=(
+                            f"Add {sorted(extra)} to config.yaml "
+                            "variables.regressors, or fix the typo in models.yaml."
+                        ),
+                        severity="warning",
+                    ))
+        except AttributeError:
+            pass
+
+    return phase
 
 
-def _check_data_file(cfg: dict, report: ValidationReport, config_path: Path | None = None) -> None:
-    """Validate the data file (only when --data flag is set)."""
-    data_path_str = _deep_get(cfg, "data", "path")
-    if data_path_str is None:
-        report.add("D-01", "data file path configured", "skip",
-                   "data.path not set in config.yaml — skipping data checks")
-        return
+# ---------------------------------------------------------------------------
+# Optional Phase 4 — Data file
+# ---------------------------------------------------------------------------
 
-    _raw = Path(str(data_path_str))
-    if not _raw.is_absolute() and config_path is not None:
-        data_path = (config_path.parent / _raw).resolve()
+def _data_validate(
+    project_cfg: Any,
+    raw_config: dict | None,
+    config_path: Path,
+) -> _PhaseResult:
+    phase = _PhaseResult(name="Data file validation")
+
+    _cfg = raw_config or {}
+    if project_cfg is not None:
+        try:
+            data_path_str = project_cfg.data.path
+            entity_col = project_cfg.data.entity_col
+            time_col = project_cfg.data.time_col
+            dep = project_cfg.variables.dependent
+            regressors = list(project_cfg.variables.regressors or [])
+        except AttributeError:
+            data_path_str = None
+            entity_col = time_col = dep = ""
+            regressors = []
     else:
-        data_path = _raw
+        data_path_str = deep_get(_cfg, "data", "path")
+        entity_col = str(deep_get(_cfg, "data", "entity_col") or "")
+        time_col = str(deep_get(_cfg, "data", "time_col") or "")
+        dep = str(deep_get(_cfg, "variables", "dependent") or "")
+        regressors = list(deep_get(_cfg, "variables", "regressors") or [])
+
+    if not data_path_str:
+        phase.issues.append(_Issue(
+            source="config.yaml",
+            location="data.path",
+            message="data.path not configured — cannot validate data file",
+            severity="warning",
+        ))
+        return phase
+
+    raw_p = Path(str(data_path_str))
+    data_path = (config_path.parent / raw_p).resolve() if not raw_p.is_absolute() else raw_p
 
     if not data_path.exists():
-        report.add("D-01", "data file exists", "fail",
-                   f"File not found: {data_path}",
-                   "Run your data preparation script to generate it.")
-        for code in ("D-02", "D-03", "D-04", "D-05"):
-            report.add(code, code, "skip", "Skipped — data file missing")
-        return
+        phase.issues.append(_Issue(
+            source="data file",
+            location=str(data_path),
+            message=f"Data file not found: {data_path}",
+            fix="Run your data preparation script to generate the file.",
+            severity="error",
+        ))
+        return phase
 
-    report.add("D-01", "data file exists", "pass", str(data_path))
-
-    # Parse CSV header
     try:
         with data_path.open(encoding="utf-8", newline="") as f:
             reader = csv.reader(f)
             headers = next(reader)
             rows = list(reader)
-        report.add("D-02", "data file parseable CSV", "pass",
-                   f"{len(rows):,} data rows, {len(headers)} columns")
     except Exception as exc:
-        report.add("D-02", "data file parseable CSV", "fail", str(exc))
-        for code in ("D-03", "D-04", "D-05"):
-            report.add(code, code, "skip", "Skipped — CSV parse failed")
-        return
+        phase.issues.append(_Issue(
+            source="data file",
+            location=str(data_path),
+            message=f"Cannot parse CSV: {exc}",
+            severity="error",
+        ))
+        return phase
 
     col_set = set(headers)
-
-    # entity_col and time_col
-    entity_col = str(_deep_get(cfg, "data", "entity_col") or "")
-    time_col = str(_deep_get(cfg, "data", "time_col") or "")
     missing_dims = [c for c in [entity_col, time_col] if c and c not in col_set]
     if missing_dims:
-        report.add("D-03", "entity/time cols present", "fail",
-                   f"Missing columns: {missing_dims}",
-                   f"Available columns: {headers[:10]}{'…' if len(headers) > 10 else ''}")
-    else:
-        report.add("D-03", "entity/time cols present", "pass",
-                   f"'{entity_col}' and '{time_col}' found")
+        phase.issues.append(_Issue(
+            source="data file",
+            location="columns",
+            message=f"Entity/time columns missing from CSV: {missing_dims}",
+            fix=f"Check data.entity_col and data.time_col in config.yaml.  "
+                f"Available: {headers[:8]}{'…' if len(headers) > 8 else ''}",
+            severity="error",
+        ))
 
-    # dependent + regressors
-    dep = str(_deep_get(cfg, "variables", "dependent") or "")
-    regressors = list(_deep_get(cfg, "variables", "regressors") or [])
     needed = ([dep] if dep else []) + regressors
     missing_vars = [c for c in needed if c and c not in col_set]
     if missing_vars:
-        report.add("D-04", "analysis variables present", "fail",
-                   f"Missing columns: {missing_vars}")
-    else:
-        report.add("D-04", "analysis variables present", "pass",
-                   f"{len(needed)} variable(s) found in CSV")
+        phase.issues.append(_Issue(
+            source="data file",
+            location="columns",
+            message=f"Analysis variables missing from CSV: {missing_vars}",
+            fix="Add these columns to your data file, or fix the names in config.yaml.",
+            severity="error",
+        ))
 
-    # Duplicate (entity, time) rows
     if entity_col in col_set and time_col in col_set:
         ei = headers.index(entity_col)
         ti = headers.index(time_col)
-        keys = [(row[ei], row[ti]) for row in rows if len(row) > max(ei, ti)]
-        duplicates = len(keys) - len(set(keys))
-        if duplicates > 0:
-            report.add("D-05", "no duplicate (entity, time) rows", "warn",
-                       f"{duplicates} duplicate panel keys detected.",
-                       "Duplicates will cause errors in linearmodels. "
-                       "Check your data preparation script.")
-        else:
-            report.add("D-05", "no duplicate (entity, time) rows", "pass",
-                       f"{len(keys):,} unique panel observations")
+        keys = [(r[ei], r[ti]) for r in rows if len(r) > max(ei, ti)]
+        dupe_count = len(keys) - len(set(keys))
+        if dupe_count > 0:
+            phase.issues.append(_Issue(
+                source="data file",
+                location=f"({entity_col}, {time_col})",
+                message=f"{dupe_count} duplicate panel observations detected",
+                fix="Check your data preparation script for duplicate rows.",
+                severity="warning",
+            ))
+
+    return phase
 
 
 # ---------------------------------------------------------------------------
-# Formatting
+# Rendering
 # ---------------------------------------------------------------------------
 
-def _render_report(report: ValidationReport, console: Console) -> None:
-    """Print the validation report to *console*."""
-    table = Table(
-        show_header=True,
-        header_style="bold",
-        box=None,
-        padding=(0, 2, 0, 0),
-    )
-    table.add_column("", width=2)   # icon
-    table.add_column("Code", style="dim", width=6)
-    table.add_column("Check")
-    table.add_column("Message", style="dim")
+def _render_phase(phase: _PhaseResult, console: Console, verbose: bool = False) -> None:
+    """Print a single validation phase."""
+    icon = _ICONS["pass"] if phase.ok else _ICONS["fail"]
+    has_issues = bool(phase.issues)
 
-    for c in report.checks:
-        if c.status == "skip":
-            continue
-        icon = _STATUS_ICON[c.status]
-        detail = f" — {c.detail}" if c.detail else ""
-        table.add_row(icon, c.code, c.name, c.message + detail)
+    console.print(f"  Phase: [bold]{escape(phase.name)}[/bold]")
 
-    console.print()
-    console.print(table)
-    console.print()
+    if not has_issues:
+        console.print(f"    {icon} {escape(phase.name.lower())} passed")
+        return
 
+    # Summarise errors vs warnings
+    errors = [i for i in phase.issues if i.severity == "error"]
+    warnings = [i for i in phase.issues if i.severity != "error"]
 
-# ---------------------------------------------------------------------------
-# Utilities
-# ---------------------------------------------------------------------------
-
-def _req(
-    report: ValidationReport,
-    code: str,
-    name: str,
-    condition: bool,
-    fix: str = "",
-) -> None:
-    """Add a pass/fail check based on *condition*."""
-    if condition:
-        report.add(code, name, "pass", "")
+    if errors:
+        console.print(
+            f"    {_ICONS['fail']} {len(errors)} error(s)"
+            + (f", {len(warnings)} warning(s)" if warnings else "")
+        )
     else:
-        report.add(code, name, "fail", fix)
+        console.print(f"    {_ICONS['warn']} {len(warnings)} warning(s)")
+
+    # Group by source file
+    by_source: dict[str, list[_Issue]] = {}
+    for issue in phase.issues:
+        by_source.setdefault(issue.source, []).append(issue)
+
+    for source, issues in by_source.items():
+        console.print(f"\n      [bold]{escape(source)}[/bold]")
+        for issue in issues:
+            sev_icon = _ICONS["fail"] if issue.severity == "error" else _ICONS["warn"]
+            loc = escape(f"[{issue.location}]") + " " if issue.location else ""
+            console.print(f"        {sev_icon} {loc}{escape(issue.message)}")
+            if issue.fix:
+                console.print(f"           [dim]Fix: {escape(issue.fix)}[/dim]")
+    console.print()
 
 
 # ---------------------------------------------------------------------------
@@ -444,9 +536,10 @@ def run_validate(
     outputs_path: Path,
     check_data: bool,
     console: Console,
+    verbose: bool = False,
 ) -> int:
     """
-    Run all validation checks and render a report.
+    Run three-phase validation and render a report.
 
     Parameters
     ----------
@@ -456,70 +549,128 @@ def run_validate(
         If True, also validate the data file referenced in config.yaml.
     console:
         Rich console for output.
+    verbose:
+        If True, print passing checks as well as failures.
 
     Returns
     -------
     int
-        0 if all checks passed (or only warnings), 1 if any check failed.
+        0 if all checks passed (errors = 0, warnings allowed), 1 on errors.
     """
     console.print()
-    console.print("[bold]EconFlow validate[/bold]\n")
-
-    report = ValidationReport()
-
-    # ------------------------------------------------------------------ Parse YAML
-    cfg, models_cfg, out_cfg = _check_config_files(
-        config_path, models_path, outputs_path, report
+    console.print(
+        f"[bold]EconFlow validate[/bold]  "
+        f"[dim]{escape(str(config_path.parent))}[/dim]\n"
     )
 
-    # ------------------------------------------------------------------ Schema
-    if cfg is not None:
-        _check_config_schema(cfg, report)
+    # --- Phase 1: Schema ---------------------------------------------------
+    (
+        phase1,
+        project_cfg,
+        models_cfg,
+        outputs_cfg,
+        raw_config,
+        raw_models,
+        raw_outputs,
+    ) = _schema_validate(config_path, models_path, outputs_path)
+
+    _render_phase(phase1, console, verbose)
+
+    # Show per-file pass/fail for schema phase
+    for label, obj in [
+        ("config.yaml ", project_cfg),
+        ("models.yaml ", models_cfg),
+        ("outputs.yaml", outputs_cfg),
+    ]:
+        icon = _ICONS["pass"] if obj is not None else _ICONS["fail"]
+        status = "schema valid" if obj is not None else "schema errors"
+        console.print(f"    {icon} {label} — {status}")
+    console.print()
+
+    # --- Phase 2: Semantic -------------------------------------------------
+    phase2 = _semantic_validate(
+        project_cfg, models_cfg, outputs_cfg, raw_config, raw_models, raw_outputs
+    )
+
+    icon2 = _ICONS["pass"] if phase2.ok else _ICONS["fail"]
+    if phase2.ok and not phase2.issues:
+        console.print(f"    {icon2} semantic validation passed")
     else:
-        for code in ("S-01", "S-02", "S-03", "S-04", "S-05"):
-            report.add(code, code, "skip", "Skipped — config.yaml could not be parsed")
+        n_e = phase2.n_errors
+        n_w = phase2.n_warnings
+        if n_e:
+            console.print(f"    {icon2} semantic validation — {n_e} error(s), {n_w} warning(s)")
+        else:
+            console.print(f"    {_ICONS['warn']} semantic validation — {n_w} warning(s)")
+        for issue in phase2.issues:
+            sev_icon = _ICONS["fail"] if issue.severity == "error" else _ICONS["warn"]
+            loc = escape(f"[{issue.location}]") + "  " if issue.location else ""
+            console.print(f"      {sev_icon} {loc}{escape(issue.message)}")
+            if issue.fix:
+                console.print(f"        [dim]Fix: {escape(issue.fix)}[/dim]")
+    console.print()
 
-    specs: list[dict] = []
-    if models_cfg is not None and cfg is not None:
-        specs = _check_models_schema(models_cfg, cfg, report)
-    elif models_cfg is None:
-        for code in ("M-01", "M-02", "M-03", "M-04", "M-05"):
-            report.add(code, code, "skip", "Skipped — models.yaml could not be parsed")
+    # --- Phase 3: Cross-file -----------------------------------------------
+    phase3 = _cross_file_validate(
+        project_cfg, models_cfg, outputs_cfg, raw_config, raw_models, raw_outputs
+    )
 
-    if out_cfg is not None:
-        _check_outputs_schema(out_cfg, report)
+    icon3 = _ICONS["pass"] if phase3.ok else _ICONS["fail"]
+    if phase3.ok and not phase3.issues:
+        console.print(f"    {icon3} cross-file validation passed")
     else:
-        for code in ("O-01", "O-02"):
-            report.add(code, code, "skip", "Skipped — outputs.yaml could not be parsed")
+        n_e = phase3.n_errors
+        n_w = phase3.n_warnings
+        if n_e:
+            console.print(f"    {icon3} cross-file validation — {n_e} error(s), {n_w} warning(s)")
+        else:
+            console.print(f"    {_ICONS['warn']} cross-file validation — {n_w} warning(s)")
+        for issue in phase3.issues:
+            sev_icon = _ICONS["fail"] if issue.severity == "error" else _ICONS["warn"]
+            loc = escape(f"[{issue.location}]") + "  " if issue.location else ""
+            console.print(f"      {sev_icon} {loc}{escape(issue.message)}")
+            if issue.fix:
+                console.print(f"        [dim]Fix: {escape(issue.fix)}[/dim]")
+    console.print()
 
-    # ------------------------------------------------------------------ Cross-file
-    if cfg is not None and out_cfg is not None and specs:
-        _check_cross_consistency(out_cfg, specs, cfg, report)
+    # --- Phase 4: Data file (optional) ------------------------------------
+    if check_data:
+        phase4 = _data_validate(project_cfg, raw_config, config_path)
+        icon4 = _ICONS["pass"] if phase4.ok else _ICONS["fail"]
+        if phase4.ok and not phase4.issues:
+            console.print(f"    {icon4} data file validation passed")
+        else:
+            n_e = phase4.n_errors
+            n_w = phase4.n_warnings
+            label = "data file validation"
+            if n_e:
+                console.print(f"    {icon4} {label} — {n_e} error(s), {n_w} warning(s)")
+            else:
+                console.print(f"    {_ICONS['warn']} {label} — {n_w} warning(s)")
+            for issue in phase4.issues:
+                sev_icon = _ICONS["fail"] if issue.severity == "error" else _ICONS["warn"]
+                loc = escape(f"[{issue.location}]") + "  " if issue.location else ""
+                console.print(f"      {sev_icon} {loc}{escape(issue.message)}")
+                if issue.fix:
+                    console.print(f"        [dim]Fix: {escape(issue.fix)}[/dim]")
+        console.print()
+    else:
+        phase4 = _PhaseResult("Data file validation")
 
-    # ------------------------------------------------------------------ Data file
-    if check_data and cfg is not None:
-        _check_data_file(cfg, report, config_path=config_path)
-    elif check_data:
-        report.add("D-01", "data checks", "skip",
-                   "Skipped — config.yaml could not be parsed")
+    # --- Summary -----------------------------------------------------------
+    all_phases = [phase1, phase2, phase3, phase4]
+    total_errors = sum(p.n_errors for p in all_phases)
+    total_warnings = sum(p.n_warnings for p in all_phases)
 
-    # ------------------------------------------------------------------ Render
-    _render_report(report, console)
-
-    # Summary line
-    n_fail = report.n_fail
-    n_warn = report.n_warn
-    n_pass = report.n_pass
-
-    if n_fail == 0 and n_warn == 0:
-        console.print(f"[bold green]✔ All {n_pass} checks passed.[/bold green]\n")
-    elif n_fail == 0:
+    if total_errors == 0 and total_warnings == 0:
+        console.print("[bold green]✔ All checks passed.[/bold green]\n")
+    elif total_errors == 0:
         console.print(
-            f"[bold yellow]⚠ {n_pass} passed · {n_warn} warning(s) · 0 errors.[/bold yellow]\n"
+            f"[bold yellow]⚠ Passed with {total_warnings} warning(s).[/bold yellow]\n"
         )
     else:
         console.print(
-            f"[bold red]✘ {n_fail} error(s) · {n_warn} warning(s) · {n_pass} passed.[/bold red]\n"
+            f"[bold red]✘ {total_errors} error(s) · {total_warnings} warning(s).[/bold red]\n"
         )
 
-    return 0 if report.ok else 1
+    return 0 if total_errors == 0 else 1

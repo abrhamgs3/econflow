@@ -1,0 +1,17 @@
+project:
+  name: "test"
+  description: "extra key"
+  authors:
+    - name: "Test"
+data:
+  path: "data/processed/panel.csv"
+  entity_col: "entity"
+  time_col: "time"
+variable:
+  dependent: "outcome"
+  regressors:
+    - "treatment"
+variables:
+  dependent: "outcome"
+  regressors:
+    - "treatment"

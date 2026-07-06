@@ -1,0 +1,7 @@
+models:
+  - id: "my_model"
+    label: "Typo Estimator"
+    estimator: "FIXXD_EFFECTS"
+    dependent: "outcome"
+    regressors:
+      - "treatment"

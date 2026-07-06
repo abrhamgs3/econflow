@@ -1,0 +1,24 @@
+project:
+  name: "test_project"
+  version: "0.1.0"
+  description: "A valid test project"
+  authors:
+    - name: "Test Author"
+      email: "test@example.com"
+  output_dir: "outputs"
+
+data:
+  path: "data/processed/panel.csv"
+  entity_col: "entity"
+  time_col: "time"
+
+sample:
+  start_year: 2000
+  end_year: 2020
+  min_obs_per_entity: 5
+
+variables:
+  dependent: "outcome"
+  regressors:
+    - "treatment"
+    - "covariate_1"

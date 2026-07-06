@@ -9,6 +9,66 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Architecture Stabilization Milestone 4 — User-Facing Configuration UX (2026-07-06)
+
+#### Added
+- `src/econflow/config/models.py` (517 lines): Pydantic v2 strict models for
+  all three YAML configuration files:
+  - `ProjectConfig` — `project`, `data`, `sample` (with year-order validator),
+    `variables` (with non-empty-regressors validator); `extra="forbid"`.
+  - `ModelsConfig` — `list[ModelSpec]` with `min_length=1`, duplicate-ID
+    validator, `^[A-Za-z][A-Za-z0-9_-]*$` ID pattern; `ModelSpec` has
+    `extra="allow"` for estimator-specific keys.
+  - `OutputsConfig` — `outputs` block with `base_dir`, nested `tables`
+    (including `ComparisonTableModel`) and `figures`; `extra="forbid"`.
+  - Every `Field` carries `description=` and `examples=`.
+- `src/econflow/config/linter.py` (529 lines): `ConfigLinter` class with
+  10 semantic lint rules (L-01 through L-10):
+  - L-01: dependent in regressors → error
+  - L-02: duplicate regressors → error
+  - L-03: start_year ≥ end_year → error
+  - L-04: unknown estimator with fuzzy-match suggestion → warning
+  - L-05: model regressor not in config.variables.regressors → warning
+  - L-06: absolute outputs.base_dir → warning
+  - L-07: unsupported data file extension → warning
+  - L-08: project.version not valid semver → warning
+  - L-09: model dependent ≠ config dependent → info
+  - L-10: model has no label → info
+  - Issues sorted errors → warnings → info; every error has `fix` text.
+- `src/econflow/config/docs.py` (344 lines): `generate_config_reference()`
+  reads Pydantic `model_fields` at runtime to generate a Markdown or plain-text
+  configuration reference that is always in sync with the schema.
+  `write_config_reference(path)` writes to file.
+- `docs/architecture/CONFIG_REFERENCE.md`: auto-generated from live Pydantic
+  models via `generate_config_reference()`.
+- `tests/fixtures/config/` — fixture YAML files:
+  - `valid/` — passing config, models, and outputs fixtures.
+  - `invalid/` — 7 named fixtures for specific lint rules (dep_in_regressors,
+    dup_regressors, year_order, extra_key, unknown_estimator, dup_model_ids,
+    abs_base_dir).
+- `tests/unit/test_config_milestone4.py` (661 lines, 54 tests):
+  `TestProjectConfig` (11), `TestModelsConfig` (7), `TestOutputsConfig` (5),
+  `TestConfigLinterRules` (17), `TestConfigDocsGenerator` (5),
+  `TestValidateCommand` (7), `TestValidateDirectoryArg` (3).
+
+#### Changed
+- `src/econflow/commands/validate.py` — complete rewrite with three-phase output:
+  - Phase 1: Schema validation via Pydantic (per-file pass/fail with actionable
+    error messages and `Fix:` hints).
+  - Phase 2: Semantic validation via `ConfigLinter` (L-01 through L-10).
+  - Phase 3: Cross-file consistency (output model IDs exist in models.yaml,
+    model regressors subset of config regressors).
+  - Phase 4 (opt-in `--data`): data file existence, column presence, duplicate
+    panel keys.
+  - `_SUPPORTED_ESTIMATORS` preserved as module-level alias for backward
+    compatibility with existing tests.
+- `src/econflow/cli.py` — `validate` command gains:
+  - `config_dir: Optional[Path]` positional argument: `econflow validate config/`
+    resolves all three files from the directory.
+  - `--verbose / -v` flag: show passing checks as well as failures.
+  - `--config`, `--models`, `--outputs` now override the positional directory
+    for per-file overrides.
+
 ### Architecture Stabilization Milestone 3 — Library-Agnostic EstimatorProtocol (2026-07-06)
 
 #### Added
@@ -425,69 +485,4 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `@register_diagnostic()`, `BaseDiagnostic`, `DiagnosticError`, and all 6 built-in
   plugin registrations.
 - `tests/integration/test_estimator_run.py`: 21 end-to-end tests — each implemented
-  estimator run on a 200-row synthetic panel; stubs verified to raise
-  `NotImplementedError`.
-- `tests/integration/test_diagnostic_run.py`: 24 end-to-end tests — Hausman,
-  Breusch-Pagan, Pesaran CD, and VIF on real `EstimationResult` objects; stubs
-  verified; registry round-trip tested.
-- `docs/architecture/ESTIMATION_FRAMEWORK.md`: full architecture document.
-
-#### Changed
-- `src/econflow/commands/info.py`: removed hard-coded `ESTIMATOR_REGISTRY` and
-  `DATA_CONNECTOR_REGISTRY` lists (H1 tech debt).  Both tables now driven by
-  `list_estimators()` and `list_connectors()` from the live registries.
-  `ESTIMATOR_REGISTRY` is retained as a module-level alias (calls live registry)
-  for backward compatibility.
-- `src/econflow/commands/validate.py`: `_SUPPORTED_ESTIMATORS` now derived from
-  `list_estimators()` instead of the hand-coded list in `info.py`.
-- `src/econflow/estimation/registry.py`: raises `RegistryError` (not `ValueError`
-  / `KeyError`) for duplicate registration and unknown id lookups. `unregister()`
-  now raises `RegistryError` on unknown id (was silent).
-- `src/econflow/diagnostics/registry.py`: same `RegistryError` upgrade.
-  `unregister_diagnostic()` now raises on unknown id.
-- `src/econflow/estimation/base.py`: `_provenance_stamp()` now includes
-  `econflow_version` field.
-- `src/econflow/diagnostics/base.py`: `_not_applicable()` now returns
-  `level="skip"` (was `"info"`).
-- `tests/unit/test_cmd_info.py`: updated to use `_load_connector_registry()` and
-  lowercase estimator IDs (`"ols"`, `"fe"`).
-- `tests/unit/test_cmd_validate.py`: updated to use lowercase estimator IDs.
-
----
-
-### Sprint 4 — Data Ecosystem (2026-06-27)
-
-#### Added
-- `src/econflow/ingestion/metadata.py`: `DatasetMetadata` immutable dataclass
-  with full JSON round-trip serialization and a `DatasetMetadata.now()` factory.
-- `src/econflow/ingestion/registry.py`: `@register()` decorator and
-  `get_connector()` / `list_connectors()` / `unregister()` functions.
-  Connectors self-register at import time; no manual registration steps needed.
-- `src/econflow/ingestion/base.py` (rewritten): `AbstractConnector` with five
-  abstract methods (`connect`, `download`, `validate`, `metadata`, `cache_key`)
-  and a `fetch()` convenience wrapper.  `ConnectorError` for typed failure reporting.
-- `src/econflow/ingestion/cache.py` (rewritten): `CacheManager` — slot-based
-  filesystem cache at `<cache_dir>/<key>/data.csv` + `meta.json`.
-  SHA-256 verification on retrieval, `CacheCorruptionError` on hash mismatch.
-- `src/econflow/ingestion/validation.py`: `DataValidator` with six configurable
-  checks (V-00 through V-06).  `DataValidationConfig`, `DataValidationReport`,
-  and `ValidationIssue` provide structured, serializable results.
-- `src/econflow/ingestion/connectors/csv_connector.py`: `LocalCSVConnector` —
-  full implementation.  Reads any UTF-8 CSV; integrates with `CacheManager`;
-  registers as `"csv"`.
-- `src/econflow/ingestion/connectors/world_bank.py`: `WorldBankConnector` —
-  full implementation.  Downloads indicator time series from the World Bank
-  API v2 (no API key required), paginates, writes tidy long-format CSV.
-  Registers as `"world_bank"`.
-- `src/econflow/ingestion/connectors/oecd.py`: `OECDConnector` — complete
-  interface with detailed stub.  Full implementation plan documented in module
-  docstring.  Registers as `"oecd"` with `status="stub"`.
-- `src/econflow/ingestion/connectors/pwt.py`: `PennWorldTablesConnector` —
-  complete interface with detailed stub.  Full implementation plan documented.
-  Registers as `"pwt"` with `status="stub"`.
-- `src/econflow/ingestion/__init__.py` (rewritten): exposes full public API —
-  `AbstractConnector`, `ConnectorError`, `CacheManager`, `CacheCorruptionError`,
-  `DatasetMetadata`, `register`, `get_connector`, `list_connectors`,
-  `DataValidator`, `DataValidationConfig`, `DataValidationReport`, `ValidationIssue`.
-- `src/econflow/provenance.py`: `ProvenanceRecorder.record_dataset(metadata)`
-  appends a dataset provenan
+  estimator run on a 200-row synthetic panel; stubs verified to rais

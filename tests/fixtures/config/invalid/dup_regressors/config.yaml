@@ -1,0 +1,14 @@
+project:
+  name: "test"
+  description: "L-02 violation"
+  authors:
+    - name: "Test"
+data:
+  path: "data/processed/panel.csv"
+  entity_col: "entity"
+  time_col: "time"
+variables:
+  dependent: "outcome"
+  regressors:
+    - "treatment"
+    - "treatment"

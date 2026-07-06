@@ -1,0 +1,16 @@
+project:
+  name: "test"
+  description: "L-03 violation"
+  authors:
+    - name: "Test"
+data:
+  path: "data/processed/panel.csv"
+  entity_col: "entity"
+  time_col: "time"
+sample:
+  start_year: 2020
+  end_year: 2000
+variables:
+  dependent: "outcome"
+  regressors:
+    - "treatment"

@@ -1,0 +1,13 @@
+models:
+  - id: "model_a"
+    label: "A"
+    estimator: "ols"
+    dependent: "outcome"
+    regressors:
+      - "treatment"
+  - id: "model_a"
+    label: "A duplicate"
+    estimator: "fe"
+    dependent: "outcome"
+    regressors:
+      - "treatment"

@@ -87,6 +87,7 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
+from typing import Optional
 
 import typer
 from rich.console import Console
@@ -210,23 +211,40 @@ def doctor() -> None:
 
 @app.command()
 def validate(
+    config_dir: "Optional[Path]" = typer.Argument(
+        None,
+        help=(
+            "Directory containing config.yaml, models.yaml, and outputs.yaml.  "
+            "Defaults to ./config/ when omitted."
+        ),
+        show_default=False,
+    ),
     config: Path = typer.Option(
-        Path("config/config.yaml"),
+        None,
         "--config", "-c",
-        help="Path to config.yaml.",
-        show_default=True,
+        help=(
+            "Explicit path to config.yaml.  "
+            "When set, overrides the positional config_dir for this file."
+        ),
+        show_default=False,
     ),
     models: Path = typer.Option(
-        Path("config/models.yaml"),
+        None,
         "--models",
-        help="Path to models.yaml.",
-        show_default=True,
+        help=(
+            "Explicit path to models.yaml.  "
+            "When set, overrides the positional config_dir for this file."
+        ),
+        show_default=False,
     ),
     outputs: Path = typer.Option(
-        Path("config/outputs.yaml"),
+        None,
         "--outputs",
-        help="Path to outputs.yaml.",
-        show_default=True,
+        help=(
+            "Explicit path to outputs.yaml.  "
+            "When set, overrides the positional config_dir for this file."
+        ),
+        show_default=False,
     ),
     data: bool = typer.Option(
         False,
@@ -236,37 +254,63 @@ def validate(
             "Checks column presence and duplicate panel keys."
         ),
     ),
+    verbose: bool = typer.Option(
+        False,
+        "--verbose", "-v",
+        help="Show passing checks as well as failures.",
+    ),
 ) -> None:
-    """Validate configuration files, directory structure, and variables.
+    """Validate configuration files against schema and semantic rules.
 
-    Runs a suite of checks on the three YAML configuration files and
-    reports pass / warn / fail for each.  Optionally validates the
-    processed data CSV when --data is set.
+    Runs three validation phases and prints a structured report:
 
-    Exit code is 0 when no FAIL checks are found (warnings are allowed).
+        ✓ schema valid
+        ✓ semantic validation passed
+        ✓ cross-file validation passed
+
+    Any errors are shown with an actionable Fix hint.
+
+    CONFIG_DIR is the directory containing config.yaml, models.yaml, and
+    outputs.yaml.  Defaults to ./config/ when omitted.
+
+    Exit code is 0 when errors = 0 (warnings are allowed).
 
     Examples:
 
-        # Validate configuration only (defaults to config/ sub-directory)
+        # Validate config/ sub-directory (default)
         econflow validate
 
-        # Validate with explicit paths
-        econflow validate \\
-            --config  examples/getting_started/config/config.yaml \\
-            --models  examples/getting_started/config/models.yaml \\
-            --outputs examples/getting_started/config/outputs.yaml
+        # Validate an explicit directory
+        econflow validate config/
 
-        # Also validate the data CSV
+        # Validate a project in a different location
+        econflow validate examples/getting_started/config/
+
+        # Also validate the data CSV referenced in config.yaml
         econflow validate --data
+
+        # Explicit per-file overrides
+        econflow validate \\
+            --config  path/to/config.yaml \\
+            --models  path/to/models.yaml \\
+            --outputs path/to/outputs.yaml
     """
     from econflow.commands.validate import run_validate
 
+    # Resolve directory: positional arg > default of ./config/
+    base_dir = Path(config_dir) if config_dir else Path("config")
+
+    config_path  = config  if config  is not None else base_dir / "config.yaml"
+    models_path  = models  if models  is not None else base_dir / "models.yaml"
+    outputs_path = outputs if outputs is not None else base_dir / "outputs.yaml"
+
     exit_code = run_validate(
-        config_path=config,
-        models_path=models,
-        outputs_path=outputs,
+        config_path=config_path,
+        models_path=models_path,
+        outputs_path=outputs_path,
         check_data=data,
         console=console,
+        verbose=verbose,
     )
     if exit_code != 0:
         raise typer.Exit(code=exit_code)
