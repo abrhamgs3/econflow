@@ -38,6 +38,7 @@ from econflow.integrity.checks import (
     list_checks,
     register_integrity_check,
     unregister_check,
+    unregister_integrity_check,
 )
 from econflow.integrity.drift import DriftItem, DriftReport, detect_drift
 from econflow.integrity.fingerprint import (
@@ -57,6 +58,8 @@ __all__ = [
     "get_check",
     "list_checks",
     "register_integrity_check",
+    "unregister_integrity_check",
+    # Deprecated alias kept for backward compat
     "unregister_check",
     # drift
     "DriftItem",

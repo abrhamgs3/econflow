@@ -9,6 +9,63 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Architecture Stabilization: Public API Hardening (2026-07-06)
+
+#### Added
+- `docs/API_STABILITY.md` (317 lines): Complete API stability tier classification
+  for all 7 packages (estimation, ingestion, outputs, diagnostics, integrity,
+  config, datasets). Documents Stable/Experimental/Internal/Deprecated tiers,
+  versioning policy, and plugin entry-point documentation.
+- `docs/release/BETA_READINESS_RESPONSE.md` (470 lines): External audit response
+  document with confirmed/partially-confirmed/not-reproducible status for all
+  16 issues, exact file:line citations, breaking-change assessments, and
+  smallest safe fixes.
+- `src/econflow/estimation/registry.py` — `register_estimator` / `unregister_estimator`
+  stable API aliases; `_load_entry_point_plugins()` — entry-point auto-loading
+  via `[project.entry-points."econflow.plugins"]` (S-2 fix).
+- `src/econflow/ingestion/registry.py` — `register_connector` / `unregister_connector`
+  stable API aliases.
+- `src/econflow/integrity/checks/registry.py` — `unregister_integrity_check`
+  stable alias (consistent with `register_integrity_check`).
+- `src/econflow/config/__init__.py` — upgraded from stub to real public API
+  exposing `ProjectConfig`, `ModelsConfig`, `OutputsConfig`, `ModelSpec`,
+  `ConfigLinter`, `LintIssue`, `generate_config_reference`, `write_config_reference`.
+- `src/econflow/config/linter.py` — lint rule L-04b: stub estimator detection;
+  raises error when `gmm` or `quantile` used (registered but `NotImplementedError`).
+
+#### Changed
+- `src/econflow/core/exceptions.py` — `EconFlowCoreError` now inherits from
+  `EconFlowError`; `except EconFlowError` now catches both pipeline-layer and
+  core-layer exceptions (S-1 / task 213 fix).
+- `src/econflow/__init__.py` — fixed module docstring (accurate "Available in v1.0"
+  and "Not yet available" sections); added `EconFlowCoreError` to public API and
+  `__all__`.
+- `src/econflow/estimation/__init__.py` — `register_estimator`, `unregister_estimator`
+  added to `__all__`; `register`/`unregister` marked deprecated.
+- `src/econflow/ingestion/__init__.py` — `register_connector`, `unregister_connector`
+  added to `__all__`; `register`/`unregister` marked deprecated.
+- `src/econflow/integrity/__init__.py` and `integrity/checks/__init__.py` —
+  `unregister_integrity_check` added to exports; `unregister_check` deprecated.
+- `src/econflow/commands/validate.py` — removed GMM/quantile from fix hint
+  (`Use one of: ols, fe, twfe, re, fd, iv`).
+- `src/econflow/cli.py` — pre-flight `run_validate()` call before `run_from_config()`
+  so `econflow run` aborts on invalid config (C-2 fix).
+- `src/econflow/config/linter.py` — removed `gmm`/`quantile` from
+  `_CANONICAL_ESTIMATORS`; stub estimators only trigger L-04b.
+- `src/econflow/datasets/panel.py` — removed duplicate `__repr__` (F811); kept
+  the `panel_balance`-based implementation.
+- `pyproject.toml` — added `pydantic>=2.0` to `[project.dependencies]` (CF-1 fix).
+- `docs/sdk/PLUGIN_SDK.md` — updated to reflect `register_estimator` as canonical
+  name and entry-point loading as fully implemented.
+
+#### Internal fixes (ruff)
+- `src/econflow/estimation/base.py` — `TYPE_CHECKING` guard for `BackendCapabilities`.
+- `src/econflow/data/cleaning.py` — `TYPE_CHECKING` guard for `SelectionSummary`;
+  wrapped long line (E501).
+- `src/econflow/data/loaders.py` — `TYPE_CHECKING` guard for `PanelDataset`.
+- `src/econflow/commands/validate.py` — removed unused `results_cfg` (F841).
+- `src/econflow/config/linter.py` — removed unused `all_estimators` block (F841).
+
 ### Architecture Stabilization Milestone 4 — User-Facing Configuration UX (2026-07-06)
 
 #### Added

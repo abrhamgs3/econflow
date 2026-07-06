@@ -7,7 +7,8 @@ clause while still discriminating on sub-types when needed.
 
 Exception tree
 --------------
-EconFlowCoreError
+EconFlowError (econflow.exceptions)
+└── EconFlowCoreError
 ├── ConfigurationError
 │   └── MissingConfigKeyError
 ├── RegistryError
@@ -37,13 +38,20 @@ from __future__ import annotations
 
 import warnings
 
+from econflow.exceptions import EconFlowError  # noqa: E402
+
 # ---------------------------------------------------------------------------
 # Root
 # ---------------------------------------------------------------------------
 
 
-class EconFlowCoreError(Exception):
-    """Base class for all EconFlow scaffold (core) exceptions."""
+class EconFlowCoreError(EconFlowError):
+    """Base class for all EconFlow scaffold (core) exceptions.
+
+    Inherits from :class:`~econflow.exceptions.EconFlowError` so that a
+    single ``except EconFlowError`` clause catches both pipeline-layer and
+    core-layer exceptions.
+    """
 
 
 # Deprecated alias

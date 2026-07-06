@@ -59,7 +59,14 @@ from econflow.ingestion.manifest import DatasetManifest, ManifestEntry
 from econflow.ingestion.metadata import DatasetMetadata
 
 # Registry
-from econflow.ingestion.registry import get_connector, list_connectors, register
+from econflow.ingestion.registry import (
+    get_connector,
+    list_connectors,
+    register,
+    register_connector,
+    unregister,
+    unregister_connector,
+)
 
 # Validation
 from econflow.ingestion.validation import (
@@ -81,10 +88,14 @@ __all__ = [
     # Manifest
     "DatasetManifest",
     "ManifestEntry",
-    # Registry
-    "register",
+    # Registry — stable names (register_connector, unregister_connector)
+    "register_connector",
     "get_connector",
     "list_connectors",
+    "unregister_connector",
+    # Deprecated aliases kept for backward compat
+    "register",
+    "unregister",
     # Validation
     "DataValidator",
     "DataValidationConfig",

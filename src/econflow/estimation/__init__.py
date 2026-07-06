@@ -48,16 +48,16 @@ import econflow.estimation.iv  # noqa: F401
 import econflow.estimation.ols  # noqa: F401
 import econflow.estimation.quantile  # noqa: F401
 import econflow.estimation.random_effects  # noqa: F401
-
-# Core abstractions (also re-exports EstimationResult for backward compat)
-from econflow.estimation.base import BaseEstimator, EstimatorError
 from econflow.estimation.backends import (
     DoubleMLMixin,
     LinearmodelsMixin,
-    PyMCMixin,
     PyfixestMixin,
+    PyMCMixin,
     StatsmodelsMixin,
 )
+
+# Core abstractions (also re-exports EstimationResult for backward compat)
+from econflow.estimation.base import BaseEstimator, EstimatorError
 from econflow.estimation.first_difference import FirstDifference
 from econflow.estimation.fixed_effects import EntityFE, TwoWayFE
 from econflow.estimation.gmm import SystemGMM
@@ -69,8 +69,8 @@ from econflow.estimation.protocol import (
     BACKEND_CUSTOM,
     BACKEND_DOUBLEML,
     BACKEND_LINEARMODELS,
-    BACKEND_PYMC,
     BACKEND_PYFIXEST,
+    BACKEND_PYMC,
     BACKEND_STATSMODELS,
     KNOWN_BACKENDS,
     BackendCapabilities,
@@ -85,7 +85,9 @@ from econflow.estimation.registry import (
     list_by_backend,
     list_estimators,
     register,
+    register_estimator,
     unregister,
+    unregister_estimator,
 )
 
 # Result objects
@@ -114,11 +116,14 @@ __all__ = [
     "PyfixestMixin",
     "DoubleMLMixin",
     "PyMCMixin",
-    # Registry
-    "register",
+    # Registry — stable names (register_estimator, unregister_estimator)
+    "register_estimator",
     "get_estimator",
     "list_estimators",
     "list_by_backend",
+    "unregister_estimator",
+    # Deprecated aliases kept for backward compat (will warn in v2.0)
+    "register",
     "unregister",
     # Concrete estimators
     "PooledOLS",

@@ -20,6 +20,7 @@ from econflow.integrity.checks.registry import (
     list_checks,
     register_integrity_check,
     unregister_check,
+    unregister_integrity_check,
 )
 
 __all__ = [
@@ -28,5 +29,7 @@ __all__ = [
     "get_check",
     "list_checks",
     "register_integrity_check",
+    "unregister_integrity_check",
+    # Deprecated alias kept for backward compat
     "unregister_check",
 ]

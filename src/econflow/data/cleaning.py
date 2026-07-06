@@ -8,7 +8,12 @@ sample-selection table.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import pandas as pd
+
+if TYPE_CHECKING:
+    from econflow.datasets.types import SelectionSummary
 
 from econflow.logging import get_logger
 
@@ -85,10 +90,10 @@ def sample_selection_summary(
 
 
 def sample_selection_summary_typed(
-    df: "pd.DataFrame",
+    df: pd.DataFrame,
     indicator_col: str = "ln_ai",
-    compare_cols: "list[str] | None" = None,
-) -> "tuple[pd.DataFrame, SelectionSummary]":
+    compare_cols: list[str] | None = None,
+) -> tuple[pd.DataFrame, SelectionSummary]:
     """Like :func:`sample_selection_summary` but also returns a typed
     :class:`~econflow.datasets.types.SelectionSummary`.
 
@@ -103,7 +108,9 @@ def sample_selection_summary_typed(
     """
     from econflow.datasets.types import SelectionSummary  # noqa: PLC0415
 
-    summary_df = sample_selection_summary(df, indicator_col=indicator_col, compare_cols=compare_cols)
+    summary_df = sample_selection_summary(
+        df, indicator_col=indicator_col, compare_cols=compare_cols
+    )
     sel = SelectionSummary(
         in_sample_rows=int(summary_df.attrs.get("in_sample_rows", 0)),
         out_of_sample_rows=int(summary_df.attrs.get("out_of_sample_rows", 0)),

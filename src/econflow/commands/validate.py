@@ -39,7 +39,7 @@ If errors are found::
         models.yaml:
           [models → 0 → estimator]
             Value error: Unknown estimator 'badname'
-            Fix: Use one of: ols, fe, twfe, re, fd, iv, gmm, quantile
+            Fix: Use one of: ols, fe, twfe, re, fd, iv
 
     ...
 
@@ -52,7 +52,6 @@ Exit codes
 from __future__ import annotations
 
 import csv
-import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
@@ -65,11 +64,10 @@ from econflow.commands._shared import deep_get, load_yaml_safe
 # ---------------------------------------------------------------------------
 # Registry-driven supported estimator IDs (backward-compat with existing tests)
 # ---------------------------------------------------------------------------
-
 from econflow.estimation.registry import list_estimators as _list_est
 
 
-def _get_supported_estimators() -> "frozenset[str]":
+def _get_supported_estimators() -> frozenset[str]:
     try:
         import econflow.estimation  # noqa: F401
         return frozenset(e["id"] for e in _list_est() if e["status"] == "implemented")
@@ -77,7 +75,7 @@ def _get_supported_estimators() -> "frozenset[str]":
         return frozenset()
 
 
-_SUPPORTED_ESTIMATORS: "frozenset[str]" = _get_supported_estimators()
+_SUPPORTED_ESTIMATORS: frozenset[str] = _get_supported_estimators()
 
 
 # ---------------------------------------------------------------------------
@@ -151,7 +149,7 @@ def _schema_validate(
     Returns (phase, project_cfg, models_cfg, outputs_cfg, raw_config, raw_models, raw_outputs).
     All config objects may be None if parsing / validation failed.
     """
-    from econflow.config.models import ProjectConfig, ModelsConfig, OutputsConfig
+    from econflow.config.models import ModelsConfig, OutputsConfig, ProjectConfig
 
     try:
         from pydantic import ValidationError
@@ -159,7 +157,6 @@ def _schema_validate(
         ValidationError = Exception  # fallback
 
     phase = _PhaseResult(name="Schema validation")
-    results_cfg = (None, None, None)
     raw_config: dict | None = None
     raw_models: dict | None = None
     raw_outputs: dict | None = None

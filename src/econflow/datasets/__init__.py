@@ -55,7 +55,12 @@ Quick start
 
 from econflow.datasets.base import Dataset
 from econflow.datasets.cross_section import CrossSectionDataset
-from econflow.datasets.migration import accepts_dataset, from_dataframe, rename_entity_col, to_dataframe
+from econflow.datasets.migration import (
+    accepts_dataset,
+    from_dataframe,
+    rename_entity_col,
+    to_dataframe,
+)
 from econflow.datasets.panel import PanelDataset
 from econflow.datasets.spatial import SpatialDataset
 from econflow.datasets.time_series import TimeSeriesDataset

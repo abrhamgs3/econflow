@@ -69,7 +69,7 @@ Usage
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from difflib import get_close_matches
 from pathlib import Path
 from typing import Literal
@@ -127,18 +127,25 @@ _SEMVER_RE = re.compile(
 
 _SUPPORTED_EXTENSIONS = frozenset({".csv", ".parquet", ".tsv"})
 
-# Canonical lower-case estimator IDs (kept in sync with registry at lint time)
+# Canonical lower-case estimator IDs for implemented estimators.
+# gmm and quantile are registered stubs — they raise NotImplementedError at runtime
+# and are blocked by L-04b below.
 _CANONICAL_ESTIMATORS: frozenset[str] = frozenset(
-    {"ols", "fe", "twfe", "re", "fd", "iv", "gmm", "quantile"}
+    {"ols", "fe", "twfe", "re", "fd", "iv"}
 )
 
-# Common aliases accepted by the validate command
+# Stub estimator IDs — present in registry but not yet implemented
+_STUB_ESTIMATORS: frozenset[str] = frozenset({"gmm", "quantile"})
+
+# Common aliases accepted by the validate command (implemented estimators only)
 _ESTIMATOR_ALIASES: dict[str, str] = {
     "OLS": "ols", "FE": "fe", "TWFE": "twfe",
     "RE": "re", "FD": "fd", "IV": "iv",
-    "GMM": "gmm", "QUANTILE": "quantile",
     "PooledOLS": "ols", "EntityFE": "fe", "TwoWayFE": "twfe",
     "RandomEffects": "re", "FirstDifference": "fd",
+    # Stub aliases preserved for detection (L-04b)
+    "GMM": "gmm", "QUANTILE": "quantile",
+    "SystemGMM": "gmm", "PanelQuantile": "quantile",
 }
 
 
@@ -404,12 +411,6 @@ class ConfigLinter:
                 for s in (raw.get("models") or [])
             ]
 
-        all_estimators = (
-            self._estimator_ids
-            | set(_ESTIMATOR_ALIASES.keys())
-            | {e.lower() for e in _ESTIMATOR_ALIASES}
-        )
-
         for spec in specs:
             mid = spec["id"] or "(unknown)"
             loc = f"models.yaml: model '{mid}'"
@@ -440,6 +441,23 @@ class ConfigLinter:
                         f"  estimator: \"fe\"  "
                         f"# valid IDs: {sorted(self._estimator_ids)}"
                     ),
+                    location=loc,
+                ))
+
+            # L-04b: stub estimator — exists in registry but not implemented
+            elif est_raw and resolved in _STUB_ESTIMATORS:
+                issues.append(LintIssue(
+                    code="L-04b",
+                    severity="error",
+                    message=(
+                        f"Estimator '{est_raw}' is registered but not yet implemented. "
+                        f"It will raise NotImplementedError at runtime."
+                    ),
+                    fix=(
+                        "Use an implemented estimator. "
+                        "Available: ols, fe, twfe, re, fd, iv."
+                    ),
+                    example='  estimator: "fe"  # two-way fixed effects',
                     location=loc,
                 ))
 

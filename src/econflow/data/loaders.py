@@ -14,8 +14,12 @@ a path and return a DataFrame.  Downstream steps decide what to do with it.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pandas as pd
+
+if TYPE_CHECKING:
+    from econflow.datasets.panel import PanelDataset
 
 from econflow.exceptions import DataValidationError
 from econflow.logging import get_logger
@@ -140,12 +144,12 @@ def drop_aggregate_entities(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def load_panel_dataset(
-    path: "str | Path",
+    path: str | Path,
     entity_col: str = "country",
     time_col: str = "year",
     title: str = "",
     source: str = "",
-) -> "PanelDataset":
+) -> PanelDataset:
     """Load the processed panel CSV and return a typed :class:`PanelDataset`.
 
     This is the preferred loader for new code.  Existing code that calls

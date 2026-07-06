@@ -46,7 +46,10 @@ from __future__ import annotations
 
 import abc
 from datetime import datetime, timezone
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from econflow.estimation.protocol import BackendCapabilities
 
 import pandas as pd
 
@@ -161,7 +164,7 @@ class BaseEstimator(abc.ABC):
     # ------------------------------------------------------------------
 
     @abc.abstractmethod
-    def validate(self, data: "pd.DataFrame | Any") -> None:
+    def validate(self, data: pd.DataFrame | Any) -> None:
         """
         Validate *data* and ``self.params`` before estimation.
 
@@ -179,7 +182,7 @@ class BaseEstimator(abc.ABC):
         """
 
     @abc.abstractmethod
-    def fit(self, data: "pd.DataFrame | Any") -> EstimationResult:
+    def fit(self, data: pd.DataFrame | Any) -> EstimationResult:
         """
         Estimate the model and return a populated :class:`EstimationResult`.
 
@@ -240,7 +243,7 @@ class BaseEstimator(abc.ABC):
     # Concrete convenience wrapper
     # ------------------------------------------------------------------
 
-    def run(self, data: "pd.DataFrame | Any") -> EstimationResult:
+    def run(self, data: pd.DataFrame | Any) -> EstimationResult:
         """
         Full estimation pipeline: ``validate -> fit -> diagnostics``.
 
@@ -324,7 +327,7 @@ class BaseEstimator(abc.ABC):
         """
         return data.set_index([entity_col, time_col]).sort_index()
 
-    def _backend_capabilities(self) -> "BackendCapabilities":
+    def _backend_capabilities(self) -> BackendCapabilities:
         """
         Return the capability profile for this estimator's backend.
 
@@ -339,8 +342,8 @@ class BaseEstimator(abc.ABC):
             Capability profile for the underlying estimation library.
         """
         from econflow.estimation.protocol import (  # noqa: PLC0415
-            BackendCapabilities,
             KNOWN_BACKENDS,
+            BackendCapabilities,
         )
         backend = getattr(self, "backend", "unknown")
         safe_backend = backend if backend in KNOWN_BACKENDS else "custom"
@@ -348,8 +351,8 @@ class BaseEstimator(abc.ABC):
 
     def _resolve_dataframe(
         self,
-        data: "pd.DataFrame | Any",
-    ) -> "pd.DataFrame":
+        data: pd.DataFrame | Any,
+    ) -> pd.DataFrame:
         """
         Coerce *data* to a plain ``pd.DataFrame``.
 

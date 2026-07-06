@@ -97,3 +97,11 @@ def unregister_check(check_id: str) -> None:
         raise RegistryError(f"No integrity check registered as {check_id!r}.")
     _REGISTRY.pop(check_id, None)
     _REGISTRY_META.pop(check_id, None)
+
+
+# ---------------------------------------------------------------------------
+# Stable API alias
+# ---------------------------------------------------------------------------
+
+#: Alias for :func:`unregister_check` using consistent naming convention.
+unregister_integrity_check = unregister_check

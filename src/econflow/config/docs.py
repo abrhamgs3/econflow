@@ -47,7 +47,6 @@ import textwrap
 from pathlib import Path
 from typing import Any, Literal, get_args, get_origin
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -251,9 +250,9 @@ def generate_config_reference(format: str = "markdown") -> str:
         The rendered reference document.
     """
     from econflow.config.models import (  # type: ignore[import]
-        ProjectConfig,
         ModelsConfig,
         OutputsConfig,
+        ProjectConfig,
     )
 
     if format == "markdown":

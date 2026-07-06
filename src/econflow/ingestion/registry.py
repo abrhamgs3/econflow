@@ -154,3 +154,14 @@ def unregister(connector_id: str) -> None:
     """
     _REGISTRY.pop(connector_id, None)
     _REGISTRY_META.pop(connector_id, None)
+
+
+# ---------------------------------------------------------------------------
+# Stable API aliases (backward-compatible)
+# ---------------------------------------------------------------------------
+
+#: Canonical decorator for registering connector plugins.
+register_connector = register
+
+#: Canonical function for removing a connector from the registry.
+unregister_connector = unregister

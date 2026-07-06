@@ -87,7 +87,6 @@ from __future__ import annotations
 
 import time
 from pathlib import Path
-from typing import Optional
 
 import typer
 from rich.console import Console
@@ -211,7 +210,7 @@ def doctor() -> None:
 
 @app.command()
 def validate(
-    config_dir: "Optional[Path]" = typer.Argument(
+    config_dir: Path | None = typer.Argument(
         None,
         help=(
             "Directory containing config.yaml, models.yaml, and outputs.yaml.  "
@@ -472,6 +471,18 @@ def run(
             if not path.exists():
                 console.print(f"[bold red]✘ {label} file not found:[/bold red] {path}")
                 raise typer.Exit(code=1)
+
+        # Pre-flight: validate config before touching any output files (C-2 fix)
+        from econflow.commands.validate import run_validate as _run_validate
+        _validate_exit = _run_validate(
+            config_path=config,
+            models_path=models,
+            outputs_path=outputs,
+            check_data=False,
+            console=console,
+        )
+        if _validate_exit != 0:
+            raise typer.Exit(code=_validate_exit)
 
         try:
             run_from_config(

@@ -30,11 +30,9 @@ These models power three downstream consumers:
 from __future__ import annotations
 
 import re
-from pathlib import Path
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
-
 
 # ===========================================================================
 # config.yaml models
@@ -163,7 +161,7 @@ class SampleModel(BaseModel):
     )
 
     @model_validator(mode="after")
-    def _check_year_order(self) -> "SampleModel":
+    def _check_year_order(self) -> SampleModel:
         if self.start_year >= self.end_year:
             raise ValueError(
                 f"sample.start_year ({self.start_year}) must be strictly less than "

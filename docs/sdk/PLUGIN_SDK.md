@@ -1,11 +1,15 @@
 # EconFlow Plugin SDK
 
-**Version:** 1.0 (Sprint 9)  
+**Version:** 1.0  
 **Stability:** Stable  
-**Date:** 2026-06-28  
+**Date:** 2026-07-06  
 **Audience:** Plugin authors — researchers and engineers extending EconFlow with custom
 estimators, data connectors, diagnostics, integrity checks, renderers, figure builders,
 and configuration extensions.
+
+> **v1.0 update:** `register_estimator` is now the canonical decorator name (replacing
+> `register` which is kept as a deprecated alias). Entry-point auto-loading via
+> `[project.entry-points."econflow.plugins"]` is fully implemented. See §9.3.
 
 ---
 

@@ -27,7 +27,8 @@ layer uses ``"country"``.  Use :func:`rename_entity_col` to reconcile::
 from __future__ import annotations
 
 import functools
-from typing import TYPE_CHECKING, Any, Callable, TypeVar
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any, TypeVar
 
 import pandas as pd
 
@@ -35,7 +36,7 @@ from econflow.datasets.panel import PanelDataset
 from econflow.datasets.types import DatasetMetadata, ProvenanceRecord
 
 if TYPE_CHECKING:
-    from econflow.datasets.base import Dataset
+    pass
 
 F = TypeVar("F", bound=Callable[..., Any])
 

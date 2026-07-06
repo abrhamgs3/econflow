@@ -31,8 +31,8 @@ from __future__ import annotations
 
 from econflow.estimation.backends.doubleml import DoubleMLMixin
 from econflow.estimation.backends.linearmodels import LinearmodelsMixin
-from econflow.estimation.backends.pymc import PyMCMixin
 from econflow.estimation.backends.pyfixest import PyfixestMixin
+from econflow.estimation.backends.pymc import PyMCMixin
 from econflow.estimation.backends.statsmodels import StatsmodelsMixin
 
 __all__ = [

@@ -9,8 +9,6 @@ re-running the econometrics.
 
 from __future__ import annotations
 
-import pandas as pd
-
 from econflow.logging import get_logger
 
 log = get_logger(__name__)

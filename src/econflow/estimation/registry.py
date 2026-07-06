@@ -58,6 +58,34 @@ _REGISTRY_META: dict[str, dict[str, Any]] = {}
 
 
 # ---------------------------------------------------------------------------
+# Entry-point auto-loading  (S-2 fix from BETA_READINESS_RESPONSE.md)
+# Plugins declared in [project.entry-points."econflow.plugins"] are loaded
+# automatically when this module is first imported.
+# ---------------------------------------------------------------------------
+
+def _load_entry_point_plugins() -> None:
+    """Auto-load estimator plugins declared via ``econflow.plugins`` entry points."""
+    try:
+        import importlib.metadata as _meta
+        for ep in _meta.entry_points(group="econflow.plugins"):
+            try:
+                ep.load()
+            except Exception as exc:  # noqa: BLE001
+                import warnings
+                warnings.warn(
+                    f"EconFlow: failed to load plugin {ep.name!r} "
+                    f"from entry point: {exc}",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+    except Exception:  # pragma: no cover
+        pass
+
+
+_load_entry_point_plugins()
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -196,3 +224,18 @@ def unregister(estimator_id: str) -> None:
         raise RegistryError(f"No estimator registered as {estimator_id!r}.")
     _REGISTRY.pop(estimator_id, None)
     _REGISTRY_META.pop(estimator_id, None)
+
+
+# ---------------------------------------------------------------------------
+# Stable API aliases (backward-compatible)
+# The canonical public names use the subsystem suffix for discoverability.
+# The short names (register, unregister) are kept as deprecated aliases.
+# ---------------------------------------------------------------------------
+
+#: Canonical decorator for registering estimator plugins.
+#: ``register`` is kept as a backward-compatible alias.
+register_estimator = register
+
+#: Canonical function for removing an estimator from the registry.
+#: ``unregister`` is kept as a backward-compatible alias.
+unregister_estimator = unregister

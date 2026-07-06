@@ -34,12 +34,10 @@ import pandas as pd
 
 from econflow.datasets.base import Dataset
 from econflow.datasets.types import (
-    ColumnInfo,
     DatasetMetadata,
     PanelBalance,
     ProvenanceRecord,
     ValidationStatus,
-    VariableRegistry,
 )
 
 
@@ -215,26 +213,6 @@ class PanelDataset(Dataset):
     # ------------------------------------------------------------------
     # Repr
     # ------------------------------------------------------------------
-
-    def __repr__(self) -> str:
-        n_entities = (
-            self._df[self._entity_col].nunique()
-            if self._entity_col in self._df.columns
-            else "?"
-        )
-        n_periods = (
-            self._df[self._time_col].nunique()
-            if self._time_col in self._df.columns
-            else "?"
-        )
-        return (
-            f"<PanelDataset "
-            f"rows={len(self._df)} "
-            f"entities={n_entities} "
-            f"periods={n_periods} "
-            f"entity_col='{self._entity_col}' "
-            f"time_col='{self._time_col}'>"
-        )
 
     # ------------------------------------------------------------------
     # Internal builders (override from Dataset base)
