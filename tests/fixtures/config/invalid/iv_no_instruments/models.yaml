@@ -1,0 +1,10 @@
+models:
+  - id: "iv_model"
+    label: "IV"
+    estimator: "iv"
+    dependent: "outcome"
+    regressors:
+      - "treatment"
+      - "covariate_1"
+    entity_effects: false
+    time_effects: false

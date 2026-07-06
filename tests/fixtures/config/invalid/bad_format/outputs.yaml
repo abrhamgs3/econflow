@@ -1,0 +1,18 @@
+outputs:
+  base_dir: "outputs"
+  tables:
+    dir: "outputs/tables"
+    formats:
+      - "csv"
+      - "word"
+      - "pptx"
+    comparison_table:
+      filename: "table_main"
+      models:
+        - "pooled_ols"
+        - "entity_fe"
+      stars: true
+      se_type: "robust"
+  figures:
+    dir: "outputs/figures"
+    enabled: true

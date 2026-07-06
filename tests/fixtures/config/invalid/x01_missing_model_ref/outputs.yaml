@@ -1,0 +1,16 @@
+outputs:
+  base_dir: "outputs"
+  tables:
+    dir: "outputs/tables"
+    formats:
+      - "csv"
+    comparison_table:
+      filename: "table_main"
+      models:
+        - "pooled_ols"
+        - "nonexistent_model"
+      stars: true
+      se_type: "robust"
+  figures:
+    enabled: true
+    dir: "outputs/figures"

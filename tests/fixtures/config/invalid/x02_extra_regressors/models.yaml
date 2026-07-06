@@ -1,0 +1,11 @@
+models:
+  - id: "pooled_ols"
+    label: "Pooled OLS"
+    estimator: "ols"
+    dependent: "outcome"
+    regressors:
+      - "treatment"
+      - "covariate_1"
+      - "mystery_var"
+    entity_effects: false
+    time_effects: false

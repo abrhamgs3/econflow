@@ -472,17 +472,45 @@ def run(
                 console.print(f"[bold red]✘ {label} file not found:[/bold red] {path}")
                 raise typer.Exit(code=1)
 
-        # Pre-flight: validate config before touching any output files (C-2 fix)
-        from econflow.commands.validate import run_validate as _run_validate
-        _validate_exit = _run_validate(
-            config_path=config,
-            models_path=models,
-            outputs_path=outputs,
-            check_data=False,
-            console=console,
-        )
-        if _validate_exit != 0:
-            raise typer.Exit(code=_validate_exit)
+        # Pre-flight: validate config before touching any output files.
+        # Uses ConfigValidator.validate_strict() which raises ConfigValidationError
+        # on the first error, enforcing the load → validate → execute flow.
+        from econflow.config.validator import ConfigValidator as _ConfigValidator
+        from econflow.core.exceptions import ConfigValidationError as _ConfigValidationError
+        try:
+            _validator = _ConfigValidator()
+            _validator.validate_strict(
+                config_path=config,
+                models_path=models,
+                outputs_path=outputs,
+                check_data=True,
+            )
+        except _ConfigValidationError as _exc:
+            console.print()
+            console.print(
+                f"[bold red]✘ Configuration validation failed "
+                f"({_exc.error_count} error(s)).[/bold red]"
+            )
+            for _issue in _exc.errors[:20]:
+                console.print(
+                    f"  [red]·[/red] [{_issue.stage}] "
+                    f"[bold]{_issue.source}[/bold] "
+                    f"[dim]{_issue.location}[/dim]"
+                )
+                console.print(f"      {_issue.message}")
+                if _issue.fix:
+                    console.print(f"      [dim]Fix: {_issue.fix}[/dim]")
+            if len(_exc.errors) > 20:
+                console.print(
+                    f"  [dim]… and {len(_exc.errors) - 20} more error(s).  "
+                    "Run `econflow validate` for the full report.[/dim]"
+                )
+            console.print()
+            console.print(
+                "[dim]Run [bold]econflow validate[/bold] for the full "
+                "validation report.[/dim]"
+            )
+            raise typer.Exit(code=1)
 
         try:
             run_from_config(

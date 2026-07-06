@@ -48,6 +48,15 @@ Lint rules
    * - L-10
      - Model ``label`` is empty (falls back to ``id`` in output)
      - info
+   * - L-11
+     - IV estimator with empty or missing instruments list
+     - error
+   * - L-12
+     - TWFE estimator but ``entity_effects`` and ``time_effects`` are both False
+     - warning
+   * - L-13
+     - ``outputs.tables.formats`` contains an unrecognised renderer ID
+     - warning
 
 Usage
 -----
@@ -146,7 +155,15 @@ _ESTIMATOR_ALIASES: dict[str, str] = {
     # Stub aliases preserved for detection (L-04b)
     "GMM": "gmm", "QUANTILE": "quantile",
     "SystemGMM": "gmm", "PanelQuantile": "quantile",
+    # Lowercase stub IDs so _resolve_estimator("gmm") returns "gmm" → L-04b fires
+    "gmm": "gmm", "quantile": "quantile",
 }
+
+
+#: Supported renderer IDs for L-13
+_SUPPORTED_FORMATS: frozenset[str] = frozenset(
+    {"csv", "latex", "markdown", "html", "json"}
+)
 
 
 def _resolve_estimator(raw: str) -> str | None:
@@ -311,13 +328,17 @@ class ConfigLinter:
         # L-03: start_year >= end_year (also caught by Pydantic validator, but
         # the Pydantic error message is less readable — emit linter version too)
         if sample_start is not None and sample_end is not None:
-            if sample_start >= sample_end:
+            try:
+                _ss, _se = int(sample_start), int(sample_end)
+            except (TypeError, ValueError):
+                _ss, _se = None, None
+            if _ss is not None and _ss >= _se:
                 issues.append(LintIssue(
                     code="L-03",
                     severity="error",
                     message=(
-                        f"sample.start_year ({sample_start}) must be strictly "
-                        f"less than sample.end_year ({sample_end})."
+                        f"sample.start_year ({_ss}) must be strictly "
+                        f"less than sample.end_year ({_se})."
                     ),
                     fix="Set start_year to an earlier year than end_year.",
                     example=(
@@ -394,6 +415,9 @@ class ConfigLinter:
                         "dependent": m.dependent,
                         "regressors": list(m.regressors or []),
                         "label": getattr(m, "label", ""),
+                        "entity_effects": getattr(m, "entity_effects", False),
+                        "time_effects": getattr(m, "time_effects", False),
+                        "instruments": list(getattr(m, "instruments", None) or []),
                     }
                     for m in cfg.models  # type: ignore[union-attr]
                 ]
@@ -506,6 +530,72 @@ class ConfigLinter:
                     location=loc,
                 ))
 
+            # L-11: IV estimator with no instruments
+            est_lower = (est_raw or "").lower()
+            _iv_aliases = {"iv", "iv2sls", "2sls"}
+            if est_lower in _iv_aliases or (resolved == "iv"):
+                instruments = spec.get("instruments") or []
+                if not instruments:
+                    # Also check if instruments exist at config level
+                    cfg_instruments: list[str] = []
+                    if project_cfg is not None:
+                        try:
+                            cfg_instruments = list(
+                                getattr(project_cfg.variables, "instruments", None) or []  # type: ignore[union-attr]
+                            )
+                        except AttributeError:
+                            pass
+                    elif raw_config is not None:
+                        cfg_instruments = list(
+                            (raw_config.get("variables") or {}).get("instruments") or []
+                        )
+                    if not cfg_instruments:
+                        issues.append(LintIssue(
+                            code="L-11",
+                            severity="error",
+                            message=(
+                                f"Model '{mid}' uses estimator 'iv' but no instruments "
+                                "are defined.  IV/2SLS requires excluded instruments."
+                            ),
+                            fix=(
+                                "Add an `instruments:` list to config.yaml "
+                                "variables block, or add `instruments:` to this "
+                                "model spec."
+                            ),
+                            example=(
+                                "variables:\n"
+                                "  instruments:\n"
+                                "    - distance_to_coast\n"
+                                "    - colonial_origin"
+                            ),
+                            location=loc,
+                        ))
+
+            # L-12: TWFE but effects flags not set
+            _twfe_aliases = {"twfe", "two_way_fe", "twfe_robust"}
+            if est_lower in _twfe_aliases or (resolved == "twfe"):
+                entity_fx = spec.get("entity_effects", False)
+                time_fx = spec.get("time_effects", False)
+                if not entity_fx and not time_fx:
+                    issues.append(LintIssue(
+                        code="L-12",
+                        severity="warning",
+                        message=(
+                            f"Model '{mid}' uses TWFE but both entity_effects and "
+                            "time_effects are False (or absent).  Two-way FE will "
+                            "not absorb either dimension."
+                        ),
+                        fix=(
+                            "Set entity_effects: true and time_effects: true for "
+                            "two-way fixed effects estimation."
+                        ),
+                        example=(
+                            "  entity_effects: true\n"
+                            "  time_effects: true"
+                        ),
+                        location=loc,
+                    ))
+
         return issues
 
     # ------------------------------------------------------------------
@@ -542,6 +632,40 @@ class ConfigLinter:
                     fix="Use a relative path such as 'outputs' or '../results'.",
                     example="outputs:\n  base_dir: \"outputs\"",
                     location="outputs.yaml: outputs.base_dir",
+                ))
+
+        # L-13: unknown renderer format ID
+        formats: list[str] = []
+        if cfg is not None:
+            try:
+                formats = list(cfg.outputs.tables.formats or [])  # type: ignore[union-attr]
+            except AttributeError:
+                pass
+        elif raw is not None:
+            formats = list(
+                ((raw.get("outputs") or {}).get("tables") or {}).get("formats") or []
+            )
+        for fmt in formats:
+            if fmt not in _SUPPORTED_FORMATS:
+                suggestions = get_close_matches(
+                    fmt.lower(),
+                    sorted(_SUPPORTED_FORMATS),
+                    n=1,
+                    cutoff=0.5,
+                )
+                hint = f"  Did you mean: '{suggestions[0]}'?" if suggestions else ""
+                issues.append(LintIssue(
+                    code="L-13",
+                    severity="warning",
+                    message=(
+                        f"outputs.tables.formats contains unknown renderer '{fmt}'.{hint}"
+                    ),
+                    fix=(
+                        f"Use one of the supported renderers: "
+                        f"{sorted(_SUPPORTED_FORMATS)}.  "
+                        "Unknown formats are silently skipped."
+                    ),
+                    location=f"outputs.yaml: outputs.tables.formats['{fmt}']",
                 ))
 
         return issues

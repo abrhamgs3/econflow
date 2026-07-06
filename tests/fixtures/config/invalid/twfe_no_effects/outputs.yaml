@@ -1,0 +1,16 @@
+outputs:
+  base_dir: outputs
+  figures:
+    dir: outputs/figures
+    enabled: true
+  tables:
+    comparison_table:
+      filename: table_main
+      models:
+      - twfe_model
+      se_type: robust
+      stars: true
+    dir: outputs/tables
+    formats:
+    - csv
+    - latex

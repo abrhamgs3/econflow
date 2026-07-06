@@ -10,7 +10,8 @@ Exception tree
 EconFlowError (econflow.exceptions)
 └── EconFlowCoreError
 ├── ConfigurationError
-│   └── MissingConfigKeyError
+│   ├── MissingConfigKeyError
+│   └── ConfigValidationError
 ├── RegistryError
 │   └── ProjectNotFoundError
 ├── PipelineError
@@ -83,6 +84,56 @@ class MissingConfigKeyError(ConfigurationError):
     def __init__(self, key: str) -> None:
         super().__init__(f"Required configuration key is missing: '{key}'")
         self.key = key
+
+
+class ConfigValidationError(ConfigurationError):
+    """
+    Raised when one or more configuration files fail validation.
+
+    Carries every :class:`~econflow.config.validator.ValidationIssue` that was
+    collected across all four validation stages (YAML syntax, Pydantic schema,
+    semantic, cross-file).  Only *errors* (not warnings) trigger this exception.
+
+    Parameters
+    ----------
+    issues:
+        All validation issues collected (errors + warnings).
+    config_path:
+        Path to the primary ``config.yaml`` file, used in the message.
+
+    Attributes
+    ----------
+    issues : list
+        All :class:`~econflow.config.validator.ValidationIssue` objects.
+    errors : list
+        Subset with ``severity == "error"``.
+    warnings : list
+        Subset with ``severity == "warning"``.
+    error_count : int
+        Number of errors.
+    """
+
+    def __init__(self, issues: list, config_path: object = None) -> None:
+        self.issues = issues
+        errors = [i for i in issues if getattr(i, "severity", None) == "error"]
+        warnings = [i for i in issues if getattr(i, "severity", None) == "warning"]
+        self.errors = errors
+        self.warnings = warnings
+        self.error_count = len(errors)
+
+        location = f" ({config_path})" if config_path else ""
+        lines = [
+            f"Configuration validation failed{location}: "
+            f"{len(errors)} error(s), {len(warnings)} warning(s).",
+        ]
+        for issue in errors[:10]:
+            lines.append(
+                f"  [{getattr(issue, 'stage', '?')}] {getattr(issue, 'source', '')} "
+                f"{getattr(issue, 'location', '')}: {getattr(issue, 'message', issue)}"
+            )
+        if len(errors) > 10:
+            lines.append(f"  … and {len(errors) - 10} more error(s).")
+        super().__init__("\n".join(lines))
 
 
 # ---------------------------------------------------------------------------

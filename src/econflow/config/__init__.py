@@ -31,6 +31,7 @@ from econflow.config.models import (
     OutputsConfig,
     ProjectConfig,
 )
+from econflow.config.validator import ConfigValidator, ValidationIssue, ValidationResult
 
 __all__ = [
     # Models
@@ -44,4 +45,8 @@ __all__ = [
     # Documentation generation
     "generate_config_reference",
     "write_config_reference",
+    # Validator
+    "ConfigValidator",
+    "ValidationResult",
+    "ValidationIssue",
 ]

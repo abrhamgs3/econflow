@@ -1,0 +1,10 @@
+project:
+  name: "bad project
+  version: "0.1.0"
+data:
+  path: data/panel.csv
+  entity_col: entity
+  time_col: year
+variables:
+  dependent: y
+  regressors: [x1]

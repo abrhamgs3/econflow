@@ -1,0 +1,21 @@
+models:
+  - id: "pooled_ols"
+    label: "Pooled OLS"
+    estimator: "ols"
+    dependent: "outcome"
+    regressors:
+      - "treatment"
+      - "covariate_1"
+    entity_effects: false
+    time_effects: false
+
+  - id: "entity_fe"
+    label: "Entity FE"
+    estimator: "fe"
+    dependent: "outcome"
+    regressors:
+      - "treatment"
+      - "covariate_1"
+    entity_effects: true
+    time_effects: false
+    cluster: "entity"
