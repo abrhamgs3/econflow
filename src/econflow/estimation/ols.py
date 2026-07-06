@@ -44,6 +44,7 @@ class PooledOLS(BaseEstimator):
     """
 
     estimator_id = "ols"
+    backend = "linearmodels"
     name = "Pooled OLS"
     description = (
         "Pooled ordinary least squares.  Ignores panel structure; "

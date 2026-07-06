@@ -40,6 +40,7 @@ class SystemGMM(BaseEstimator):
     """
 
     estimator_id = "gmm"
+    backend = "linearmodels"
     name = "System GMM"
     description = (
         "Dynamic panel estimator (Arellano-Bond / Blundell-Bond system GMM).  "

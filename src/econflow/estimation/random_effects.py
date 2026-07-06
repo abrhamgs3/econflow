@@ -36,6 +36,7 @@ class RandomEffects(BaseEstimator):
     """
 
     estimator_id = "re"
+    backend = "linearmodels"
     name = "Random Effects (GLS)"
     description = (
         "Random-effects GLS estimator assuming individual effects are "

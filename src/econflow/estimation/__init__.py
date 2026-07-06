@@ -3,11 +3,17 @@ econflow.estimation — Plugin-based estimation framework.
 
 Public API
 ----------
+Protocol (Milestone 3)
+~~~~~~~~~~~~~~~~~~~~~~
+.. autoclass:: econflow.estimation.protocol.EstimatorProtocol
+.. autoclass:: econflow.estimation.protocol.BackendCapabilities
+
 Registry
 ~~~~~~~~
 .. autofunction:: econflow.estimation.registry.register
 .. autofunction:: econflow.estimation.registry.get_estimator
 .. autofunction:: econflow.estimation.registry.list_estimators
+.. autofunction:: econflow.estimation.registry.list_by_backend
 
 Core abstractions
 ~~~~~~~~~~~~~~~~~
@@ -45,6 +51,13 @@ import econflow.estimation.random_effects  # noqa: F401
 
 # Core abstractions (also re-exports EstimationResult for backward compat)
 from econflow.estimation.base import BaseEstimator, EstimatorError
+from econflow.estimation.backends import (
+    DoubleMLMixin,
+    LinearmodelsMixin,
+    PyMCMixin,
+    PyfixestMixin,
+    StatsmodelsMixin,
+)
 from econflow.estimation.first_difference import FirstDifference
 from econflow.estimation.fixed_effects import EntityFE, TwoWayFE
 from econflow.estimation.gmm import SystemGMM
@@ -52,11 +65,28 @@ from econflow.estimation.iv import IV2SLS
 
 # Convenience re-exports of concrete classes
 from econflow.estimation.ols import PooledOLS
+from econflow.estimation.protocol import (
+    BACKEND_CUSTOM,
+    BACKEND_DOUBLEML,
+    BACKEND_LINEARMODELS,
+    BACKEND_PYMC,
+    BACKEND_PYFIXEST,
+    BACKEND_STATSMODELS,
+    KNOWN_BACKENDS,
+    BackendCapabilities,
+    EstimatorProtocol,
+)
 from econflow.estimation.quantile import PanelQuantile
 from econflow.estimation.random_effects import RandomEffects
 
 # Registry
-from econflow.estimation.registry import get_estimator, list_estimators, register, unregister
+from econflow.estimation.registry import (
+    get_estimator,
+    list_by_backend,
+    list_estimators,
+    register,
+    unregister,
+)
 
 # Result objects
 from econflow.estimation.result import DiagnosticResult, EstimationResult
@@ -68,10 +98,27 @@ __all__ = [
     # Abstractions
     "BaseEstimator",
     "EstimatorError",
+    # Protocol (Milestone 3)
+    "EstimatorProtocol",
+    "BackendCapabilities",
+    "BACKEND_LINEARMODELS",
+    "BACKEND_STATSMODELS",
+    "BACKEND_PYFIXEST",
+    "BACKEND_DOUBLEML",
+    "BACKEND_PYMC",
+    "BACKEND_CUSTOM",
+    "KNOWN_BACKENDS",
+    # Backend mixins (Milestone 3)
+    "LinearmodelsMixin",
+    "StatsmodelsMixin",
+    "PyfixestMixin",
+    "DoubleMLMixin",
+    "PyMCMixin",
     # Registry
     "register",
     "get_estimator",
     "list_estimators",
+    "list_by_backend",
     "unregister",
     # Concrete estimators
     "PooledOLS",

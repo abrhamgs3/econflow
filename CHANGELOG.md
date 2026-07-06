@@ -9,6 +9,70 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Architecture Stabilization Milestone 3 — Library-Agnostic EstimatorProtocol (2026-07-06)
+
+#### Added
+- `src/econflow/estimation/protocol.py`: new module defining `EstimatorProtocol`
+  (`@runtime_checkable Protocol`), `BackendCapabilities` dataclass, and six
+  `BACKEND_*` string constants (`linearmodels`, `statsmodels`, `pyfixest`,
+  `doubleml`, `pymc`, `custom`) plus `KNOWN_BACKENDS` frozenset.
+- `src/econflow/estimation/backends/` — new package of library-specific mixin
+  classes:
+  - `LinearmodelsMixin` [implemented]: `_to_panel()` (MultiIndex builder for
+    linearmodels), `_check_linearmodels()`, `_backend_capabilities()` returning
+    `BackendCapabilities(supports_panel=True, supports_iv=True, supports_gmm=True)`.
+  - `StatsmodelsMixin` [stub — Milestone 4]: `_to_formula()` raises
+    `NotImplementedError`; `_check_statsmodels()` returns installed version.
+  - `PyfixestMixin` [stub — Milestone 4]: `_to_fixest_formula()` raises
+    `NotImplementedError`; `_check_pyfixest()` returns installed version.
+  - `DoubleMLMixin` [stub — Milestone 5]: `_to_doubleml_data()` raises
+    `NotImplementedError`; `_check_doubleml()` returns installed version.
+  - `PyMCMixin` [stub — Milestone 6]: `_build_pymc_model()` and
+    `_extract_posterior_summary()` raise `NotImplementedError`;
+    `_check_pymc()` returns installed version.
+- `BaseEstimator.backend: str = "unknown"` — new class attribute; all 8
+  concrete estimators now declare `backend = "linearmodels"`.
+- `BaseEstimator._backend_capabilities()` — new concrete method returning a
+  `BackendCapabilities` instance; falls back to `backend="custom"` for
+  unrecognised backend strings.
+- `list_by_backend(backend: str)` in `estimation/registry.py` — filters the
+  registry by backend identifier and returns sorted metadata dicts.
+- `tests/unit/test_estimator_protocol.py`: 51 protocol conformance and
+  migration tests covering: `isinstance(est, EstimatorProtocol)` for all 8
+  registered estimators, duck-typed custom class satisfies protocol without
+  ABC inheritance, incomplete class does NOT satisfy protocol, all
+  `BackendCapabilities` flags, `list_by_backend()`, `LinearmodelsMixin._to_panel()`,
+  stub mixin `NotImplementedError`, `_backend_capabilities()` fallback, and all
+  public `__init__` exports.
+
+#### Changed
+- `estimation/registry.py`: `@register()` decorator gains optional `backend=`
+  keyword; reads `cls.backend` as fallback. `_REGISTRY_META` entries now include
+  `"backend"` key. `list_estimators()` returns dicts with `"backend"` key.
+- `estimation/base.py`: `validate(data)`, `fit(data)`, and `run(data)` type
+  hints updated to `pd.DataFrame | Any` to formally document Dataset acceptance.
+  `_to_panel()` retains a deprecation note pointing to `LinearmodelsMixin`.
+- `estimation/{ols,fixed_effects,random_effects,first_difference,iv,gmm,quantile}.py`:
+  each class now declares `backend = "linearmodels"`.
+- `estimation/__init__.py`: exports `EstimatorProtocol`, `BackendCapabilities`,
+  all `BACKEND_*` constants, `KNOWN_BACKENDS`, all 5 backend mixins, and
+  `list_by_backend`.
+- `docs/architecture/ESTIMATION_FRAMEWORK.md`: added Milestone 3 section
+  documenting `EstimatorProtocol` design, backend mixin table, `BackendCapabilities`
+  usage, migration path for third-party estimators, and updated module map.
+
+#### Architecture Notes
+- **No breaking changes**: all existing estimators, registry calls, and imports
+  work without modification. `BaseEstimator._to_panel()` kept in base for
+  backward compat (formally deprecated, owned by `LinearmodelsMixin`).
+- **Structural typing**: `EstimatorProtocol` is a `typing.Protocol` — any class
+  implementing `fit/validate/diagnostics/run` + `estimator_id/name/backend`
+  satisfies it without inheriting `BaseEstimator`. Enables third-party backends.
+- **Runtime checkable**: `isinstance(est, EstimatorProtocol)` works at runtime,
+  enabling runner-level backend capability routing.
+
+---
+
 ### Architecture Stabilization Milestone 2 — Dataset Abstraction (2026-07-06)
 
 #### Added

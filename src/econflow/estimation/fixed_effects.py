@@ -87,6 +87,7 @@ class EntityFE(BaseEstimator):
     """
 
     estimator_id = "fe"
+    backend = "linearmodels"
     name = "Entity Fixed Effects"
     description = (
         "Within estimator with entity fixed effects.  Controls for all "
@@ -180,6 +181,7 @@ class TwoWayFE(BaseEstimator):
     """
 
     estimator_id = "twfe"
+    backend = "linearmodels"
     name = "Two-Way Fixed Effects"
     description = (
         "Entity + time fixed effects via the within transformation.  "

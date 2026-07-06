@@ -35,6 +35,7 @@ class FirstDifference(BaseEstimator):
     """
 
     estimator_id = "fd"
+    backend = "linearmodels"
     name = "First Difference"
     description = (
         "First-difference estimator.  Eliminates entity fixed effects by "

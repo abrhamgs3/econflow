@@ -36,6 +36,7 @@ class IV2SLS(BaseEstimator):
     """
 
     estimator_id = "iv"
+    backend = "linearmodels"
     name = "IV / 2SLS"
     description = (
         "Two-stage least squares.  Addresses endogeneity via excluded "

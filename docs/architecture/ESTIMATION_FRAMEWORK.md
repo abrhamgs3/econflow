@@ -312,8 +312,187 @@ pytest tests/unit/test_diagnostic_registry.py    # 23 tests  — diagnostic regi
 pytest tests/integration/test_estimator_run.py   # 21 tests  — OLS/FE/TWFE/RE/FD/IV on synthetic panel
 pytest tests/integration/test_diagnostic_run.py  # 24 tests  — Hausman/BP/CD/VIF + stubs + registry
 
+# Milestone 3 protocol tests
+pytest tests/unit/test_estimator_protocol.py     # protocol conformance + backend + registry
+
 # Full suite
-pytest                                           # 516 tests total
+pytest                                           # 1100+ tests total
+```
+
+---
+
+## Architecture Stabilization — Milestone 3: Library-Agnostic EstimatorProtocol
+
+**Status:** Implemented (2026-07-06)
+
+### Problem
+
+The previous `BaseEstimator` ABC coupled the *interface* to the `linearmodels`
+library in two ways:
+
+1. **`_to_panel()`** — a helper that creates a `(entity, time)` `MultiIndex`
+   specifically required by `linearmodels`.  This method lived in `BaseEstimator`
+   but has no meaning for `statsmodels`, `pyfixest`, `DoubleML`, or `PyMC` backends.
+
+2. **Type annotations** — `validate(data: pd.DataFrame)`, `fit(data: pd.DataFrame)`
+   suggested that `pd.DataFrame` was the only accepted input, even though the
+   Dataset abstraction (Milestone 2) had extended the interface.
+
+### Solution
+
+#### `EstimatorProtocol` (structural typing)
+
+`src/econflow/estimation/protocol.py` defines a `@runtime_checkable Protocol`:
+
+```python
+from econflow.estimation.protocol import EstimatorProtocol
+
+# Any class with fit/validate/diagnostics/run + estimator_id/name/backend satisfies it
+assert isinstance(my_estimator, EstimatorProtocol)
+```
+
+Key properties:
+- **Structural, not nominal** — no inheritance required.  A statsmodels wrapper,
+  a pyfixest wrapper, or a fully custom class all satisfy the Protocol as long as
+  they implement the four methods and three attributes.
+- **`@runtime_checkable`** — `isinstance(est, EstimatorProtocol)` works at runtime.
+- **Future-proof** — new backends can be added without modifying `BaseEstimator`.
+
+#### `BACKEND_*` constants
+
+```python
+from econflow.estimation.protocol import (
+    BACKEND_LINEARMODELS,  # "linearmodels"
+    BACKEND_STATSMODELS,   # "statsmodels"
+    BACKEND_PYFIXEST,      # "pyfixest"
+    BACKEND_DOUBLEML,      # "doubleml"
+    BACKEND_PYMC,          # "pymc"
+    BACKEND_CUSTOM,        # "custom"
+    KNOWN_BACKENDS,        # frozenset of all six
+)
+```
+
+#### `BackendCapabilities` dataclass
+
+Advertises what a backend supports:
+
+```python
+from econflow.estimation.protocol import BackendCapabilities
+
+caps = estimator._backend_capabilities()
+if caps.supports_iv:
+    run_iv_robustness_check(estimator)
+```
+
+Fields: `supports_panel`, `supports_cross_section`, `supports_time_series`,
+`supports_spatial`, `supports_bayesian`, `supports_iv`, `supports_quantile`,
+`supports_gmm`.
+
+#### Backend mixin classes (`src/econflow/estimation/backends/`)
+
+| Mixin | Backend | Status | Key helpers |
+|-------|---------|--------|-------------|
+| `LinearmodelsMixin` | `linearmodels` | **Implemented** | `_to_panel()`, `_check_linearmodels()`, `_backend_capabilities()` |
+| `StatsmodelsMixin` | `statsmodels` | Planned M4 | `_to_formula()` stub |
+| `PyfixestMixin` | `pyfixest` | Planned M4 | `_to_fixest_formula()` stub |
+| `DoubleMLMixin` | `doubleml` | Planned M5 | `_to_doubleml_data()` stub |
+| `PyMCMixin` | `pymc` | Planned M6 | `_build_pymc_model()` stub |
+
+New estimators inherit from `BaseEstimator` + the appropriate mixin:
+
+```python
+from econflow.estimation.base import BaseEstimator
+from econflow.estimation.backends.linearmodels import LinearmodelsMixin
+from econflow.estimation.protocol import BACKEND_LINEARMODELS
+
+class MyPanelEstimator(BaseEstimator, LinearmodelsMixin):
+    backend = BACKEND_LINEARMODELS
+
+    def fit(self, data):
+        data = self._resolve_dataframe(data)         # Dataset → pd.DataFrame
+        panel = self._to_panel(data.dropna(...), ...) # from LinearmodelsMixin
+        ...
+```
+
+#### Updated `BaseEstimator`
+
+Three additions, zero breaking changes:
+
+1. `backend: str = "unknown"` — class attribute; all 8 concrete estimators now
+   set `backend = "linearmodels"`.
+2. `_backend_capabilities()` — concrete method returning `BackendCapabilities`.
+   Falls back to `BackendCapabilities(backend="custom")` for unknown backends.
+3. Updated type hints: `validate(data: pd.DataFrame | Any)` and
+   `fit(data: pd.DataFrame | Any)` — documents that Dataset inputs are accepted.
+
+`_to_panel()` remains in `BaseEstimator` for backward compat (deprecated in
+favour of `LinearmodelsMixin._to_panel()`).
+
+#### Updated `EstimatorRegistry`
+
+`@register()` gains an optional `backend=` keyword argument:
+
+```python
+@register("myfe", backend="pyfixest", ...)
+class MyFE(BaseEstimator, PyfixestMixin): ...
+```
+
+If omitted, the decorator reads `cls.backend`.  New registry function:
+
+```python
+from econflow.estimation.registry import list_by_backend
+
+lm_estimators = list_by_backend("linearmodels")
+# Returns all 8 built-in estimators
+```
+
+`list_estimators()` now includes a `"backend"` key in every entry dict.
+
+### Module map additions
+
+```
+src/econflow/estimation/
+├── protocol.py              EstimatorProtocol, BackendCapabilities, BACKEND_* constants
+└── backends/
+    ├── __init__.py          Exports all 5 mixins
+    ├── linearmodels.py      LinearmodelsMixin  [implemented]
+    ├── statsmodels.py       StatsmodelsMixin   [stub — Milestone 4]
+    ├── pyfixest.py          PyfixestMixin      [stub — Milestone 4]
+    ├── doubleml.py          DoubleMLMixin      [stub — Milestone 5]
+    └── pymc.py              PyMCMixin          [stub — Milestone 6]
+```
+
+### Migration path for third-party estimators
+
+```python
+# Before Milestone 3: must subclass BaseEstimator
+class OldCustomEstimator(BaseEstimator):
+    def validate(self, data): ...
+    def fit(self, data): ...
+    def diagnostics(self, result): ...
+
+# After Milestone 3: can satisfy protocol without BaseEstimator
+class NewCustomEstimator:
+    estimator_id = "my_custom"
+    name         = "My Custom"
+    backend      = "custom"
+
+    def fit(self, data) -> EstimationResult:       ...
+    def validate(self, data) -> None:              ...
+    def diagnostics(self, result) -> list:         ...
+    def run(self, data) -> EstimationResult:
+        self.validate(data)
+        result = self.fit(data)
+        result.diagnostic_results = self.diagnostics(result)
+        return result
+
+# Register it
+from econflow.estimation.registry import _REGISTRY
+_REGISTRY["my_custom"] = NewCustomEstimator  # duck-typing accepted
+
+# Protocol check passes
+from econflow.estimation.protocol import EstimatorProtocol
+assert isinstance(NewCustomEstimator(), EstimatorProtocol)
 ```
 
 ---

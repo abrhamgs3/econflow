@@ -41,6 +41,7 @@ class PanelQuantile(BaseEstimator):
     """
 
     estimator_id = "quantile"
+    backend = "linearmodels"
     name = "Panel Quantile Regression"
     description = (
         "Panel quantile regression (Koenker 2004 / Canay 2011).  "

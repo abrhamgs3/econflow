@@ -10,7 +10,7 @@ Usage — registering an estimator
     from econflow.estimation.registry import register
     from econflow.estimation.base import BaseEstimator
 
-    @register("my_estimator", label="My Custom Estimator")
+    @register("my_estimator", label="My Custom Estimator", backend="linearmodels")
     class MyEstimator(BaseEstimator):
         ...
 
@@ -23,6 +23,18 @@ Usage — resolving an estimator from YAML config
     EstimatorClass = get_estimator(config["estimator"])  # e.g. "twfe"
     model = EstimatorClass(params=config)
     result = model.run(data)
+
+Architecture Stabilization Milestone 3
+---------------------------------------
+``@register`` now accepts an optional ``backend`` keyword argument.  If
+omitted, the decorator reads ``cls.backend`` from the class after decoration.
+This means existing ``@register(...)`` calls without ``backend=`` continue to
+work — the class attribute set in each concrete estimator is used instead.
+
+``list_estimators()`` now includes a ``"backend"`` key in each entry dict.
+
+``list_by_backend(backend)`` is a new helper that filters the registry by
+backend identifier, e.g. ``list_by_backend("linearmodels")``.
 """
 
 from __future__ import annotations
@@ -38,10 +50,10 @@ if TYPE_CHECKING:
 # Internal registry
 # ---------------------------------------------------------------------------
 
-#: Maps estimator_id → estimator class.
+#: Maps estimator_id -> estimator class.
 _REGISTRY: dict[str, type[BaseEstimator]] = {}
 
-#: Maps estimator_id → display metadata.
+#: Maps estimator_id -> display metadata.
 _REGISTRY_META: dict[str, dict[str, Any]] = {}
 
 
@@ -56,6 +68,7 @@ def register(
     status: str = "implemented",
     notes: str = "",
     supported_data: list[str] | None = None,
+    backend: str = "",
 ) -> Any:
     """
     Class decorator that registers an estimator in the global registry.
@@ -74,6 +87,11 @@ def register(
     supported_data:
         Data formats this estimator supports (e.g. ``["balanced_panel",
         "unbalanced_panel"]``).  Defaults to ``["panel"]``.
+    backend:
+        The underlying estimation library (e.g. ``"linearmodels"``).
+        Defaults to the class's ``backend`` attribute if omitted.
+        One of the ``BACKEND_*`` constants in
+        :mod:`econflow.estimation.protocol`.
 
     Raises
     ------
@@ -89,6 +107,8 @@ def register(
                 f"(by {_REGISTRY[estimator_id].__name__!r}). "
                 "Use a different estimator_id or unregister first."
             )
+        # Resolve backend: explicit kwarg > class attribute > "unknown"
+        _backend = backend or getattr(cls, "backend", "unknown")
         _REGISTRY[estimator_id] = cls
         _REGISTRY_META[estimator_id] = {
             "id":             estimator_id,
@@ -96,6 +116,7 @@ def register(
             "status":         status,
             "notes":          notes,
             "supported_data": _supported,
+            "backend":        _backend,
         }
         cls.estimator_id = estimator_id  # type: ignore[attr-defined]
         return cls
@@ -126,10 +147,40 @@ def list_estimators() -> list[dict[str, Any]]:
     Return a list of dicts describing all registered estimators.
 
     Each dict has keys: ``id``, ``label``, ``status``, ``notes``,
-    ``supported_data``.  Used by ``econflow info`` to populate the
-    estimator table.
+    ``supported_data``, ``backend``.  Used by ``econflow info`` to populate
+    the estimator table.
     """
     return [_REGISTRY_META[eid] for eid in sorted(_REGISTRY_META)]
+
+
+def list_by_backend(backend: str) -> list[dict[str, Any]]:
+    """
+    Return registry entries whose ``backend`` matches *backend*.
+
+    Parameters
+    ----------
+    backend:
+        One of the ``BACKEND_*`` constants from
+        :mod:`econflow.estimation.protocol` (e.g. ``"linearmodels"``).
+
+    Returns
+    -------
+    list[dict[str, Any]]
+        Subset of :func:`list_estimators` filtered by backend, sorted by id.
+
+    Examples
+    --------
+    ::
+
+        from econflow.estimation.registry import list_by_backend
+        lm_estimators = list_by_backend("linearmodels")
+        # [{'id': 'fd', 'backend': 'linearmodels', ...}, ...]
+    """
+    return [
+        meta
+        for meta in sorted(_REGISTRY_META.values(), key=lambda m: m["id"])
+        if meta.get("backend") == backend
+    ]
 
 
 def unregister(estimator_id: str) -> None:

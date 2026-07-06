@@ -10,11 +10,36 @@ The class-level attributes provide self-documenting metadata that is surfaced
 by ``econflow info`` and can be validated by the config system before any data
 is loaded.
 
+Architecture Stabilization Milestone 3
+---------------------------------------
+``BaseEstimator`` now explicitly satisfies
+:class:`~econflow.estimation.protocol.EstimatorProtocol`.  The three new
+elements are:
+
+* ``backend`` class attribute — canonical library identifier string
+  (one of the ``BACKEND_*`` constants in
+  :mod:`econflow.estimation.protocol`).  Default is ``"unknown"``; concrete
+  subclasses should override with ``BACKEND_LINEARMODELS`` etc.
+
+* ``_backend_capabilities()`` concrete method — returns a
+  :class:`~econflow.estimation.protocol.BackendCapabilities` instance
+  describing what the estimator's backend supports.
+
+* Updated type hints on ``validate``, ``fit``, and ``run`` — the data
+  argument is now annotated as ``pd.DataFrame | Any`` to signal that
+  :class:`~econflow.datasets.base.Dataset` subclasses are accepted.
+  The concrete ``_resolve_dataframe()`` helper coerces the input before
+  any library-specific code sees it.
+
 Backward compatibility
 -----------------------
 ``EstimationResult`` is still importable from this module — all existing
 ``from econflow.estimation.base import EstimationResult`` statements continue
 to work without modification.
+
+``_to_panel()`` is kept on ``BaseEstimator`` for estimators written before the
+mixin split.  New estimators should inherit from
+:class:`~econflow.estimation.backends.linearmodels.LinearmodelsMixin` instead.
 """
 
 from __future__ import annotations
@@ -80,11 +105,11 @@ class BaseEstimator(abc.ABC):
 
     Subclasses must:
 
-    1. Set class-level metadata attributes (``name``, ``description``, …).
+    1. Set class-level metadata attributes (``name``, ``description``, ...).
     2. Implement :meth:`validate`, :meth:`fit`, and :meth:`diagnostics`.
     3. Decorate the class with ``@register(estimator_id)``.
 
-    The concrete :meth:`run` method chains ``validate → fit → diagnostics``
+    The concrete :meth:`run` method chains ``validate -> fit -> diagnostics``
     and returns the enriched :class:`EstimationResult`.
 
     Class attributes
@@ -95,6 +120,10 @@ class BaseEstimator(abc.ABC):
         Human-readable name.
     description:
         One-paragraph description of the estimator.
+    backend:
+        One of the ``BACKEND_*`` constants from
+        :mod:`econflow.estimation.protocol`.  Set to ``"unknown"`` here;
+        all concrete estimators override this with ``"linearmodels"`` etc.
     supported_data:
         Data formats the estimator accepts (e.g. ``["balanced_panel",
         "unbalanced_panel"]``).
@@ -109,6 +138,10 @@ class BaseEstimator(abc.ABC):
     estimator_id: str = "base"
     name: str = "BaseEstimator"
     description: str = ""
+    #: One of the ``BACKEND_*`` constants from
+    #: :mod:`econflow.estimation.protocol`.  Set to ``"unknown"`` here;
+    #: all concrete estimators override this with ``"linearmodels"`` etc.
+    backend: str = "unknown"
     supported_data: list[str] = ["panel"]
     required_parameters: list[str] = ["dependent", "regressors"]
     optional_parameters: dict[str, Any] = {}
@@ -128,7 +161,7 @@ class BaseEstimator(abc.ABC):
     # ------------------------------------------------------------------
 
     @abc.abstractmethod
-    def validate(self, data: pd.DataFrame) -> None:
+    def validate(self, data: "pd.DataFrame | Any") -> None:
         """
         Validate *data* and ``self.params`` before estimation.
 
@@ -138,18 +171,26 @@ class BaseEstimator(abc.ABC):
         Parameters
         ----------
         data:
-            Wide-format panel DataFrame.
+            Wide-format panel ``pd.DataFrame`` **or** any
+            :class:`~econflow.datasets.base.Dataset` subclass.
+            ``Dataset`` objects expose ``.columns`` and ``__getitem__`` as
+            pass-throughs so that column-presence checks work without
+            resolving to a DataFrame.
         """
 
     @abc.abstractmethod
-    def fit(self, data: pd.DataFrame) -> EstimationResult:
+    def fit(self, data: "pd.DataFrame | Any") -> EstimationResult:
         """
         Estimate the model and return a populated :class:`EstimationResult`.
 
         Parameters
         ----------
         data:
-            Wide-format panel DataFrame containing all referenced columns.
+            Wide-format panel ``pd.DataFrame`` **or** any
+            :class:`~econflow.datasets.base.Dataset` subclass.
+            Implementations must call ``data = self._resolve_dataframe(data)``
+            as their first statement to normalise the input to a plain
+            ``pd.DataFrame`` before passing it to the underlying library.
         """
 
     @abc.abstractmethod
@@ -199,9 +240,9 @@ class BaseEstimator(abc.ABC):
     # Concrete convenience wrapper
     # ------------------------------------------------------------------
 
-    def run(self, data: pd.DataFrame) -> EstimationResult:
+    def run(self, data: "pd.DataFrame | Any") -> EstimationResult:
         """
-        Full estimation pipeline: ``validate → fit → diagnostics``.
+        Full estimation pipeline: ``validate -> fit -> diagnostics``.
 
         Equivalent to::
 
@@ -213,7 +254,9 @@ class BaseEstimator(abc.ABC):
         Parameters
         ----------
         data:
-            Wide-format panel DataFrame.
+            Wide-format panel ``pd.DataFrame`` **or** any
+            :class:`~econflow.datasets.base.Dataset` subclass.
+            Both ``validate`` and ``fit`` handle Dataset inputs natively.
 
         Returns
         -------
@@ -272,8 +315,36 @@ class BaseEstimator(abc.ABC):
 
         Returns a copy of *data* with the MultiIndex set and columns
         sorted for determinism.
+
+        .. deprecated::
+            New estimators should inherit from
+            :class:`~econflow.estimation.backends.linearmodels.LinearmodelsMixin`
+            which owns this helper.  This copy exists for backward compatibility
+            with estimators written before the mixin split (Milestone 3).
         """
         return data.set_index([entity_col, time_col]).sort_index()
+
+    def _backend_capabilities(self) -> "BackendCapabilities":
+        """
+        Return the capability profile for this estimator's backend.
+
+        The default implementation returns a generic ``BackendCapabilities``
+        with the backend string set to ``self.backend`` and all capability
+        flags set to ``False``.  Concrete estimators that inherit from a
+        backend mixin will override this with the mixin's implementation.
+
+        Returns
+        -------
+        BackendCapabilities
+            Capability profile for the underlying estimation library.
+        """
+        from econflow.estimation.protocol import (  # noqa: PLC0415
+            BackendCapabilities,
+            KNOWN_BACKENDS,
+        )
+        backend = getattr(self, "backend", "unknown")
+        safe_backend = backend if backend in KNOWN_BACKENDS else "custom"
+        return BackendCapabilities(backend=safe_backend)
 
     def _resolve_dataframe(
         self,
@@ -303,7 +374,6 @@ class BaseEstimator(abc.ABC):
         if isinstance(data, _DS):
             return data.dataframe
         return data
-
 
     def _provenance_stamp(self) -> dict[str, Any]:
         """Return a provenance dict with current UTC timestamp, version, and params."""
