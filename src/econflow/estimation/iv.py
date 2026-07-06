@@ -67,6 +67,7 @@ class IV2SLS(BaseEstimator):
             )
 
     def fit(self, data: pd.DataFrame) -> EstimationResult:
+        data = self._resolve_dataframe(data)
         from linearmodels.iv import IV2SLS as _IV2SLS  # noqa: PLC0415
 
         dep = self.params["dependent"]

@@ -30,6 +30,31 @@ log = get_logger(__name__)
 
 
 # ---------------------------------------------------------------------------
+# Dataset compatibility shim (Architecture Stabilization Milestone 2)
+# ---------------------------------------------------------------------------
+
+def _resolve_df(df):
+    """
+    Accept ``pd.DataFrame`` or ``PanelDataset``; return a flat ``pd.DataFrame``.
+
+    All internal logic in this module works on plain DataFrames.  This shim
+    is the ONLY place where Dataset objects are unwrapped — every public
+    function calls it as its first statement.  No econometric logic changes.
+    """
+    try:
+        from econflow.datasets.panel import PanelDataset as _PDS  # noqa
+        from econflow.datasets.base import Dataset as _DS          # noqa
+        if isinstance(df, _PDS):
+            return df.to_dataframe()
+        if isinstance(df, _DS):
+            return df.dataframe
+    except ImportError:
+        pass
+    return df
+
+
+
+# ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
 
@@ -138,6 +163,7 @@ def _fit_driscoll_kraay(
 # ---------------------------------------------------------------------------
 
 def run_tfp_model(df: pd.DataFrame):
+    df = _resolve_df(df)
     """Baseline FE: ln_tfp ~ ln_ai + ln_hc with country fixed effects."""
     return _fit_model(
         df, "ln_tfp", ["ln_ai", "ln_hc"],
@@ -147,6 +173,7 @@ def run_tfp_model(df: pd.DataFrame):
 
 
 def run_growth_model(df: pd.DataFrame):
+    df = _resolve_df(df)
     """GDP growth model: first-differenced ln_gdp on ln_ai and ln_hc."""
     panel_df = _to_panel(df).copy()
     panel_df["gdp_growth"] = panel_df.groupby(level=0)["ln_gdp"].diff()
@@ -163,6 +190,7 @@ def run_growth_model(df: pd.DataFrame):
 # ---------------------------------------------------------------------------
 
 def run_robustness_suite(df: pd.DataFrame) -> dict:
+    df = _resolve_df(df)
     """Four robustness specifications: baseline, two-way FE, trimmed, growth."""
     log.info("Running robustness suite (4 models)")
 
@@ -194,6 +222,7 @@ def run_robustness_suite(df: pd.DataFrame) -> dict:
 
 
 def run_sensitivity_suite(df: pd.DataFrame) -> dict:
+    df = _resolve_df(df)
     """Six sensitivity checks: lagged AI, time cluster, placebo HC,
     Driscoll-Kraay, AI_index levels, PWT-only TFP.
 
@@ -271,6 +300,7 @@ def run_sensitivity_suite(df: pd.DataFrame) -> dict:
 
 
 def run_falsification_suite(df: pd.DataFrame) -> dict:
+    df = _resolve_df(df)
     """Four falsification checks: digital infra, innovation, reverse causality, coverage-restricted."""  # noqa: E501
     log.info("Running falsification suite (4 models)")
     panel_df = _to_panel(df).copy()
@@ -314,6 +344,7 @@ def run_falsification_suite(df: pd.DataFrame) -> dict:
 
 
 def run_heterogeneity_suite(df: pd.DataFrame) -> dict:
+    df = _resolve_df(df)
     """Seven heterogeneity checks exploiting the 2010-2024 extended panel.
 
     Specs

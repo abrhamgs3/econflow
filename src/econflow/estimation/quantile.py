@@ -66,6 +66,7 @@ class PanelQuantile(BaseEstimator):
             )
 
     def fit(self, data: pd.DataFrame) -> EstimationResult:
+        data = self._resolve_dataframe(data)
         raise NotImplementedError(
             "PanelQuantile.fit() is not yet implemented.  "
             "This estimator is a documented stub.  "

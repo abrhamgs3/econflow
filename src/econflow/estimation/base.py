@@ -275,6 +275,36 @@ class BaseEstimator(abc.ABC):
         """
         return data.set_index([entity_col, time_col]).sort_index()
 
+    def _resolve_dataframe(
+        self,
+        data: "pd.DataFrame | Any",
+    ) -> "pd.DataFrame":
+        """
+        Coerce *data* to a plain ``pd.DataFrame``.
+
+        If *data* is a :class:`~econflow.datasets.panel.PanelDataset` the flat
+        (non-MultiIndex) representation is returned via ``to_dataframe()``.
+        If *data* is any other :class:`~econflow.datasets.base.Dataset`, the
+        ``dataframe`` property is used.  Plain ``pd.DataFrame`` objects are
+        returned as-is.
+
+        This is the only Dataset-to-DataFrame conversion point in the
+        estimation layer; P0 safety is preserved because ``to_dataframe()``
+        produces a byte-for-byte copy of the flat frame the ``PanelDataset``
+        was built from.
+        """
+        try:
+            from econflow.datasets.panel import PanelDataset as _PDS  # noqa
+            from econflow.datasets.base import Dataset as _DS          # noqa
+        except ImportError:
+            return data  # datasets package not installed — pass through
+        if isinstance(data, _PDS):
+            return data.to_dataframe()
+        if isinstance(data, _DS):
+            return data.dataframe
+        return data
+
+
     def _provenance_stamp(self) -> dict[str, Any]:
         """Return a provenance dict with current UTC timestamp, version, and params."""
         from econflow import __version__

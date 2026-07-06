@@ -110,6 +110,7 @@ class EntityFE(BaseEstimator):
         self._require_columns(data, dep, entity_col, time_col, *regs)
 
     def fit(self, data: pd.DataFrame) -> EstimationResult:
+        data = self._resolve_dataframe(data)
         dep = self.params["dependent"]
         regs = self.params["regressors"]
         entity_col = self.params.get("entity_col", "entity")
@@ -202,6 +203,7 @@ class TwoWayFE(BaseEstimator):
         self._require_columns(data, dep, entity_col, time_col, *regs)
 
     def fit(self, data: pd.DataFrame) -> EstimationResult:
+        data = self._resolve_dataframe(data)
         dep = self.params["dependent"]
         regs = self.params["regressors"]
         entity_col = self.params.get("entity_col", "entity")

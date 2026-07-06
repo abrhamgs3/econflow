@@ -59,6 +59,7 @@ class SystemGMM(BaseEstimator):
         self._require_params("dependent", "regressors")
 
     def fit(self, data: pd.DataFrame) -> EstimationResult:
+        data = self._resolve_dataframe(data)
         raise NotImplementedError(
             "SystemGMM.fit() is not yet implemented.  "
             "This estimator is a documented stub.  "

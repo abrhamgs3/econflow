@@ -58,6 +58,7 @@ class FirstDifference(BaseEstimator):
         self._require_columns(data, dep, entity_col, time_col, *regs)
 
     def fit(self, data: pd.DataFrame) -> EstimationResult:
+        data = self._resolve_dataframe(data)
         from linearmodels import FirstDifferenceOLS as _FD  # noqa: PLC0415
 
         dep = self.params["dependent"]

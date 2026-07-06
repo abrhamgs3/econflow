@@ -2,7 +2,7 @@
 Auto-generate LaTeX narrative text for the results and falsification sections.
 
 These functions inspect the fitted model results and return a LaTeX string
-ready to be ``\input``-ed into the paper.  They are intentionally separate
+ready to be ``\\input``-ed into the paper.  They are intentionally separate
 from the estimation code so the narrative can be regenerated without
 re-running the econometrics.
 """
@@ -94,7 +94,21 @@ def write_results(results: dict) -> str:
     return text
 
 
-def write_falsification_results(results: dict, selection_summary: pd.DataFrame) -> str:
+
+def _get_sel(summary, key: str, default="NA"):
+    """Extract a count from either a pd.DataFrame (.attrs) or a SelectionSummary."""
+    try:
+        from econflow.datasets.types import SelectionSummary as _SS  # noqa
+        if isinstance(summary, _SS):
+            return getattr(summary, key, default)
+    except ImportError:
+        pass
+    if hasattr(summary, "attrs"):
+        return summary.attrs.get(key, default)
+    return default
+
+
+def write_falsification_results(results: dict, selection_summary) -> str:
     """Generate the falsification section narrative (LaTeX string).
 
     Parameters
@@ -102,7 +116,8 @@ def write_falsification_results(results: dict, selection_summary: pd.DataFrame) 
     results:
         Dict from :func:`run_falsification_suite`.
     selection_summary:
-        DataFrame from :func:`sample_selection_summary` (with ``.attrs``).
+        DataFrame from :func:`sample_selection_summary` (with ``.attrs``), or a
+        :class:`~econflow.datasets.types.SelectionSummary` typed object.
     """
     log.info("Generating falsification narrative")
 
@@ -133,10 +148,11 @@ def write_falsification_results(results: dict, selection_summary: pd.DataFrame) 
         f"(n = {int(getattr(coverage, 'nobs', 0))} observations) yields an AI coefficient of "
         f"{_fmt_num(coverage.params.get('ln_ai'))} "
         f"(p-value {_fmt_pvalue(coverage.pvalues.get('ln_ai'))}).\n\n"
-        f"For context, only {selection_summary.attrs.get('in_sample_countries', 'NA')} of the 193 countries in the "  # noqa: E501
+        # Accept either pd.DataFrame (legacy .attrs) or SelectionSummary (typed)
+        f"For context, only {_get_sel(selection_summary, 'in_sample_countries')} of the 193 countries in the "  # noqa: E501
         f"cleaned panel report AI data in at least one year, contributing "
-        f"{selection_summary.attrs.get('in_sample_rows', 'NA')} country-year observations with non-missing AI data, "  # noqa: E501
-        f"against {selection_summary.attrs.get('out_of_sample_rows', 'NA')} country-years without it. "  # noqa: E501
+        f"{_get_sel(selection_summary, 'in_sample_rows')} country-year observations with non-missing AI data, "  # noqa: E501
+        f"against {_get_sel(selection_summary, 'out_of_sample_rows')} country-years without it. "  # noqa: E501
         "Table~\\ref{tab:sample-selection} compares observable characteristics across these two groups."  # noqa: E501
     )
     return text

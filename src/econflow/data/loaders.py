@@ -137,3 +137,43 @@ def drop_aggregate_entities(df: pd.DataFrame) -> pd.DataFrame:
     if dropped:
         log.debug("Dropped %d aggregate/non-sovereign rows", dropped)
     return df
+
+
+def load_panel_dataset(
+    path: "str | Path",
+    entity_col: str = "country",
+    time_col: str = "year",
+    title: str = "",
+    source: str = "",
+) -> "PanelDataset":
+    """Load the processed panel CSV and return a typed :class:`PanelDataset`.
+
+    This is the preferred loader for new code.  Existing code that calls
+    :func:`load_panel` continues to work unchanged (P0 safe).
+
+    Parameters
+    ----------
+    path:
+        Path to the panel CSV.
+    entity_col / time_col:
+        Column names for the entity and time dimensions.
+    title / source:
+        Metadata strings stored on the returned Dataset.
+
+    Returns
+    -------
+    PanelDataset
+        A new ``PanelDataset`` wrapping the loaded DataFrame.
+    """
+    from econflow.datasets.migration import from_dataframe  # noqa: PLC0415
+
+    df = load_panel(path)
+    return from_dataframe(
+        df,
+        entity_col=entity_col,
+        time_col=time_col,
+        title=title or str(path),
+        source=source,
+        origin="load_panel_dataset",
+    )
+

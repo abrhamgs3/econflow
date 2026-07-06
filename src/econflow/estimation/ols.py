@@ -72,6 +72,7 @@ class PooledOLS(BaseEstimator):
             )
 
     def fit(self, data: pd.DataFrame) -> EstimationResult:
+        data = self._resolve_dataframe(data)
         from linearmodels import PooledOLS as _PooledOLS  # noqa: PLC0415
 
         dep = self.params["dependent"]

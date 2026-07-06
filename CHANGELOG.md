@@ -9,6 +9,68 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Architecture Stabilization Milestone 2 — Dataset Abstraction (2026-07-06)
+
+#### Added
+- `src/econflow/datasets/` — new package implementing a typed Dataset abstraction
+  layer that replaces raw `pd.DataFrame` passing throughout EconFlow.
+- `src/econflow/datasets/types.py`: shared value types — `DatasetMetadata`,
+  `ProvenanceRecord`, `ColumnInfo`, `VariableRegistry`, `MissingnessSummary`,
+  `PanelBalance`, `ValidationStatus`, `SelectionSummary`, `VALID_ROLES`.
+- `src/econflow/datasets/base.py`: abstract `Dataset` base class with defensive
+  DataFrame storage, `functools.cached_property` lazy diagnostics, and pandas
+  pass-through operators (`__getitem__`, `__contains__`, `groupby`, `reset_index`).
+- `src/econflow/datasets/panel.py`: `PanelDataset` — primary Dataset type for
+  EconFlow. Methods: `to_dataframe()` (P0-safe flat copy), `to_multiindex_dataframe()`
+  (equivalent to legacy `_to_panel()`), `rename_entity_col()` (resolves
+  country/iso3 bifurcation), `copy()`.
+- `src/econflow/datasets/cross_section.py`: `CrossSectionDataset` — one row per
+  entity; validates no duplicate entities.
+- `src/econflow/datasets/time_series.py`: `TimeSeriesDataset` — one observation
+  per time period; validates no duplicate periods.
+- `src/econflow/datasets/spatial.py`: `SpatialDataset` — stub with lat/lon
+  columns; all spatial methods raise `NotImplementedError` (Milestone 3).
+- `src/econflow/datasets/migration.py`: compatibility layer — `from_dataframe()`,
+  `to_dataframe()`, `rename_entity_col()`, `@accepts_dataset` decorator.
+- `src/econflow/datasets/__init__.py`: exports all public Dataset classes,
+  types, and migration utilities.
+- `BaseEstimator._resolve_dataframe()` in `estimation/base.py`: single
+  Dataset-to-DataFrame conversion point in the estimation layer. Returns
+  `to_dataframe()` for `PanelDataset`, `.dataframe` for other `Dataset`
+  subclasses, and passes `pd.DataFrame` through unchanged.
+- `_resolve_df()` module-level shim in `econometrics/panel.py`: same logic
+  applied at the boundary of the legacy estimation functions.
+- `load_panel_dataset()` in `data/loaders.py`: new loader that wraps `load_panel()`
+  and returns a `PanelDataset`.
+- `sample_selection_summary_typed()` in `data/cleaning.py`: returns
+  `tuple[pd.DataFrame, SelectionSummary]` — typed alternative to the
+  `.attrs`-based legacy function.
+- `_get_sel()` helper in `reporting/narrative.py`: extracts sample counts from
+  either a legacy `.attrs`-bearing `pd.DataFrame` or a typed `SelectionSummary`.
+- `tests/unit/test_datasets.py`: 75 new unit tests covering all Dataset classes,
+  value types, migration utilities, `_resolve_dataframe`, and data layer additions.
+- `docs/architecture/DATASET_ABSTRACTION.md`: full architecture reference
+  including type hierarchy, contract, safety properties, and file manifest.
+
+#### Changed
+- `estimation/{ols,fixed_effects,random_effects,first_difference,iv,gmm,quantile}.py`:
+  each concrete `fit()` method now calls `data = self._resolve_dataframe(data)` as
+  its first statement, enabling `PanelDataset | pd.DataFrame` at all call sites.
+- `econometrics/panel.py`: all six public estimation functions now call
+  `df = _resolve_df(df)` at entry, accepting `PanelDataset | pd.DataFrame`.
+- `reporting/narrative.py`: `write_falsification_results()` now accepts either
+  a legacy `pd.DataFrame` (with `.attrs`) or a `SelectionSummary` object.
+
+#### Architecture Notes
+- **P0 safety preserved**: `to_dataframe()` returns a byte-for-byte flat copy of
+  the original input. The `dropna()` call inside each estimator's `fit()` sees
+  exactly the same rows. Econometric results are unchanged.
+- **No breaking changes**: all existing callers that pass `pd.DataFrame` continue
+  to work without modification.
+- **`.attrs` fragility resolved**: `SelectionSummary` carries sample counts in
+  typed dataclass fields that survive all pandas operations.
+
+
 ### Sprint 10 — Replication Engine (2026-06-29)
 
 #### Added
