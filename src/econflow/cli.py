@@ -1241,6 +1241,80 @@ def compare(
 
 
 # ---------------------------------------------------------------------------
+# docs
+# ---------------------------------------------------------------------------
+
+
+
+# ---------------------------------------------------------------------------
+# docs
+# ---------------------------------------------------------------------------
+
+
+@app.command()
+def docs(
+    topic: str = typer.Argument(
+        "config",
+        help="Documentation topic.  Currently only 'config' is supported.",
+    ),
+    output: Path | None = typer.Option(
+        None,
+        "--output", "-o",
+        help=(
+            "Write to this file instead of the default location "
+            "(docs/reference/configuration.md)."
+        ),
+        show_default=False,
+    ),
+    stdout: bool = typer.Option(
+        False,
+        "--stdout",
+        help="Print to stdout instead of writing a file.",
+    ),
+    text: bool = typer.Option(
+        False,
+        "--text",
+        help="Use plain-text format instead of Markdown.",
+    ),
+) -> None:
+    """Generate reference documentation from the live Pydantic schema.
+
+    Writes docs/reference/configuration.md (or prints to stdout).
+
+    The generated document lists every configuration option with its type,
+    default value, allowed values, description, and examples.
+
+    Examples:
+
+        econflow docs config
+
+        econflow docs config --text --stdout
+
+        econflow docs config --output path/to/config_reference.md
+    """
+    if topic != "config":
+        console.print(
+            f"[red]Unknown topic {topic!r}.  Only 'config' is supported.[/red]"
+        )
+        raise typer.Exit(code=1)
+
+    from econflow.config.docs import (
+        generate_config_reference,
+        write_config_reference,
+    )
+
+    fmt = "text" if text else "markdown"
+
+    if stdout:
+        content = generate_config_reference(format=fmt)
+        console.print(content, highlight=False)
+        return
+
+    written = write_config_reference(path=output, format=fmt)
+    console.print(f"[green]✓[/green] Written: {written}")
+
+
+# ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
 

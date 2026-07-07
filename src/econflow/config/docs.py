@@ -1,22 +1,21 @@
 """
 econflow.config.docs — Auto-generated configuration reference.
 
-Architecture Stabilization Milestone 4.
-
 Generates human-readable documentation for all EconFlow configuration files
 directly from the Pydantic v2 model definitions in
 :mod:`econflow.config.models`.  The output is always in sync with the schema
-because it reads ``model_fields``, ``Field(description=...)`` and
-``Field(examples=...)`` at runtime.
+because it reads ``model_fields``, ``Field(description=...)``,
+``Field(examples=...)``, and field metadata (Literal args, constraints) at
+runtime.
 
 Two output formats are supported:
 
 ``markdown``
-    A GitHub-flavoured Markdown document suitable for ``docs/`` directories
-    and GitHub wikis.
+    A GitHub-flavoured Markdown document written to
+    ``docs/reference/configuration.md`` by default.
 
 ``text``
-    Plain text output for ``econflow validate --help`` and terminal display.
+    Plain text for terminal display.
 
 Usage
 -----
@@ -27,18 +26,17 @@ Usage
     md = generate_config_reference(format="markdown")
     print(md)
 
-    txt = generate_config_reference(format="text")
-    print(txt)
-
 Or via the CLI::
 
-    econflow docs config          # prints markdown to stdout
-    econflow docs config --text   # prints plain text
+    econflow docs config                     # write docs/reference/configuration.md
+    econflow docs config --stdout            # print markdown to stdout
+    econflow docs config --text              # print plain text to stdout
+    econflow docs config --output path.md   # write to a custom path
 
-Or to write a file::
+Or programmatically::
 
     from econflow.config.docs import write_config_reference
-    write_config_reference("docs/CONFIG_REFERENCE.md")
+    write_config_reference("docs/reference/configuration.md")
 """
 
 from __future__ import annotations
@@ -48,12 +46,18 @@ from pathlib import Path
 from typing import Any, Literal, get_args, get_origin
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Constants
 # ---------------------------------------------------------------------------
 
-_INDENT = "  "
+#: Canonical output path for the generated reference.
+DEFAULT_OUTPUT_PATH: str = "docs/reference/configuration.md"
+
 _HR_MD = "\n---\n"
 
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 def _type_name(annotation: Any) -> str:
     """Return a concise human-readable type annotation string."""
@@ -61,7 +65,7 @@ def _type_name(annotation: Any) -> str:
         return "any"
     origin = get_origin(annotation)
     if origin is Literal:  # type: ignore[comparison-overlap]
-        return " | ".join(repr(a) for a in get_args(annotation))
+        return "string"
     if origin is list:
         args = get_args(annotation)
         inner = _type_name(args[0]) if args else "any"
@@ -69,13 +73,12 @@ def _type_name(annotation: Any) -> str:
     if hasattr(annotation, "__name__"):
         return annotation.__name__
     s = str(annotation)
-    # clean up typing.Optional etc.
     s = s.replace("typing.", "").replace("Optional[", "").rstrip("]")
     return s
 
 
 def _default_str(field_info: Any) -> str:
-    """Return the default value as a string, or empty string if required."""
+    """Return the default value as a display string."""
     from pydantic_core import PydanticUndefined  # type: ignore[import]
 
     dv = field_info.default
@@ -89,8 +92,43 @@ def _default_str(field_info: Any) -> str:
     if isinstance(dv, bool):
         return f"`{'true' if dv else 'false'}`"
     if isinstance(dv, str):
-        return f'`"{dv}"`'
+        return '`"' + dv + '"`'
     return f"`{dv!r}`"
+
+
+def _allowed_values_str(field_info: Any) -> str:
+    """Extract allowed-value constraints from a field.
+
+    Sources checked:
+    - ``Literal[...]`` annotation -> enumerated values
+    - annotated-types metadata -> Ge, Le, Gt, Lt, MinLen, MaxLen, Pattern
+    """
+    ann = field_info.annotation
+    origin = get_origin(ann)
+
+    if origin is Literal:  # type: ignore[comparison-overlap]
+        values = get_args(ann)
+        return " | ".join(f"`{v!r}`" for v in values)
+
+    parts: list[str] = []
+    for meta in getattr(field_info, "metadata", []):
+        cls_name = type(meta).__name__
+        if cls_name == "Ge":
+            parts.append(f">= `{meta.ge}`")
+        elif cls_name == "Le":
+            parts.append(f"<= `{meta.le}`")
+        elif cls_name == "Gt":
+            parts.append(f"> `{meta.gt}`")
+        elif cls_name == "Lt":
+            parts.append(f"< `{meta.lt}`")
+        elif cls_name == "MinLen":
+            parts.append(f"min len `{meta.min_length}`")
+        elif cls_name == "MaxLen":
+            parts.append(f"max len `{meta.max_length}`")
+        elif cls_name in ("Pattern", "Regex"):
+            pattern = getattr(meta, "pattern", getattr(meta, "regex", ""))
+            parts.append(f"pattern `{pattern}`")
+    return ", ".join(parts) if parts else ""
 
 
 def _examples_str(field_info: Any, format: str = "markdown") -> str:
@@ -107,7 +145,7 @@ def _examples_str(field_info: Any, format: str = "markdown") -> str:
 
 
 # ---------------------------------------------------------------------------
-# Core doc generation
+# Core rendering
 # ---------------------------------------------------------------------------
 
 def _document_model(
@@ -116,24 +154,13 @@ def _document_model(
     format: str = "markdown",
     yaml_key: str = "",
 ) -> str:
-    """
-    Render documentation for a single Pydantic model.
+    """Render documentation for a single Pydantic model.
 
-    Parameters
-    ----------
-    model_class:
-        The Pydantic BaseModel class to document.
-    heading_level:
-        Markdown heading level (2 = ``##``, 3 = ``###``).
-    format:
-        ``"markdown"`` or ``"text"``.
-    yaml_key:
-        The YAML key path under which this model sits, e.g. ``"project"``.
+    Every field is rendered with: type, default, allowed values,
+    description, and examples.
     """
     lines: list[str] = []
-
     docstring = (model_class.__doc__ or "").strip()
-    # Only keep the first paragraph of the docstring
     short_doc = docstring.split("\n\n")[0].strip()
 
     if format == "markdown":
@@ -143,16 +170,19 @@ def _document_model(
         if short_doc:
             lines.append(f"{short_doc}\n")
         lines.append("")
-        lines.append("| Field | Type | Default | Description |")
-        lines.append("|-------|------|---------|-------------|")
+        lines.append("| Field | Type | Default | Allowed | Description |")
+        lines.append("|-------|------|---------|---------|-------------|")
         for field_name, field_info in model_class.model_fields.items():
             ftype = _type_name(field_info.annotation)
             default = _default_str(field_info)
+            allowed = _allowed_values_str(field_info)
             desc = field_info.description or ""
             ex = _examples_str(field_info, format="markdown")
             if ex:
                 desc = f"{desc} {ex}"
-            lines.append(f"| `{field_name}` | `{ftype}` | {default} | {desc} |")
+            lines.append(
+                f"| `{field_name}` | `{ftype}` | {default} | {allowed} | {desc} |"
+            )
         lines.append("")
     else:
         title = yaml_key or model_class.__name__
@@ -164,9 +194,12 @@ def _document_model(
         for field_name, field_info in model_class.model_fields.items():
             ftype = _type_name(field_info.annotation)
             default = _default_str(field_info)
+            allowed = _allowed_values_str(field_info)
             desc = field_info.description or ""
             ex = _examples_str(field_info, format="text")
             lines.append(f"  {field_name} ({ftype}, default {default})")
+            if allowed:
+                lines.append(f"    allowed: {allowed}")
             if desc:
                 for ln in textwrap.wrap(f"    {desc}", 78):
                     lines.append(ln)
@@ -184,11 +217,7 @@ def _walk_model(
     yaml_key: str = "",
     visited: set | None = None,
 ) -> list[str]:
-    """
-    Recursively document *model_class* and all nested Pydantic models.
-
-    Returns a list of rendered section strings.
-    """
+    """Recursively document *model_class* and all nested Pydantic models."""
     from pydantic import BaseModel  # type: ignore[import]
 
     if visited is None:
@@ -201,10 +230,8 @@ def _walk_model(
     sections: list[str] = []
     sections.append(_document_model(model_class, heading_level, format, yaml_key))
 
-    # Recurse into nested BaseModel fields
     for field_name, field_info in model_class.model_fields.items():
         ann = field_info.annotation
-        # unwrap list[X]
         if get_origin(ann) is list:
             args = get_args(ann)
             ann = args[0] if args else None
@@ -233,11 +260,11 @@ def _walk_model(
 # ---------------------------------------------------------------------------
 
 def generate_config_reference(format: str = "markdown") -> str:
-    """
-    Generate a complete configuration reference document.
+    """Generate a complete configuration reference document.
 
     Reads the Pydantic models in :mod:`econflow.config.models` and renders
-    every field with its type, default value, and description.
+    every field with its type, default value, allowed values, description,
+    and examples.
 
     Parameters
     ----------
@@ -256,42 +283,41 @@ def generate_config_reference(format: str = "markdown") -> str:
     )
 
     if format == "markdown":
-        header = textwrap.dedent("""\
-            # EconFlow Configuration Reference
-
-            > **Auto-generated** from `src/econflow/config/models.py`.
-            > Do not edit this file manually — run `econflow docs config` to regenerate.
-
-            EconFlow projects are configured through three YAML files:
-
-            | File | Purpose |
-            |------|---------|
-            | `config.yaml` | Project metadata, data source, sample period, variable names |
-            | `models.yaml` | Estimator specifications (one entry per regression) |
-            | `outputs.yaml` | Table and figure output settings |
-
-            All files support strict validation.  Unknown keys cause an error.
-            Run `econflow validate config/` to check all three files at once.
-
-        """)
+        header = (
+            "# EconFlow Configuration Reference\n\n"
+            "> **Auto-generated** from `src/econflow/config/models.py`.\n"
+            "> Do not edit this file manually"
+            " -- run `econflow docs config` to regenerate.\n\n"
+            "EconFlow projects are configured through three YAML files:\n\n"
+            "| File | Purpose |\n"
+            "|------|---------|\n"
+            "| `config.yaml` | Project metadata, data source,"
+            " sample period, variable names |\n"
+            "| `models.yaml` | Estimator specifications"
+            " (one entry per regression) |\n"
+            "| `outputs.yaml` | Table and figure output settings |\n\n"
+            "All files use strict validation -- unknown keys are rejected.\n"
+            "Run `econflow validate config/` to check all three files at once.\n"
+            "Run `econflow validate --data` to also verify the data CSV.\n\n"
+            "> **Tip:** Error messages from `econflow validate` and"
+            " `econflow run` include a fix hint and reference this document.\n\n"
+        )
         separator = _HR_MD
     else:
-        header = textwrap.dedent("""\
-            ECONFLOW CONFIGURATION REFERENCE
-            =================================
-            Auto-generated from src/econflow/config/models.py.
-
-            Three YAML files configure an EconFlow project:
-              config.yaml  — project metadata, data source, sample, variables
-              models.yaml  — estimator specs (one per regression)
-              outputs.yaml — table and figure output settings
-
-        """)
+        header = (
+            "ECONFLOW CONFIGURATION REFERENCE\n"
+            "=================================\n"
+            "Auto-generated from src/econflow/config/models.py.\n\n"
+            "Three YAML files configure an EconFlow project:\n"
+            "  config.yaml  -- project metadata, data source, sample, variables\n"
+            "  models.yaml  -- estimator specs (one per regression)\n"
+            "  outputs.yaml -- table and figure output settings\n\n"
+            "Unknown keys are rejected.  Run: econflow validate config/\n\n"
+        )
         separator = "\n" + "=" * 72 + "\n\n"
 
     parts: list[str] = [header]
 
-    # config.yaml
     if format == "markdown":
         parts.append("## `config.yaml`\n")
     else:
@@ -299,7 +325,6 @@ def generate_config_reference(format: str = "markdown") -> str:
     parts.extend(_walk_model(ProjectConfig, heading_level=3, format=format, yaml_key=""))
     parts.append(separator)
 
-    # models.yaml
     if format == "markdown":
         parts.append("## `models.yaml`\n")
     else:
@@ -307,7 +332,6 @@ def generate_config_reference(format: str = "markdown") -> str:
     parts.extend(_walk_model(ModelsConfig, heading_level=3, format=format, yaml_key=""))
     parts.append(separator)
 
-    # outputs.yaml
     if format == "markdown":
         parts.append("## `outputs.yaml`\n")
     else:
@@ -318,16 +342,15 @@ def generate_config_reference(format: str = "markdown") -> str:
 
 
 def write_config_reference(
-    path: str | Path,
+    path: str | Path | None = None,
     format: str = "markdown",
 ) -> Path:
-    """
-    Write the configuration reference to *path*.
+    """Write the configuration reference to *path*.
 
     Parameters
     ----------
     path:
-        Destination file path.
+        Destination file path.  Defaults to ``docs/reference/configuration.md``.
     format:
         ``"markdown"`` (default) or ``"text"``.
 
@@ -336,7 +359,7 @@ def write_config_reference(
     Path
         Absolute path of the written file.
     """
-    dest = Path(path).expanduser().resolve()
+    dest = Path(path or DEFAULT_OUTPUT_PATH).expanduser().resolve()
     dest.parent.mkdir(parents=True, exist_ok=True)
     content = generate_config_reference(format=format)
     dest.write_text(content, encoding="utf-8")

@@ -9,6 +9,73 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Automatic Configuration Documentation (2026-07-07)
+
+#### Added
+- `src/econflow/config/docs.py` — `generate_config_reference(format)` and
+  `write_config_reference(path, format)`: runtime documentation generator that
+  reads Pydantic `model_fields`, `Field(description=...)`, `Field(examples=...)`,
+  and type metadata (Literal args, Ge/Le/MinLen/Pattern constraints) to produce
+  a 5-column table (Field, Type, Default, Allowed, Description) for every
+  configuration option. `DEFAULT_OUTPUT_PATH = "docs/reference/configuration.md"`.
+- `docs/reference/configuration.md` — auto-generated reference covering all
+  three YAML files (`config.yaml`, `models.yaml`, `outputs.yaml`) including
+  `se_type` Literal allowed values (`'robust' | 'clustered' | 'classical'`).
+- `econflow docs config` CLI command — regenerates the reference doc on demand;
+  supports `--stdout`, `--text`, and `--output <path>` flags.
+- `tests/unit/test_config_docs.py` (31 tests): coverage for
+  `generate_config_reference`, `_allowed_values_str`, `write_config_reference`,
+  the `docs` CLI command, and validate→doc-hint integration.
+
+#### Changed
+- `src/econflow/commands/validate.py` — error and warning summaries now include
+  a `Reference: docs/reference/configuration.md` doc hint and prompt
+  `econflow docs config` for regeneration.
+- `src/econflow/cli.py` — `docs` command added; `_output_summary` helper
+  restored with complete body.
+
+### Configuration Correctness Boundary (2026-07-06)
+
+#### Added
+- `src/econflow/config/validator.py` (740 lines): `ConfigValidator` — single source
+  of truth for all 4 validation stages: YAML syntax, Pydantic schema, semantic, and
+  cross-file. Returns `ValidationResult` (never raises). `validate_strict()` raises
+  `ConfigValidationError` on any error and returns parsed config objects.
+  - `ValidationIssue` dataclass: `stage`, `severity`, `source`, `location`, `message`,
+    `fix`, `code` fields.
+  - `ValidationResult` dataclass: `ok`, `errors`, `warnings`, `infos`, `by_stage()`,
+    `by_source()` helpers.
+- `src/econflow/core/exceptions.py` — `ConfigValidationError(ConfigurationError)`:
+  carries full issue list; `error_count`, `errors`, `warnings` properties; renders
+  first 10 errors in `str()`.
+- `src/econflow/config/linter.py` — three new lint rules:
+  - L-11: IV estimator with no instruments → error (prevents silent empty-IV runs)
+  - L-12: TWFE with neither entity_effects nor time_effects set → warning
+  - L-13: unknown renderer format ID (not in csv/latex/markdown/html/json) → warning
+- `tests/unit/test_config_validation.py` (67 tests across 8 classes): full
+  regression coverage for all 4 stages, `ConfigValidationError`, and programmatic
+  API.
+- `docs/architecture/CONFIG_VALIDATION.md` (280 lines): validation flow diagram,
+  all rules table, programmatic API examples, CLI usage, migration notes.
+- Test fixtures (7 directories): `iv_no_instruments/`, `twfe_no_effects/`,
+  `bad_format/`, `x01_missing_model_ref/`, `x02_extra_regressors/`,
+  `yaml_syntax_error/`, `wrong_nesting/`.
+
+#### Changed
+- `src/econflow/cli.py` — `econflow run` pre-flight replaced with
+  `ConfigValidator.validate_strict(check_data=True)`; aborts with structured error
+  list before touching any output files (load → validate → execute → report).
+- `src/econflow/commands/validate.py` — fully delegates to `ConfigValidator`;
+  renders issues grouped by stage and source via Rich; exits 1 on any error.
+- `src/econflow/config/__init__.py` — exports `ConfigValidator`, `ValidationResult`,
+  `ValidationIssue` in public API.
+- `src/econflow/config/linter.py` — L-03 guarded against non-integer
+  `sample_start`/`sample_end` (no crash on schema-invalid configs); `_ESTIMATOR_ALIASES`
+  includes lowercase stub IDs; spec dict includes `entity_effects`, `time_effects`,
+  `instruments` from typed model objects.
+- Data stage D-01 (file not found) severity upgraded from `warning` → `error`
+  (missing data file is a hard blocker, not advisory).
+
 ### Architecture Stabilization: Public API Hardening (2026-07-06)
 
 #### Added
@@ -476,70 +543,4 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 #### Fixed
 - `src/econflow/outputs/diagnostics_report.py`: `_conclusion()` uses
-  `DiagnosticResult.level` (not the non-existent `passed`/`message` fields);
-  estimator grouping uses `extra["estimator_id"]` instead of missing
-  `estimator_id` attribute.
-
-
-### Sprint 5 — Estimation Framework (2026-06-28)
-
-#### Added
-- `src/econflow/estimation/result.py`: `EstimationResult` immutable dataclass with
-  full provenance, `tvalues` property, `summary_frame()`, `to_dict()`, `to_json()`.
-  `DiagnosticResult` dataclass with `to_dict()`, `to_json()`, `from_dict()`.
-- `src/econflow/estimation/registry.py`: `@register()` decorator and
-  `get_estimator()` / `list_estimators()` / `unregister()`.  Estimators
-  self-register at import time.  Raises `RegistryError` (not `ValueError`) on
-  duplicate or unknown id.
-- `src/econflow/estimation/base.py` (rewrite): `BaseEstimator` abstract class with
-  `validate()`, `fit()`, `diagnostics()`, concrete `run()` chain, and helper
-  methods `_require_params()`, `_require_columns()`, `_to_panel()`,
-  `_provenance_stamp()`.  `EstimatorError` for typed failure reporting.
-  Re-exports `EstimationResult` and `DiagnosticResult` for backward compatibility.
-- `src/econflow/estimation/ols.py`: `PooledOLS` — `linearmodels.PooledOLS`.
-  Registers as `"ols"`.
-- `src/econflow/estimation/fixed_effects.py`: `EntityFE` (`"fe"`) and `TwoWayFE`
-  (`"twfe"`) via `linearmodels.PanelOLS`.
-- `src/econflow/estimation/random_effects.py`: `RandomEffects` (`"re"`) via
-  `linearmodels.RandomEffects`.
-- `src/econflow/estimation/first_difference.py`: `FirstDifference` (`"fd"`) via
-  `linearmodels.FirstDifferenceOLS`.
-- `src/econflow/estimation/iv.py`: `IV2SLS` (`"iv"`) via `linearmodels.iv.IV2SLS`.
-  Enforces order condition; correctly splits exogenous and endogenous regressors.
-- `src/econflow/estimation/gmm.py`: `SystemGMM` (`"gmm"`) — stub.
-- `src/econflow/estimation/quantile.py`: `PanelQuantile` (`"quantile"`) — stub.
-- `src/econflow/estimation/__init__.py` (rewrite): full public API; imports all
-  built-in estimators to trigger `@register()` calls.
-- `src/econflow/diagnostics/base.py`: `BaseDiagnostic` ABC with `run()`,
-  `supports()`, `_not_applicable()`.  `DiagnosticError` exception.
-- `src/econflow/diagnostics/registry.py`: `@register_diagnostic()`,
-  `get_diagnostic()`, `list_diagnostics()`, `unregister_diagnostic()`.
-  Raises `RegistryError` on duplicate/unknown id.
-- `src/econflow/diagnostics/__init__.py` (rewrite): full public API; imports all
-  built-in plugins.
-- `src/econflow/diagnostics/plugins/hausman.py`: Hausman endogeneity test.
-  Regularises near-singular covariance difference matrix.  Registers as
-  `"hausman"`.
-- `src/econflow/diagnostics/plugins/breusch_pagan.py`: Breusch-Pagan LM
-  heteroskedasticity test via `statsmodels`.  Registers as `"breusch_pagan"`.
-- `src/econflow/diagnostics/plugins/pesaran_cd.py`: Pesaran (2004) cross-sectional
-  dependence CD test.  Registers as `"pesaran_cd"`.
-- `src/econflow/diagnostics/plugins/vif.py`: Variance Inflation Factor check via
-  `statsmodels` with numpy fallback.  Registers as `"vif"`.
-- `src/econflow/diagnostics/plugins/wooldridge.py`: stub — registers as
-  `"wooldridge"`.
-- `src/econflow/diagnostics/plugins/serial_correlation.py`: stub — registers as
-  `"serial_correlation"`.
-- `tests/unit/test_estimation_result.py`: 27 tests covering `EstimationResult`
-  and `DiagnosticResult` construction, serialisation, and mutability.
-- `tests/unit/test_estimation_registry.py`: 21 tests covering `@register()`,
-  `get_estimator()`, `list_estimators()`, `unregister()`, and all 8 built-in
-  estimator registrations.
-- `tests/unit/test_estimation_base.py`: 29 tests covering `EstimatorError`,
-  `BaseEstimator` abstract enforcement, `run()` chain, helpers, and backward-compat
-  re-exports.
-- `tests/unit/test_diagnostic_registry.py`: 23 tests covering
-  `@register_diagnostic()`, `BaseDiagnostic`, `DiagnosticError`, and all 6 built-in
-  plugin registrations.
-- `tests/integration/test_estimator_run.py`: 21 end-to-end tests — each implemented
-  estimator run on a 200-row synthetic panel; stubs verified to rais
+  `DiagnosticResult.level` (not the non-existe

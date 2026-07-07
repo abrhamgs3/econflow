@@ -1,5 +1,5 @@
 """
-econflow.commands.validate — ``econflow validate`` command implementation.
+econflow.commands.validate -- ``econflow validate`` command implementation.
 
 This module is a *rendering layer* only.  All validation logic lives in
 :mod:`econflow.config.validator`.  This module converts a
@@ -8,39 +8,16 @@ Rich terminal report.
 
 Validation stages
 -----------------
-1. **YAML syntax**  — malformed YAML detected before any parsing.
-2. **Schema**       — Pydantic v2 strict validation; unknown keys, wrong
+1. **YAML syntax**  -- malformed YAML detected before any parsing.
+2. **Schema**       -- Pydantic v2 strict validation; unknown keys, wrong
    types, incorrect nesting, and missing required fields rejected here.
-3. **Semantic**     — linter rules L-01 through L-13 check value
+3. **Semantic**     -- linter rules L-01 through L-13 check value
    relationships within a single file.
-4. **Cross-file**   — consistency checks that span multiple files.
+4. **Cross-file**   -- consistency checks that span multiple files.
 
 Optional stage 5 (``--data``):
-   **Data file**    — verifies the CSV path, column presence, and uniqueness
+   **Data file**    -- verifies the CSV path, column presence, and uniqueness
    of panel keys.
-
-CLI output format
------------------
-::
-
-    EconFlow validate  config/
-
-    Stage 1 · YAML syntax
-      ✓ config.yaml
-      ✓ models.yaml
-      ✓ outputs.yaml
-
-    Stage 2 · Schema validation
-      ✓ config.yaml — schema valid
-      ✗ models.yaml — schema errors
-
-        [models → 0 → estimator]
-          Value error: 'badname' is not a valid estimator
-          Fix: Use one of the registered estimator IDs.
-
-    ...
-
-    ✘ 1 error(s) · 0 warning(s).
 
 Exit codes
 ----------
@@ -55,10 +32,6 @@ from pathlib import Path
 from rich.console import Console
 from rich.markup import escape
 
-# ---------------------------------------------------------------------------
-# Re-export for backward compatibility with existing tests that import
-# _SUPPORTED_ESTIMATORS from this module.
-# ---------------------------------------------------------------------------
 from econflow.estimation.registry import list_estimators as _list_est
 
 
@@ -72,15 +45,21 @@ def _get_supported_estimators() -> frozenset[str]:
 
 _SUPPORTED_ESTIMATORS: frozenset[str] = _get_supported_estimators()
 
-# ---------------------------------------------------------------------------
-# Status icons (Rich markup)
-# ---------------------------------------------------------------------------
-
 _ICONS: dict[str, str] = {
-    "pass": "[green]✓[/green]",
-    "warn": "[yellow]⚠[/yellow]",
-    "fail": "[red]✗[/red]",
+    "pass": "[green]\u2713[/green]",
+    "warn": "[yellow]\u26a0[/yellow]",
+    "fail": "[red]\u2717[/red]",
     "skip": "[dim]-[/dim]",
+}
+
+_DOC_REF = "docs/reference/configuration.md"
+
+_STAGE_DOC_ANCHOR: dict[str, str] = {
+    "yaml_syntax": "#configyaml",
+    "schema":      "#configyaml",
+    "semantic":    "#configyaml",
+    "cross_file":  "#modelsyaml",
+    "data":        "#configyaml",
 }
 
 _STAGE_LABELS: dict[str, str] = {
@@ -92,17 +71,12 @@ _STAGE_LABELS: dict[str, str] = {
 }
 
 
-# ---------------------------------------------------------------------------
-# Rendering helpers
-# ---------------------------------------------------------------------------
-
 def _render_stage(
     stage_key: str,
     issues: list,
     console: Console,
     verbose: bool,
 ) -> None:
-    """Render one validation stage block."""
     label = _STAGE_LABELS.get(stage_key, stage_key)
     errors = [i for i in issues if i.severity == "error"]
     warnings = [i for i in issues if i.severity == "warning"]
@@ -110,18 +84,17 @@ def _render_stage(
 
     if not issues:
         if verbose:
-            console.print(f"  {_ICONS['pass']} {label} — passed")
+            console.print(f"  {_ICONS['pass']} {label} -- passed")
         return
 
     if n_e:
         console.print(
-            f"  {_ICONS['fail']} {label} — "
+            f"  {_ICONS['fail']} {label} -- "
             f"{n_e} error(s)" + (f", {n_w} warning(s)" if n_w else "")
         )
     else:
-        console.print(f"  {_ICONS['warn']} {label} — {n_w} warning(s)")
+        console.print(f"  {_ICONS['warn']} {label} -- {n_w} warning(s)")
 
-    # Group by source file
     by_source: dict[str, list] = {}
     for issue in issues:
         if issue.severity == "info":
@@ -140,10 +113,6 @@ def _render_stage(
     console.print()
 
 
-# ---------------------------------------------------------------------------
-# Public entry point
-# ---------------------------------------------------------------------------
-
 def run_validate(
     config_path: Path,
     models_path: Path,
@@ -152,28 +121,6 @@ def run_validate(
     console: Console,
     verbose: bool = False,
 ) -> int:
-    """
-    Run all validation stages and render a Rich report.
-
-    Delegates validation to :class:`~econflow.config.validator.ConfigValidator`.
-    This function only handles rendering.
-
-    Parameters
-    ----------
-    config_path, models_path, outputs_path:
-        Paths to the three YAML configuration files.
-    check_data:
-        If ``True``, run Stage 5 data file validation.
-    console:
-        Rich console for output.
-    verbose:
-        If ``True``, print passing stages as well as failures.
-
-    Returns
-    -------
-    int
-        0 if all checks passed (zero errors); 1 if any errors found.
-    """
     from econflow.config.validator import ConfigValidator
 
     console.print()
@@ -187,14 +134,13 @@ def run_validate(
         config_path, models_path, outputs_path, check_data=check_data
     )
 
-    # --- Per-stage rendering -----------------------------------------------
     all_stage_keys = ["yaml_syntax", "schema", "semantic", "cross_file"]
     if check_data:
         all_stage_keys.append("data")
 
     for stage_key in all_stage_keys:
         stage_label = _STAGE_LABELS.get(stage_key, stage_key)
-        stage_issues = result.by_stage(stage_key)  # type: ignore[arg-type]
+        stage_issues = result.by_stage(stage_key)
         has_errors = any(i.severity == "error" for i in stage_issues)
         has_issues = bool(stage_issues)
 
@@ -205,12 +151,11 @@ def run_validate(
         )
 
         if not has_issues and not verbose:
-            # Compact: one line per passing stage
             console.print(f"  {icon} Stage: {stage_label}")
             continue
 
         if not has_issues and verbose:
-            console.print(f"  {icon} Stage: {stage_label} — passed")
+            console.print(f"  {icon} Stage: {stage_label} -- passed")
             continue
 
         console.print(f"\n  [bold]Stage: {escape(stage_label)}[/bold]")
@@ -218,7 +163,6 @@ def run_validate(
 
     console.print()
 
-    # --- Per-file schema pass/fail summary ---------------------------------
     console.print("  [dim]Schema status:[/dim]")
     for label, obj in [
         ("config.yaml ", result.project_cfg),
@@ -227,22 +171,29 @@ def run_validate(
     ]:
         icon = _ICONS["pass"] if obj is not None else _ICONS["fail"]
         status = "valid" if obj is not None else "errors"
-        console.print(f"    {icon} {label} — {status}")
+        console.print(f"    {icon} {label} -- {status}")
     console.print()
 
-    # --- Summary -----------------------------------------------------------
     n_errors = len(result.errors)
     n_warnings = len(result.warnings)
 
     if n_errors == 0 and n_warnings == 0:
-        console.print("[bold green]✔ All checks passed.[/bold green]\n")
+        console.print("[bold green]\u2714 All checks passed.[/bold green]\n")
     elif n_errors == 0:
         console.print(
-            f"[bold yellow]⚠ Passed with {n_warnings} warning(s).[/bold yellow]\n"
+            f"[bold yellow]\u26a0 Passed with {n_warnings} warning(s).[/bold yellow]\n"
+        )
+        console.print(
+            f"  [dim]Reference: {_DOC_REF}  "
+            f"(run 'econflow docs config' to regenerate)[/dim]\n"
         )
     else:
         console.print(
-            f"[bold red]✘ {n_errors} error(s) · {n_warnings} warning(s).[/bold red]\n"
+            f"[bold red]\u2718 {n_errors} error(s) \u00b7 {n_warnings} warning(s).[/bold red]\n"
+        )
+        console.print(
+            f"  [dim]Reference: {_DOC_REF}  "
+            f"(run 'econflow docs config' to view all options)[/dim]\n"
         )
 
     return 0 if n_errors == 0 else 1
