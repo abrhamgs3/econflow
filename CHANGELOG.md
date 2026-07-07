@@ -9,6 +9,25 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Documentation Audit (2026-07-07)
+
+#### Fixed
+- `CONTRIBUTING.md`: stale test count `371` → `931+`.
+- `pyproject.toml`: added `per-file-ignores` for `tests/**` suppressing
+  `E501`, `F401`, and `I001`; `ruff check src/ tests/` now exits 0.
+- `src/econflow/outputs/__init__.py`: exported `BaseRenderer` and
+  `FigureBuilder` so Plugin SDK import examples work.
+- `docs/sdk/PLUGIN_SDK.md` §7: renamed non-existent `BaseFigureBuilder` →
+  `FigureBuilder`; removed non-existent `register_figure_builder`,
+  `get_figure_builder`, `list_figure_builders` from import blocks and
+  backward-compatibility table.
+
+#### Added
+- `docs/release/DOCUMENTATION_VALIDATION.md` — full audit report: 13 files,
+  168 code blocks verified, 12 release blockers found and resolved.
+
+---
+
 ### Automatic Configuration Documentation (2026-07-07)
 
 #### Added
@@ -525,22 +544,4 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   collecting tables and figures and writing them to a structured output
   directory with `manifest.json`.
 - `src/econflow/outputs/__init__.py` (rewrite): complete public API re-exporting
-  all model objects, registry functions, table builders, figure builders,
-  diagnostics builder, and `PublicationBundle`.
-- `src/econflow/commands/report.py`: `run_report()` backing function for the
-  `econflow report` CLI command.
-- `src/econflow/cli.py`: `econflow report` command registered via
-  `@app.command()`.
-- `docs/architecture/REPORTING_ENGINE.md`: full architecture documentation for
-  Sprint 6 (454 lines).
-- **158 new tests** across 5 new test modules:
-  `tests/unit/test_report_model.py`,
-  `tests/unit/test_renderer_registry.py`,
-  `tests/unit/test_renderers.py`,
-  `tests/unit/test_table_builders.py`,
-  `tests/unit/test_figure_builders.py`,
-  `tests/integration/test_outputs_pipeline.py`.
-
-#### Fixed
-- `src/econflow/outputs/diagnostics_report.py`: `_conclusion()` uses
-  `DiagnosticResult.level` (not the non-existe
+  all model objects, registry functions, table builders, fig

@@ -26,7 +26,11 @@ Table builders::
 
 Figure builders::
 
-    from econflow.outputs import CoefficientPlot, CIPlot
+    from econflow.outputs import CoefficientPlot, CIPlot, FigureBuilder
+
+Plugin base classes::
+
+    from econflow.outputs import BaseRenderer, FigureBuilder
 
 Diagnostics & bundling::
 
@@ -37,7 +41,7 @@ Diagnostics & bundling::
 import econflow.outputs.renderers  # noqa: F401  — registers all renderers
 
 # --- Base classes and errors ------------------------------------------------
-from econflow.outputs.base import RendererError
+from econflow.outputs.base import BaseRenderer, RendererError
 
 # --- Diagnostics + bundle ---------------------------------------------------
 from econflow.outputs.bundle import PublicationBundle
@@ -45,6 +49,7 @@ from econflow.outputs.diagnostics_report import build_diagnostics_report
 
 # --- Figure builders --------------------------------------------------------
 from econflow.outputs.figures import CIPlot, CoefficientPlot
+from econflow.outputs.figures.base import FigureBuilder
 from econflow.outputs.model import ReportFigure, ReportTable, TableRow
 from econflow.outputs.registry import (
     get_renderer,
@@ -70,6 +75,9 @@ __all__ = [
     "ReportTable",
     "ReportFigure",
     "TableRow",
+    # base classes
+    "BaseRenderer",
+    "FigureBuilder",
     # errors
     "RendererError",
     # registry

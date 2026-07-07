@@ -100,7 +100,7 @@ my_ols = "my_plugin_package.my_estimator"
 | Diagnostic | `BaseDiagnostic` | `@register_diagnostic(id)` | §4 |
 | Integrity check | `BaseIntegrityCheck` | `@register_integrity_check(id)` | §5 |
 | Renderer | `BaseRenderer` | `@register_renderer(id)` | §6 |
-| Figure builder | `BaseFigureBuilder` | `@register_figure_builder(id)` | §7 |
+| Figure builder | `FigureBuilder` | direct subclass (registry planned for v1.1) | §7 |
 | Config extension | `BaseConfigExtension` | `@register_config_extension(id)` | §8 |
 
 ---
@@ -2006,29 +2006,22 @@ Once registered, a figure builder is available by ID in `outputs.yaml`.
 ### 7.1 Imports
 
 ```python
-from econflow.outputs import (
-    BaseFigureBuilder,
-    ReportFigure,
-    register_figure_builder,
-    get_figure_builder,
-    list_figure_builders,
-)
+from econflow.outputs import FigureBuilder, ReportFigure
 from econflow.estimation import EstimationResult
 ```
 
-### 7.2 Contract: `BaseFigureBuilder`
+### 7.2 Contract: `FigureBuilder`
 
 ```python
 import abc
 from econflow.outputs import ReportFigure
 from econflow.estimation import EstimationResult
 
-class BaseFigureBuilder(abc.ABC):
+class FigureBuilder(abc.ABC):
     """
     Abstract base class for all EconFlow figure builders.
 
-    Subclass this, implement ``build()``, and decorate with
-    ``@register_figure_builder(figure_id)``.
+    Subclass this and implement ``build()``.
 
     The figure builder produces a ``ReportFigure`` data object.
     The actual rendering to PNG, SVG, or PDF is performed by a
@@ -2097,12 +2090,11 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from econflow.outputs import BaseFigureBuilder, ReportFigure, register_figure_builder
+from econflow.outputs import FigureBuilder, ReportFigure
 from econflow.estimation import EstimationResult
 
 
-@register_figure_builder("binscatter", label="Binned Scatter Plot")
-class BinscatterBuilder(BaseFigureBuilder):
+class BinscatterBuilder(FigureBuilder):
     """
     Produces a binned scatter plot of outcome vs. treatment variable.
 
@@ -2738,8 +2730,8 @@ def run(self, result: EstimationResult) -> IntegrityCheckResult: ...
 # BaseRenderer
 def render(self, table: ReportTable, **kwargs) -> str: ...
 
-# BaseFigureBuilder
-def build(self, result: EstimationResult, **kwargs) -> ReportFigure: ...
+# FigureBuilder
+def build(self, **kwargs) -> ReportFigure: ...
 ```
 
 ### 13.2 Frozen: registration decorator signatures
@@ -2750,7 +2742,6 @@ register_connector(connector_id, *, label="", status="implemented", notes="")
 register_diagnostic(diagnostic_id, *, label="")
 register_integrity_check(check_id, *, label="")
 register_renderer(renderer_id, *, label="")
-register_figure_builder(figure_id, *, label="")
 register_config_extension(extension_id)
 ```
 

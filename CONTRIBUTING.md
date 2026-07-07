@@ -34,7 +34,7 @@ pip install -e ".[dev]"
 Verify everything works:
 
 ```bash
-pytest          # 371 tests should pass
+pytest          # 931+ tests should pass
 ruff check src/ tests/
 econflow doctor
 ```
