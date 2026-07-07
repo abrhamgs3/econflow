@@ -45,6 +45,9 @@ econflow cache list|inspect|clear|purge
 econflow datasets
     List all registered data connectors.
 
+econflow release-check
+    Run the EconFlow Release Quality Gate (9 checks; exits 1 on any blocker).
+
 Examples
 --------
     $ econflow --version
@@ -1241,9 +1244,85 @@ def compare(
 
 
 # ---------------------------------------------------------------------------
-# docs
+# release-check
 # ---------------------------------------------------------------------------
 
+
+@app.command(name="release-check")
+def release_check(
+    quick: bool = typer.Option(
+        False,
+        "--quick",
+        help=(
+            "Skip slow checks: QG-01 (package build), QG-06 (integration tests), "
+            "QG-07 (blind replication).  Useful for fast pre-flight verification."
+        ),
+    ),
+    checks: str = typer.Option(
+        "",
+        "--checks",
+        help=(
+            "Comma-separated list of check IDs to run, e.g. QG-02,QG-03,QG-05.  "
+            "Defaults to all checks."
+        ),
+    ),
+    output: Path = typer.Option(
+        None,
+        "--output", "-o",
+        help="Write a Markdown release report to this path.",
+    ),
+    json_output: Path = typer.Option(
+        None,
+        "--json",
+        help="Write a machine-readable JSON report to this path.",
+    ),
+) -> None:
+    """Run the EconFlow Release Quality Gate.
+
+    Executes 9 checks and produces a structured release report:
+
+    \b
+      QG-01  package_build       Wheel builds from source
+      QG-02  package_import      All public sub-packages import cleanly
+      QG-03  cli_smoke           --version and doctor both pass
+      QG-04  schema_validation   ConfigValidator passes on blind_replication example
+      QG-05  plugin_registry     All registries meet minimum thresholds
+      QG-06  integration_tests   pytest tests/integration/ exits 0
+      QG-07  blind_replication   econflow reproduce examples/blind_replication/
+      QG-08  doc_api_examples    Documented import patterns work in-process
+      QG-09  api_consistency     Every __all__ entry is importable
+
+    Exit code is 0 when no blockers exist; 1 when one or more checks fail.
+
+    Examples:
+
+        # Full gate (may take several minutes)
+        econflow release-check
+
+        # Fast pre-flight (skips build, integration tests, replication)
+        econflow release-check --quick
+
+        # Run specific checks only
+        econflow release-check --checks QG-02,QG-05,QG-08
+
+        # Save a full report
+        econflow release-check --output docs/release/gate_report.md --json gate.json
+    """
+    from econflow.commands.release_check import run_release_check
+
+    checks_filter: set[str] | None = None
+    if checks:
+        checks_filter = {c.strip().upper() for c in checks.split(",") if c.strip()}
+
+    exit_code = run_release_check(
+        quick=quick,
+        checks_filter=checks_filter,
+        output_md=output,
+        output_json=json_output,
+        console=console,
+    )
+    if exit_code != 0:
+        raise typer.Exit(code=exit_code)
 
 
 # ---------------------------------------------------------------------------
