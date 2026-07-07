@@ -83,7 +83,7 @@ def _ensure_tmp() -> tuple[Path, Path, Path, Path]:
 
 def _load_data(path: Path, label: str) -> None:
     """Validate and register a data path in session state."""
-    from econflow.data.validators import validate_data, report_has_blockers
+    from econflow.data.validators import validate_data
     with st.spinner("Validating…"):
         report = validate_data(path)
     st.session_state.data_path = path
@@ -239,9 +239,10 @@ with tab_run:
                     progress_bar.progress(pct, text=msg)
 
                 try:
-                    from econflow.pipeline import run as _run
-                    from econflow.logging import configure_logging
                     import logging
+
+                    from econflow.logging import configure_logging
+                    from econflow.pipeline import run as _run
                     configure_logging(level=logging.DEBUG if verbose else logging.WARNING)
 
                     t0 = time.perf_counter()

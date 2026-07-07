@@ -383,45 +383,52 @@ def run(
     config: Path = typer.Option(
         None,
         "--config", "-c",
-        help=(
-            "Path to config.yaml for a generic panel pipeline. "
-            "When provided, --models and --outputs are also required. "
-            "Ignores --data-path, --tables-dir, --figures-dir, --paper-dir."
-        ),
+        help="Path to config.yaml.  Also requires --models and --outputs.",
     ),
     models: Path = typer.Option(
         None,
         "--models",
-        help="Path to models.yaml (required when --config is set).",
+        help="Path to models.yaml.",
     ),
     outputs: Path = typer.Option(
         None,
         "--outputs",
-        help="Path to outputs.yaml (required when --config is set).",
+        help="Path to outputs.yaml.",
     ),
+    # ------------------------------------------------------------------
+    # Deprecated legacy options (AI & Productivity paper replication path).
+    # These remain functional until v0.3.0 to preserve backward compatibility.
+    # Use `econflow run --config` instead.
+    # ------------------------------------------------------------------
     data_path: Path = typer.Option(
-        Path("data/processed/panel_clean.csv"),
+        None,
         "--data-path", "-d",
-        help="Path to the processed panel CSV (legacy pipeline, used when --config is absent).",
-        show_default=True,
+        help=(
+            "[DEPRECATED v0.3.0] Run the AI & Productivity legacy pipeline against "
+            "a raw panel CSV.  Use --config / --models / --outputs for all new projects."
+        ),
+        hidden=True,
     ),
     tables_dir: Path = typer.Option(
         Path("tables"),
         "--tables-dir",
-        help="Output directory for tables (legacy pipeline).",
+        help="[DEPRECATED] Output directory for tables (legacy pipeline).",
         show_default=True,
+        hidden=True,
     ),
     figures_dir: Path = typer.Option(
         Path("figures"),
         "--figures-dir",
-        help="Output directory for figures (legacy pipeline).",
+        help="[DEPRECATED] Output directory for figures (legacy pipeline).",
         show_default=True,
+        hidden=True,
     ),
     paper_dir: Path = typer.Option(
         Path("paper/sections"),
         "--paper-dir",
-        help="Output directory for auto-generated LaTeX narrative (legacy pipeline).",
+        help="[DEPRECATED] Output directory for LaTeX narrative (legacy pipeline).",
         show_default=True,
+        hidden=True,
     ),
     verbose: bool = typer.Option(
         False,
@@ -429,18 +436,16 @@ def run(
         help="Enable DEBUG-level logging.",
     ),
 ) -> None:
-    """Run the analysis pipeline.
+    """Run the EconFlow analysis pipeline.
 
-    Generic mode (recommended for new projects):
+    Requires three YAML configuration files produced by ``econflow init``:
 
         econflow run \\
             --config  config/config.yaml \\
-            --models  models.yaml \\
-            --outputs outputs.yaml
+            --models  config/models.yaml \\
+            --outputs config/outputs.yaml
 
-    Legacy mode (AI & Productivity paper replication):
-
-        econflow run --data-path data/processed/panel_clean.csv
+    See ``examples/getting_started/`` for a complete worked example.
     """
     import logging
 
@@ -455,71 +460,49 @@ def run(
 
     t0 = time.perf_counter()
 
-    # ------------------------------------------------------------------ Generic mode
-    if config is not None:
-        from econflow.pipeline_generic import run_from_config
+    # ------------------------------------------------------------------
+    # Legacy mode guard — --data-path was provided explicitly.
+    # Emit a deprecation warning and route to the AI&P pipeline for
+    # backward compatibility.  This path is removed in v0.3.0.
+    # ------------------------------------------------------------------
+    if data_path is not None:
+        import warnings
+        warnings.warn(
+            "econflow run --data-path is deprecated and will be removed in "
+            "EconFlow v0.3.0.  Use --config / --models / --outputs instead.  "
+            "See: econflow run --help",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        console.print()
+        console.print(
+            "[bold yellow]⚠  Deprecation warning[/bold yellow]: "
+            "--data-path invokes the legacy AI & Productivity pipeline.  "
+            "This mode is removed in v0.3.0."
+        )
+        console.print(
+            "   For new projects use the config-driven pipeline:\n"
+            "   [dim]econflow run --config config/config.yaml "
+            "--models config/models.yaml --outputs config/outputs.yaml[/dim]"
+        )
+        console.print()
 
-        missing_flags = []
-        if models is None:
-            missing_flags.append("--models")
-        if outputs is None:
-            missing_flags.append("--outputs")
-        if missing_flags:
-            console.print(
-                f"[bold red]✘ --config requires:[/bold red] {', '.join(missing_flags)}"
-            )
-            raise typer.Exit(code=1)
+        from econflow.pipeline import run as _run  # type: ignore[import]
 
-        for label, path in [("config", config), ("models", models), ("outputs", outputs)]:
-            if not path.exists():
-                console.print(f"[bold red]✘ {label} file not found:[/bold red] {path}")
-                raise typer.Exit(code=1)
-
-        # Pre-flight: validate config before touching any output files.
-        # Uses ConfigValidator.validate_strict() which raises ConfigValidationError
-        # on the first error, enforcing the load → validate → execute flow.
-        from econflow.config.validator import ConfigValidator as _ConfigValidator
-        from econflow.core.exceptions import ConfigValidationError as _ConfigValidationError
-        try:
-            _validator = _ConfigValidator()
-            _validator.validate_strict(
-                config_path=config,
-                models_path=models,
-                outputs_path=outputs,
-                check_data=True,
-            )
-        except _ConfigValidationError as _exc:
-            console.print()
+        if not data_path.exists():
+            console.print(f"[bold red]✘ Data file not found:[/bold red] {data_path}")
             console.print(
-                f"[bold red]✘ Configuration validation failed "
-                f"({_exc.error_count} error(s)).[/bold red]"
-            )
-            for _issue in _exc.errors[:20]:
-                console.print(
-                    f"  [red]·[/red] [{_issue.stage}] "
-                    f"[bold]{_issue.source}[/bold] "
-                    f"[dim]{_issue.location}[/dim]"
-                )
-                console.print(f"      {_issue.message}")
-                if _issue.fix:
-                    console.print(f"      [dim]Fix: {_issue.fix}[/dim]")
-            if len(_exc.errors) > 20:
-                console.print(
-                    f"  [dim]… and {len(_exc.errors) - 20} more error(s).  "
-                    "Run `econflow validate` for the full report.[/dim]"
-                )
-            console.print()
-            console.print(
-                "[dim]Run [bold]econflow validate[/bold] for the full "
-                "validation report.[/dim]"
+                "  Provide the path to a processed panel CSV with --data-path."
             )
             raise typer.Exit(code=1)
 
         try:
-            run_from_config(
-                config_path=config,
-                models_path=models,
-                outputs_path=outputs,
+            _run(
+                data_path=data_path,
+                tables_dir=tables_dir,
+                figures_dir=figures_dir,
+                paper_dir=paper_dir,
+                verbose=verbose,
             )
         except EconFlowError as exc:
             console.print()
@@ -536,28 +519,96 @@ def run(
         elapsed = time.perf_counter() - t0
         console.print()
         console.rule("[bold green]Pipeline complete[/bold green]")
-        console.print(f"  Completed in [bold]{elapsed:.1f} s[/bold]")
         console.print()
+        _output_summary(tables_dir, figures_dir, paper_dir, elapsed)
         return
 
-    # ------------------------------------------------------------------ Legacy mode
-    from econflow.pipeline import run as _run
-
-    if not data_path.exists():
-        console.print(f"[bold red]✘ Data file not found:[/bold red] {data_path}")
+    # ------------------------------------------------------------------
+    # Generic pipeline — the canonical path for all new projects.
+    # ------------------------------------------------------------------
+    if config is None:
         console.print(
-            "  Run [bold]scripts/02_clean_data.py[/bold] to generate it, "
-            "or check --data-path."
+            "[bold red]✘  econflow run requires --config, --models, and --outputs.[/bold red]"
+        )
+        console.print()
+        console.print("  Run [bold]econflow init[/bold] to create a project skeleton, then:")
+        console.print(
+            "  [dim]econflow run \\\n"
+            "      --config  config/config.yaml \\\n"
+            "      --models  config/models.yaml \\\n"
+            "      --outputs config/outputs.yaml[/dim]"
+        )
+        console.print()
+        console.print(
+            "  Or try the Getting Started example:\n"
+            "  [dim]econflow run \\\n"
+            "      --config  examples/getting_started/config/config.yaml \\\n"
+            "      --models  examples/getting_started/config/models.yaml \\\n"
+            "      --outputs examples/getting_started/config/outputs.yaml[/dim]"
+        )
+        raise typer.Exit(code=1)
+
+    from econflow.pipeline_generic import run_from_config
+
+    missing_flags = []
+    if models is None:
+        missing_flags.append("--models")
+    if outputs is None:
+        missing_flags.append("--outputs")
+    if missing_flags:
+        console.print(
+            f"[bold red]✘ --config requires:[/bold red] {', '.join(missing_flags)}"
+        )
+        raise typer.Exit(code=1)
+
+    for label, path in [("config", config), ("models", models), ("outputs", outputs)]:
+        if not path.exists():
+            console.print(f"[bold red]✘ {label} file not found:[/bold red] {path}")
+            raise typer.Exit(code=1)
+
+    # Pre-flight: validate config before touching any output files.
+    from econflow.config.validator import ConfigValidator as _ConfigValidator
+    from econflow.core.exceptions import ConfigValidationError as _ConfigValidationError
+    try:
+        _validator = _ConfigValidator()
+        _validator.validate_strict(
+            config_path=config,
+            models_path=models,
+            outputs_path=outputs,
+            check_data=True,
+        )
+    except _ConfigValidationError as _exc:
+        console.print()
+        console.print(
+            f"[bold red]✘ Configuration validation failed "
+            f"({_exc.error_count} error(s)).[/bold red]"
+        )
+        for _issue in _exc.errors[:20]:
+            console.print(
+                f"  [red]·[/red] [{_issue.stage}] "
+                f"[bold]{_issue.source}[/bold] "
+                f"[dim]{_issue.location}[/dim]"
+            )
+            console.print(f"      {_issue.message}")
+            if _issue.fix:
+                console.print(f"      [dim]Fix: {_issue.fix}[/dim]")
+        if len(_exc.errors) > 20:
+            console.print(
+                f"  [dim]… and {len(_exc.errors) - 20} more error(s).  "
+                "Run `econflow validate` for the full report.[/dim]"
+            )
+        console.print()
+        console.print(
+            "[dim]Run [bold]econflow validate[/bold] for the full "
+            "validation report.[/dim]"
         )
         raise typer.Exit(code=1)
 
     try:
-        _run(
-            data_path=data_path,
-            tables_dir=tables_dir,
-            figures_dir=figures_dir,
-            paper_dir=paper_dir,
-            verbose=verbose,
+        run_from_config(
+            config_path=config,
+            models_path=models,
+            outputs_path=outputs,
         )
     except EconFlowError as exc:
         console.print()
@@ -572,12 +623,10 @@ def run(
         raise typer.Exit(code=1)
 
     elapsed = time.perf_counter() - t0
-
     console.print()
     console.rule("[bold green]Pipeline complete[/bold green]")
+    console.print(f"  Completed in [bold]{elapsed:.1f} s[/bold]")
     console.print()
-
-    _output_summary(tables_dir, figures_dir, paper_dir, elapsed)
 
 
 # ---------------------------------------------------------------------------

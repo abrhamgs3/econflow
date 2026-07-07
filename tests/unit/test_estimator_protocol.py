@@ -16,34 +16,33 @@ Verifies:
 
 from __future__ import annotations
 
-import pytest
 import pandas as pd
+import pytest
+
+from econflow.estimation.backends import (
+    DoubleMLMixin,
+    LinearmodelsMixin,
+    PyfixestMixin,
+    PyMCMixin,
+    StatsmodelsMixin,
+)
+from econflow.estimation.base import BaseEstimator
 
 # ---------------------------------------------------------------------------
 # Protocol and backend imports
 # ---------------------------------------------------------------------------
-
 from econflow.estimation.protocol import (
     BACKEND_CUSTOM,
     BACKEND_DOUBLEML,
     BACKEND_LINEARMODELS,
-    BACKEND_PYMC,
     BACKEND_PYFIXEST,
+    BACKEND_PYMC,
     BACKEND_STATSMODELS,
     KNOWN_BACKENDS,
     BackendCapabilities,
     EstimatorProtocol,
 )
-from econflow.estimation.backends import (
-    DoubleMLMixin,
-    LinearmodelsMixin,
-    PyMCMixin,
-    PyfixestMixin,
-    StatsmodelsMixin,
-)
-from econflow.estimation.base import BaseEstimator
-from econflow.estimation.result import DiagnosticResult, EstimationResult
-
+from econflow.estimation.result import EstimationResult
 
 # ---------------------------------------------------------------------------
 # Helpers — minimal duck-typed estimator (no BaseEstimator inheritance)
@@ -194,7 +193,6 @@ class TestEstimatorProtocol:
 
     def test_protocol_is_runtime_checkable(self):
         """EstimatorProtocol must be decorated with @runtime_checkable."""
-        from typing import get_args, get_origin
         # If not runtime-checkable, isinstance() would raise TypeError
         est = _MinimalCustomEstimator()
         try:
@@ -227,7 +225,6 @@ class TestEstimatorProtocol:
 # ---------------------------------------------------------------------------
 
 # Import estimation to trigger @register() on all 8 built-in estimators
-import econflow.estimation  # noqa: E402
 
 ALL_ESTIMATOR_IDS = ["ols", "fe", "twfe", "re", "fd", "iv", "gmm", "quantile"]
 

@@ -1,0 +1,58 @@
+# ============================================================
+# EconFlow model specifications
+# ============================================================
+# Each entry defines one regression model.
+# All models below are passed to `econflow run --models`.
+#
+# Supported estimators
+# --------------------
+# OLS  — Pooled OLS (linearmodels.PooledOLS, heteroskedasticity-robust SEs)
+# FE   — Panel fixed effects (linearmodels.PanelOLS, within estimator)
+#
+# Cluster options: "entity" | "time" | null (robust)
+
+models:
+
+  # ------------------------------------------------------------------
+  # Specification 1 — Pooled OLS baseline
+  # ------------------------------------------------------------------
+  - id:            "pooled_ols"
+    label:         "Pooled OLS"
+    estimator:     "OLS"
+    dependent:     "outcome"
+    regressors:    ["treatment", "covariate_1"]
+    entity_effects: false
+    time_effects:   false
+    description: >
+      Baseline specification ignoring panel structure.
+      Included to motivate the need for fixed effects.
+
+  # ------------------------------------------------------------------
+  # Specification 2 — Entity fixed effects
+  # ------------------------------------------------------------------
+  - id:            "entity_fe"
+    label:         "Entity FE"
+    estimator:     "FE"
+    dependent:     "outcome"
+    regressors:    ["treatment", "covariate_1"]
+    entity_effects: true
+    time_effects:   false
+    cluster:       "entity"
+    description: >
+      Within estimator with entity (cross-sectional) fixed effects.
+      Controls for all time-invariant unit characteristics.
+
+  # ------------------------------------------------------------------
+  # Specification 3 — Two-way fixed effects
+  # ------------------------------------------------------------------
+  - id:            "twoway_fe"
+    label:         "Two-Way FE"
+    estimator:     "FE"
+    dependent:     "outcome"
+    regressors:    ["treatment", "covariate_1"]
+    entity_effects: true
+    time_effects:   true
+    cluster:       "entity"
+    description: >
+      Entity + time fixed effects.
+      Also absorbs aggregate time-series shocks common to all units.

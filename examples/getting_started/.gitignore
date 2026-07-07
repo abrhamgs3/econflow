@@ -1,0 +1,6 @@
+# Generated pipeline outputs — excluded from version control
+outputs/
+
+# Python
+__pycache__/
+*.pyc

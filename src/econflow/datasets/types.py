@@ -257,7 +257,7 @@ class SelectionSummary:
     -----
     Build from the legacy DataFrame::
 
-        summary_df = sample_selection_summary(df)
+        summary_df = sample_selection_summary(df, indicator_col="my_indicator")
         sel = SelectionSummary.from_legacy_dataframe(summary_df)
 
     Or build directly::

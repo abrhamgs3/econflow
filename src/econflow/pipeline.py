@@ -253,7 +253,8 @@ def run(
     _save_falsification_table(falsification, tables_dir)
     _save_heterogeneity_table(heterogeneity, tables_dir)
 
-    selection_summary = sample_selection_summary(df)
+    # AI & Productivity paper uses "ln_ai" as the indicator column
+    selection_summary = sample_selection_summary(df, indicator_col="ln_ai", entity_col="country")
     _save_sample_selection_table(selection_summary, tables_dir)
 
     # 5. Figures

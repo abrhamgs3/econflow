@@ -5,4 +5,5 @@ from econflow.visualization.figures import (
     ai_tfp_trend,
     missingness_profile,
 )
+
 __all__ = ["ai_tfp_scatter", "ai_tfp_trend", "ai_coefficient_comparison", "missingness_profile"]

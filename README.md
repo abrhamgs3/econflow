@@ -1,27 +1,26 @@
 # EconFlow
 
-**Reusable panel econometrics research platform.**
+**Open-source platform for reproducible panel econometric research.**
 
 [![CI](https://github.com/abrhamgs3/econflow/actions/workflows/ci.yml/badge.svg)](https://github.com/abrhamgs3/econflow/actions/workflows/ci.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 EconFlow is an open-source Python framework for running reproducible
-cross-country panel econometric analyses — from raw data download through
-publication-ready regression tables, figures, and LaTeX narrative sections.
-It was extracted from the *AI Adoption and Total Factor Productivity* paper
-and is designed to be reused for any panel study.
+panel econometric analyses — from raw data through publication-ready
+regression tables, figures, and integrity certificates. It is designed for
+any panel study, regardless of dataset, discipline, or research question.
 
 ---
 
 ## Features
 
-- **End-to-end pipeline** — ingest → process → estimate → diagnose → render
-- **Panel econometrics** — FE, two-way FE, GLS, IV, GMM, quantile estimators powered by `linearmodels`
-- **Reproducibility** — every run hashes its inputs and outputs to a `run_metadata.json` provenance record
-- **Configurable** — projects defined by three YAML files; no code changes required to run a new study
-- **Tested** — 100-test suite covering regression helpers, exception hierarchy, and provenance recording
-- **Interactive dashboard** — optional Streamlit interface for exploring results
+- **End-to-end pipeline** — ingest → validate → estimate → diagnose → render → certify
+- **Panel econometrics** — FE, two-way FE, RE, IV, GMM, quantile estimators via `linearmodels`
+- **Reproducibility** — every run produces a provenance certificate with SHA-256 fingerprints
+- **Config-driven** — projects defined by three YAML files; no code changes to run a new study
+- **Integrity chain** — `certify` → `verify` → `package` → `reproduce` for full replication support
+- **Plugin system** — extend estimators, diagnostics, and renderers via `@register` decorators
 
 ---
 
@@ -39,48 +38,61 @@ cd econflow
 pip install -e ".[dev]"
 ```
 
-To add the optional Streamlit dashboard:
-
-```bash
-pip install "econflow[app]"
-```
-
 ---
 
 ## Quick Start
 
 ```bash
-# Verify the environment
-econflow doctor
+# 1. Create a new project skeleton
+econflow init my_study
+cd my_study
 
-# Run the full pipeline against your panel CSV
-econflow run --data-path path/to/panel_clean.csv
+# 2. Edit config/config.yaml — set data path, entity/time columns, variables
 
-# Specify custom output directories
-econflow run --data-path path/to/panel_clean.csv \
-             --tables-dir results/tables \
-             --figures-dir results/figures \
-             --paper-dir  results/paper/sections
+# 3. Validate configuration before running
+econflow validate config/
+
+# 4. Run the analysis pipeline
+econflow run \
+    --config  config/config.yaml \
+    --models  config/models.yaml \
+    --outputs config/outputs.yaml
+
+# 5. Generate a reproducibility certificate
+econflow certify
 ```
 
-The pipeline expects a CSV with at minimum the columns specified in your
-`config.yaml` (`country`, `year`, and log-transformed variables by default).
-See [examples/ai_productivity_paper/](examples/ai_productivity_paper/) for
-a fully annotated project with config files, reference outputs, and an
-interactive dashboard.
+See [`examples/getting_started/`](examples/getting_started/) for a complete
+10-minute tutorial using the Grunfeld firm investment panel.
 
 ---
 
 ## Project Layout
 
-A project is defined by three YAML files, conventionally placed under
-`examples/<project_name>/config/`:
+Every EconFlow study is defined by three YAML files:
 
 | File | Purpose |
 |---|---|
-| `config.yaml` | Data sources, sample period, variable definitions, cache directory |
-| `models.yaml` | Model specifications consumed by `SensitivityRunner` |
-| `outputs.yaml` | Output directories, file names, figure formats |
+| `config.yaml` | Data path, entity/time column names, variable definitions |
+| `models.yaml` | Regression specifications (estimator, regressors, fixed effects) |
+| `outputs.yaml` | Output directories and file formats (CSV, LaTeX, HTML) |
+
+```
+my_study/
+├── config/
+│   ├── config.yaml
+│   ├── models.yaml
+│   └── outputs.yaml
+├── data/
+│   ├── raw/
+│   └── processed/
+├── outputs/
+│   ├── tables/
+│   ├── figures/
+│   └── provenance/
+├── scripts/
+└── docs/
+```
 
 ---
 
@@ -88,22 +100,41 @@ A project is defined by three YAML files, conventionally placed under
 
 ```
 src/econflow/
-├── cli.py            CLI — doctor and run commands
-├── pipeline.py       Sequential pipeline orchestrator
-├── provenance.py     ProvenanceRecorder — SHA-256 run metadata
+├── cli.py            CLI entry point (16 commands)
+├── pipeline_generic.py  Config-driven pipeline orchestrator
 ├── exceptions.py     Domain exception hierarchy (EconFlowError)
-├── data/             Panel CSV validation and loading
-├── econometrics/     Active panel econometrics suites (FE, robustness, sensitivity, falsification)
-├── features/         Feature engineering (AI index, TFP, transforms)
-├── visualization/    Publication-quality figures
-├── reporting/        LaTeX narrative generation
-├── core/             Scaffold infrastructure (config, registry, provenance)
-├── ingestion/        Data connectors — World Bank, OECD, PWT
-├── processing/       Harmonisation, quality checks
-├── estimation/       Estimator classes — OLS, FE, RE, IV, GMM, quantile
-├── diagnostics/      Hausman, Sargan-Hansen, Pesaran CD, Arellano-Bond AR
-├── sensitivity/      SensitivityRunner, ResultsComparison
-└── outputs/          Table, figure, and report renderers
+├── commands/         CLI command implementations
+├── config/           Pydantic v2 config models, linter, validator (13 rules)
+├── estimation/       Panel estimators — OLS, FE, TWFE, RE, FD, IV, GMM, Quantile
+├── diagnostics/      Post-estimation tests — Hausman, BP, Pesaran CD, VIF, AR(1)
+├── outputs/          Table, figure, and report renderers (CSV, LaTeX, MD, HTML, JSON)
+├── integrity/        Provenance certificates, drift detection, replication packages
+├── replication/      Blind replication engine — inspect, reproduce, compare
+├── ingestion/        Data connectors — CSV, World Bank, OECD, PWT, FRED
+└── core/             Shared exceptions, registry, and configuration infrastructure
+```
+
+---
+
+## CLI Reference
+
+```
+econflow init         Create a new project skeleton
+econflow validate     Check YAML configuration files
+econflow run          Execute the analysis pipeline
+econflow report       Render publication bundle (tables + figures)
+econflow certify      Generate a reproducibility certificate
+econflow verify       Verify a certificate against current outputs
+econflow package      Build a self-contained replication package
+econflow inspect      Inspect a replication package
+econflow reproduce    Re-execute a replication package
+econflow compare      Compare two sets of outputs
+econflow doctor       Check the EconFlow environment
+econflow info         Show platform and project information
+econflow fetch        Fetch data from an external connector
+econflow cache        Manage the local data cache
+econflow datasets     List available data connectors
+econflow release-check  Run the release quality gate
 ```
 
 ---
@@ -111,43 +142,15 @@ src/econflow/
 ## Testing
 
 ```bash
-pytest                           # full suite (100 tests)
-pytest tests/regression/         # regression helper tests
-pytest tests/test_provenance.py  # provenance recorder tests
-
-# Live-data reproduction test (requires network access)
-ECONFLOW_RUN_LIVE_REGRESSION=1 pytest tests/regression/test_live_data_reproduction.py
+pytest                   # full suite
+pytest tests/unit/       # unit tests only
+pytest tests/integration/ # integration tests
 ```
 
 ---
 
-## Contributing
+## Examples
 
-Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md)
-before opening a pull request. Bug reports and feature requests go in
-[GitHub Issues](https://github.com/abrhamgs3/econflow/issues).
-
----
-
-## Citation
-
-If you use EconFlow in academic work, please cite it:
-
-```bibtex
-@software{econflow2026,
-  author  = {Meressa, Abrha Megos},
-  title   = {{EconFlow}: Reusable panel econometrics research platform},
-  year    = {2026},
-  version = {0.1.0},
-  url     = {https://github.com/abrhamgs3/econflow},
-  license = {MIT}
-}
-```
-
-A `CITATION.cff` file is also provided for tools that read it automatically.
-
----
-
-## License
-
-[MIT](LICENSE) © 2026 Abrha Megos Meressa
+| Example | Description |
+|---------|-------------|
+| [`examples/ge

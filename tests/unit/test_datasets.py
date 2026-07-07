@@ -586,7 +586,9 @@ class TestSampleSelectionSummaryTyped:
 
     def test_selection_summary_counts(self, selection_df):
         from econflow.data.cleaning import sample_selection_summary_typed
-        _, sel = sample_selection_summary_typed(selection_df, indicator_col="ln_ai")
+        _, sel = sample_selection_summary_typed(
+            selection_df, indicator_col="ln_ai", entity_col="country"
+        )
         assert isinstance(sel, SelectionSummary)
         assert sel.in_sample_rows == 3    # A/2000, B/2000, B/2001
         assert sel.out_of_sample_rows == 3

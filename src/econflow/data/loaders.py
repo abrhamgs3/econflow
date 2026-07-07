@@ -75,18 +75,27 @@ _EXCLUDED: frozenset[str] = frozenset(AGGREGATE_ENTITIES + NON_SOVEREIGN_ENTITIE
 # Public API
 # ---------------------------------------------------------------------------
 
-def load_panel(path: str | Path) -> pd.DataFrame:
-    """Load the processed panel CSV and return a sorted DataFrame.
+def load_panel(
+    path: str | Path,
+    entity_col: str | None = None,
+    time_col: str | None = None,
+) -> pd.DataFrame:
+    """Load a panel CSV and return a sorted DataFrame.
 
     Parameters
     ----------
     path:
-        Path to the panel CSV (typically ``data/processed/panel_clean.csv``).
+        Path to the panel CSV.
+    entity_col:
+        Cross-sectional identifier column.  When provided, the DataFrame is
+        sorted by ``[entity_col, time_col]``.  Pass ``None`` to skip sorting.
+    time_col:
+        Time period identifier column.  Required when ``entity_col`` is set.
 
     Returns
     -------
     pd.DataFrame
-        Sorted by ``["country", "year"]`` with a clean integer index.
+        Loaded DataFrame with a clean integer index.
 
     Raises
     ------
@@ -97,7 +106,7 @@ def load_panel(path: str | Path) -> pd.DataFrame:
     if not path.exists():
         raise DataValidationError(
             f"Panel file not found: {path}. "
-            "Run scripts/02_clean_data.py to generate it."
+            "Ensure the data file exists and the path in config.yaml is correct."
         )
 
     log.info("Loading panel from %s", path)
@@ -106,15 +115,19 @@ def load_panel(path: str | Path) -> pd.DataFrame:
     except Exception as exc:
         raise DataValidationError(f"Cannot read {path}: {exc}") from exc
 
-    if {"country", "year"}.issubset(df.columns):
-        df = df.sort_values(["country", "year"]).reset_index(drop=True)
+    # Sort by panel dimensions if specified
+    if entity_col is not None and time_col is not None:
+        sort_cols = [c for c in (entity_col, time_col) if c in df.columns]
+        if sort_cols:
+            df = df.sort_values(sort_cols).reset_index(drop=True)
+    elif entity_col is None and time_col is None:
+        # Backward-compat heuristic: sort by country/year if those columns exist
+        if {"country", "year"}.issubset(df.columns):
+            df = df.sort_values(["country", "year"]).reset_index(drop=True)
 
-    log.info(
-        "Panel loaded: %d rows, %d countries, %d years",
-        len(df),
-        df["country"].nunique() if "country" in df.columns else 0,
-        df["year"].nunique() if "year" in df.columns else 0,
-    )
+    n_entities = df[entity_col].nunique() if entity_col and entity_col in df.columns else "?"
+    n_times = df[time_col].nunique() if time_col and time_col in df.columns else "?"
+    log.info("Panel loaded: %d rows, %s entities, %s periods", len(df), n_entities, n_times)
     return df
 
 

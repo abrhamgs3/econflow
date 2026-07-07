@@ -12,11 +12,9 @@ Creates a complete EconFlow project skeleton in *directory*:
     │   ├── raw/           ← original source files (never modified)
     │   └── processed/     ← cleaned, merged panel CSV
     ├── outputs/
-    │   ├── tables/
-    │   ├── figures/
-    │   └── provenance/
-    ├── paper/
-    │   └── sections/      ← auto-generated LaTeX narrative fragments
+    │   ├── tables/        ← regression tables (CSV + LaTeX)
+    │   ├── figures/       ← coefficient plots and diagnostics
+    │   └── provenance/    ← run metadata and certificates
     ├── scripts/
     │   ├── 01_download_data.py
     │   └── 02_clean_data.py
@@ -52,7 +50,6 @@ _DIRECTORIES = [
     "outputs/tables",
     "outputs/figures",
     "outputs/provenance",
-    "paper/sections",
     "scripts",
     "tests",
     "docs",
@@ -225,7 +222,6 @@ build/
 outputs/tables/
 outputs/figures/
 outputs/provenance/
-paper/sections/
 
 # Jupyter
 .ipynb_checkpoints/
@@ -267,7 +263,6 @@ config/         YAML configuration files
 data/raw/       Original source data (unmodified)
 data/processed/ Cleaned panel CSV ready for estimation
 outputs/        Regression tables, figures, provenance records
-paper/          LaTeX manuscript and auto-generated sections
 scripts/        Data download and cleaning scripts
 docs/           Project documentation
 notebooks/      Exploratory analysis notebooks

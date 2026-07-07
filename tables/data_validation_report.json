@@ -1,32 +1,16 @@
 {
-  "path": "examples/getting_started/data/grunfeld.csv",
-  "required_columns": [
-    "country",
-    "year",
-    "ln_ai",
-    "ln_tfp",
-    "ln_hc",
-    "ln_gdp"
-  ],
-  "missing_columns": [
-    "country",
-    "ln_ai",
-    "ln_tfp",
-    "ln_hc",
-    "ln_gdp"
-  ],
+  "path": "/sessions/trusting-amazing-keller/tmp/pytest-of-trusting-amazing-keller/pytest-155/test_deprecation_mentions_conf0/panel.csv",
+  "required_columns": [],
+  "missing_columns": [],
   "duplicate_panel_keys": 0,
   "duplicate_country_year": 0,
   "missing_by_column": {
-    "invest": 0,
-    "value": 0,
-    "capital": 0,
-    "firm": 0,
-    "year": 0
+    "entity": 0,
+    "time": 0,
+    "y": 0
   },
   "log_vars_non_finite": {},
   "coverage": {
-    "rows": 220,
-    "periods": 20
+    "rows": 1
   }
 }

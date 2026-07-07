@@ -1,4 +1,4 @@
-"""
+r"""
 EconFlow visualization — publication-quality figures for panel econometrics.
 
 All functions follow the same contract:

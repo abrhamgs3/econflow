@@ -57,10 +57,11 @@ def test_init_creates_outputs_dirs(tmp_path: Path) -> None:
     assert (proj / "outputs" / "provenance").is_dir()
 
 
-def test_init_creates_paper_dir(tmp_path: Path) -> None:
+def test_init_does_not_create_paper_dir(tmp_path: Path) -> None:
+    """Sprint 10.5: paper/sections is AI&P-specific and must not be in the generic scaffold."""
     proj = tmp_path / "test_proj"
     _invoke_init([str(proj)])
-    assert (proj / "paper" / "sections").is_dir()
+    assert not (proj / "paper" / "sections").exists()
 
 
 def test_init_creates_scripts_dir(tmp_path: Path) -> None:

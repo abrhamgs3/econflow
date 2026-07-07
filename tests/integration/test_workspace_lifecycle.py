@@ -66,13 +66,18 @@ class TestInitScaffold:
         assert project_dir.is_dir()
 
     def test_creates_all_required_directories(self, project_dir: Path) -> None:
+        """Sprint 10.5: paper/sections removed from generic scaffold."""
         required = [
             "config", "data/raw", "data/processed",
             "outputs/tables", "outputs/figures", "outputs/provenance",
-            "paper/sections", "scripts", "tests", "docs", "notebooks",
+            "scripts", "tests", "docs", "notebooks",
         ]
         for rel in required:
             assert (project_dir / rel).is_dir(), f"Missing directory: {rel}"
+        # paper/sections is AI&P-specific — must NOT be in the generic scaffold
+        assert not (project_dir / "paper" / "sections").exists(), (
+            "paper/sections must not be created by econflow init"
+        )
 
     def test_creates_config_yaml(self, project_dir: Path) -> None:
         cfg_path = project_dir / "config" / "config.yaml"

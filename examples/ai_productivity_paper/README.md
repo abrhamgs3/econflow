@@ -1,22 +1,26 @@
 # AI & Productivity Paper — Replication Package
 
-Replication assets for:
+The original research project that motivated EconFlow's development:
 
 > *AI Adoption and Total Factor Productivity: Panel Evidence from 193 Countries*
+
+This example demonstrates EconFlow running a production-grade research pipeline
+with 13 model specifications, multi-source data ingestion (World Bank, OECD, PWT),
+and a full replication package.  It is one example among many — see
+[`examples/`](../) for others.
+
+---
 
 ## Directory layout
 
 ```
 examples/ai_productivity_paper/
 ├── config/
-│   ├── config.yaml        # Project-level settings (data paths, cache)
-│   ├── models.yaml        # All 13 regression model specifications
+│   ├── config.yaml        # Project-level settings (data sources, variables)
+│   ├── models.yaml        # 13 regression model specifications
 │   └── outputs.yaml       # Output directories and filenames
 ├── app/
 │   └── streamlit_app.py   # Interactive four-tab research dashboard
-├── data/
-│   └── demo/
-│       └── panel_demo.csv # Synthetic 30-country demo dataset (not included in repo)
 └── reference_outputs/     # Frozen paper-version outputs for regression testing
     ├── data/
     ├── figures/
@@ -25,29 +29,34 @@ examples/ai_productivity_paper/
     └── manifest.yaml
 ```
 
+---
+
 ## Quick start
 
 ```bash
 # Install EconFlow
 pip install -e .
 
-# Launch the interactive dashboard
-streamlit run examples/ai_productivity_paper/app/streamlit_app.py
+# Validate the paper configuration
+econflow validate examples/ai_productivity_paper/config/
 
-# Run with custom data
-econflow run --data path/to/panel_clean.csv \
-             --config examples/ai_productivity_paper/config/config.yaml
+# Run the pipeline with the paper configuration
+econflow run \
+    --config  examples/ai_productivity_paper/config/config.yaml \
+    --models  examples/ai_productivity_paper/config/models.yaml \
+    --outputs examples/ai_productivity_paper/config/outputs.yaml
 ```
+
+For the interactive dashboard:
+
+```bash
+streamlit run examples/ai_productivity_paper/app/streamlit_app.py
+```
+
+---
 
 ## Configuration files
 
 | File | Purpose |
 |------|---------|
-| `config/config.yaml` | Data sources (WDI, OECD, PWT), cache directory, logging |
-| `config/models.yaml` | 13 model specifications with estimators and controls |
-| `config/outputs.yaml` | Output paths and filenames for tables, figures, paper sections |
-
-## Reference outputs
-
-`reference_outputs/` contains the frozen outputs from the published paper run.
-These are used by `tests/regression/` to ensure the pipeline is reproducible.
+| `config/config.y

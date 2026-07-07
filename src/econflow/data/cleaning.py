@@ -1,9 +1,13 @@
 """
 Sample-selection and coverage diagnostics.
 
-These functions answer the question: "Is the sub-sample of country-years with
-AI data representative of the full panel?"  The answer goes into the paper's
-sample-selection table.
+These functions compare the sub-sample of observations with non-missing values
+for a given indicator against the rest of the panel — useful for assessing
+selection bias in any panel study.
+
+Note: This module was originally written for the AI & Productivity paper
+(indicator_col defaults historically assumed ``"ln_ai"``).  All paper-specific
+defaults have been removed; callers must pass ``indicator_col`` explicitly.
 """
 
 from __future__ import annotations
@@ -22,20 +26,24 @@ log = get_logger(__name__)
 
 def sample_selection_summary(
     df: pd.DataFrame,
-    indicator_col: str = "ln_ai",
+    indicator_col: str,
     compare_cols: list[str] | None = None,
+    entity_col: str = "entity",
 ) -> pd.DataFrame:
-    """Compare country-years with vs. without AI data on key observables.
+    """Compare observations with vs. without a given indicator across a panel.
 
     Parameters
     ----------
     df:
-        Panel DataFrame (country × year rows, not yet multi-indexed).
+        Panel DataFrame (entity × time rows, not yet multi-indexed).
     indicator_col:
-        The AI variable whose missingness defines in- vs. out-of-sample.
+        The variable whose missingness defines in- vs. out-of-sample.
+        **Required** — must be passed explicitly (no default).
     compare_cols:
-        Columns to compare across groups.  Defaults to governance and income
-        indicators available in the panel.
+        Columns to compare across groups.  Defaults to all numeric columns
+        present in the DataFrame other than ``indicator_col``.
+    entity_col:
+        Name of the cross-sectional identifier column (default: ``"entity"``).
 
     Returns
     -------
@@ -46,21 +54,25 @@ def sample_selection_summary(
 
         DataFrame-level ``.attrs`` carries aggregate counts:
         ``in_sample_rows``, ``out_of_sample_rows``,
-        ``in_sample_countries``, ``out_of_sample_countries``.
+        ``in_sample_entities``, ``out_of_sample_entities``.
     """
-    compare_cols = compare_cols or ["ln_gdp", "ln_hc", "population", "rule_law", "gov_effect"]
+    if compare_cols is None:
+        compare_cols = [
+            c for c in df.select_dtypes("number").columns
+            if c != indicator_col
+        ]
     compare_cols = [c for c in compare_cols if c in df.columns]
 
     in_sample = df[df[indicator_col].notna()]
     out_sample = df[df[indicator_col].isna()]
 
     log.info(
-        "Sample split on '%s': in=%d rows (%d countries), out=%d rows (%d countries)",
+        "Sample split on '%s': in=%d rows (%d entities), out=%d rows (%d entities)",
         indicator_col,
         len(in_sample),
-        in_sample["country"].nunique() if "country" in in_sample.columns else 0,
+        in_sample[entity_col].nunique() if entity_col in in_sample.columns else 0,
         len(out_sample),
-        out_sample["country"].nunique() if "country" in out_sample.columns else 0,
+        out_sample[entity_col].nunique() if entity_col in out_sample.columns else 0,
     )
 
     rows = []
@@ -80,19 +92,24 @@ def sample_selection_summary(
     summary = pd.DataFrame(rows)
     summary.attrs["in_sample_rows"] = int(len(in_sample))
     summary.attrs["out_of_sample_rows"] = int(len(out_sample))
-    summary.attrs["in_sample_countries"] = (
-        int(in_sample["country"].nunique()) if "country" in in_sample.columns else 0
+    # Generic entity count — use entity_col, not hardcoded "country"
+    summary.attrs["in_sample_entities"] = (
+        int(in_sample[entity_col].nunique()) if entity_col in in_sample.columns else 0
     )
-    summary.attrs["out_of_sample_countries"] = (
-        int(out_sample["country"].nunique()) if "country" in out_sample.columns else 0
+    summary.attrs["out_of_sample_entities"] = (
+        int(out_sample[entity_col].nunique()) if entity_col in out_sample.columns else 0
     )
+    # Legacy keys kept for backward compatibility with code reading "in_sample_countries"
+    summary.attrs["in_sample_countries"] = summary.attrs["in_sample_entities"]
+    summary.attrs["out_of_sample_countries"] = summary.attrs["out_of_sample_entities"]
     return summary
 
 
 def sample_selection_summary_typed(
     df: pd.DataFrame,
-    indicator_col: str = "ln_ai",
+    indicator_col: str,
     compare_cols: list[str] | None = None,
+    entity_col: str = "entity",
 ) -> tuple[pd.DataFrame, SelectionSummary]:
     """Like :func:`sample_selection_summary` but also returns a typed
     :class:`~econflow.datasets.types.SelectionSummary`.
@@ -109,7 +126,7 @@ def sample_selection_summary_typed(
     from econflow.datasets.types import SelectionSummary  # noqa: PLC0415
 
     summary_df = sample_selection_summary(
-        df, indicator_col=indicator_col, compare_cols=compare_cols
+        df, indicator_col=indicator_col, compare_cols=compare_cols, entity_col=entity_col
     )
     sel = SelectionSummary(
         in_sample_rows=int(summary_df.attrs.get("in_sample_rows", 0)),

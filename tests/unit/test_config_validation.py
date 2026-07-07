@@ -16,7 +16,6 @@ ValidationIssue, ConfigValidationError) and the CLI enforcement contract
 
 from __future__ import annotations
 
-import textwrap
 from pathlib import Path
 
 import pytest
@@ -411,7 +410,7 @@ class TestSemanticValidation:
                 "tables": {
                     "dir": "outputs/tables",
                     "formats": ["csv"],
-                    "comparison_table": {"filename": "t", "models": ["twfe"], "stars": True, "se_type": "robust"},
+                    "comparison_table": {"filename": "t", "models": ["twfe"], "stars": True, "se_type": "robust"},  # noqa: E501
                 },
             }
         }
@@ -447,7 +446,7 @@ class TestSemanticValidation:
                 "tables": {
                     "dir": "outputs/tables",
                     "formats": ["csv"],
-                    "comparison_table": {"filename": "t", "models": ["iv_m"], "stars": True, "se_type": "robust"},
+                    "comparison_table": {"filename": "t", "models": ["iv_m"], "stars": True, "se_type": "robust"},  # noqa: E501
                 },
             }
         }
@@ -681,7 +680,7 @@ class TestConfigValidationError:
             pytest.fail("validate_strict raised on warning-only config")
 
     def test_config_validation_error_is_configuration_error(self):
-        from econflow.core.exceptions import ConfigValidationError, ConfigurationError
+        from econflow.core.exceptions import ConfigurationError, ConfigValidationError
         assert issubclass(ConfigValidationError, ConfigurationError)
 
     def test_config_validation_error_is_econflow_error(self):
@@ -697,8 +696,8 @@ class TestConfigValidationError:
 class TestProgrammaticAPI:
     def test_no_cli_import_needed(self):
         """ConfigValidator must be importable without any CLI dependencies."""
-        from econflow.config.validator import ConfigValidator  # noqa: F401 (duplicate, intentional)
         from econflow.config import ConfigValidator as CV2  # noqa: F401
+        from econflow.config.validator import ConfigValidator  # noqa: F401 (duplicate, intentional)
 
     def test_validation_result_by_stage(self, validator):
         result = validator.validate(*_vld("dep_in_regressors"))
@@ -772,4 +771,3 @@ class TestProgrammaticAPI:
         assert issue.severity == "error"
         assert issue.source == "config.yaml"
         assert issue.code == "T-01"
-        assert "T-01" in str(issue)

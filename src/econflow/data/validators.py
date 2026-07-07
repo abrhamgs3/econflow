@@ -29,13 +29,22 @@ from econflow.logging import get_logger
 
 log = get_logger(__name__)
 
-# Default required columns (reference implementation: AI & Productivity paper).
-# Pass a different list to validate_data() to use a custom schema.
-DEFAULT_REQUIRED_COLUMNS: list[str] = [
+# Default required columns for the generic platform — intentionally empty.
+# Pass an explicit required_columns list to validate_data() to enforce your schema.
+# EconFlow is paper-agnostic; the specific columns depend entirely on your dataset.
+DEFAULT_REQUIRED_COLUMNS: list[str] = []
+
+# ---------------------------------------------------------------------------
+# AI & Productivity paper column list — kept for reference and backward compat.
+# This is NOT the default.  It is the schema of the paper that motivated
+# EconFlow's development.  Do not use this in new projects.
+# ---------------------------------------------------------------------------
+_AI_PRODUCTIVITY_REQUIRED_COLUMNS: list[str] = [
     "country", "year", "ln_ai", "ln_tfp", "ln_hc", "ln_gdp"
 ]
 
-# Deprecated alias kept for backward compatibility — use DEFAULT_REQUIRED_COLUMNS.
+# Deprecated alias.  Code that imported REQUIRED_COLUMNS before v0.1.0 should
+# switch to an explicit list passed to validate_data().  Removed in v0.3.0.
 REQUIRED_COLUMNS = DEFAULT_REQUIRED_COLUMNS
 
 
