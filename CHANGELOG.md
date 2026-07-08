@@ -1,5 +1,27 @@
 # Changelog
 
+## [Unreleased] — Sprint 11D: End-to-End Acceptance Test
+
+### Added
+- `econflow doctor` now checks whether `~/.local/bin` is on `PATH` (EXT-07) and
+  prints the exact `export PATH=...` fix for Linux/macOS users after pip install.
+- `econflow validate --data` now prints a data summary line after the data stage
+  passes: `Data loaded: N rows · E entities · T time periods`.
+- `econflow certify` auto-detects data paths and config from
+  `outputs/provenance/run_metadata.json` when `--data` / `--config` are omitted.
+- `econflow package` auto-detects `outputs/certificate.json` and all `config/*.yaml`
+  files when the corresponding flags are omitted.
+- `econflow init` scaffold now includes `markdown` in the default output formats
+  (was `["csv", "latex"]`; now `["csv", "latex", "markdown"]`).
+- Replication package `README.md` now includes the `econflow run` step in its
+  "How to Replicate" section.
+- `docs/release/USER_JOURNEY_VALIDATION.md` — full acceptance-test report.
+
+### Changed
+- `econflow init` config scaffold: placeholder column names now have `# ACTION REQUIRED`
+  comments with concrete examples; `models.yaml` dependent/regressors annotated with
+  `# ← replace with …`; next-steps message updated to name the placeholders explicitly.
+
 All notable changes to this project will be documented here.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).

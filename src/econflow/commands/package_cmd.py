@@ -56,6 +56,30 @@ def run_package(
 
     pkg = ReplicationPackage(output_dir, overwrite=overwrite)
 
+    # ---- Auto-detect certificate -----------------------------------------
+    if certificate_path is None:
+        _default_cert = Path("outputs/certificate.json")
+        if _default_cert.exists():
+            certificate_path = _default_cert
+            console.print(
+                f"  [dim]Auto-detected certificate: {_default_cert}[/dim]"
+            )
+
+    # ---- Auto-detect config files ----------------------------------------
+    if not config_paths:
+        _cfg_dir = Path("config")
+        _auto_configs = [
+            _cfg_dir / "config.yaml",
+            _cfg_dir / "models.yaml",
+            _cfg_dir / "outputs.yaml",
+        ]
+        detected = [p for p in _auto_configs if p.exists()]
+        if detected:
+            config_paths = detected
+            console.print(
+                f"  [dim]Auto-detected {len(detected)} config file(s) from config/[/dim]"
+            )
+
     # ---- Certificate ----------------------------------------------------
     if certificate_path is not None:
         if not certificate_path.exists():

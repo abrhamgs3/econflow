@@ -57,6 +57,33 @@ def run_certify(
     console.rule("[bold]EconFlow certify[/bold]")
     console.print()
 
+    # ---- Auto-detect run context from provenance if not supplied ----------
+    run_meta_path = Path("outputs/provenance/run_metadata.json")
+    if run_meta_path.exists() and (not data_paths or not project_name):
+        try:
+            import json
+            meta = json.loads(run_meta_path.read_text())
+            if not project_name:
+                project_name = meta.get("project_name") or project_name
+            if not data_paths:
+                raw_inputs = meta.get("inputs", {})
+                detected = [
+                    Path(v) for v in raw_inputs.values()
+                    if isinstance(v, str) and v.endswith(".csv") and Path(v).exists()
+                ]
+                if detected:
+                    data_paths = detected
+                    console.print(
+                        f"  [dim]Auto-detected {len(data_paths)} data file(s) "
+                        f"from {run_meta_path}[/dim]"
+                    )
+            if config_path is None:
+                detected_cfg = meta.get("config_path")
+                if detected_cfg and Path(detected_cfg).exists():
+                    config_path = Path(detected_cfg)
+        except Exception:
+            pass  # silently skip — user can supply flags manually
+
     # ---- Fingerprint data paths ------------------------------------------
     missing = [str(p) for p in data_paths if not p.exists()]
     if missing:

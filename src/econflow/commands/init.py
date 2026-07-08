@@ -84,17 +84,19 @@ data:
   # The default value points one level up into the project root data/ folder.
   path: "../data/processed/panel.csv"
 
-  # Column names for the two panel dimensions
-  entity_col: "entity"   # cross-sectional unit (firm, country, individual, ...)
-  time_col:   "time"     # time period identifier (year, quarter, month, ...)
+  # *** ACTION REQUIRED: Replace placeholder names with your actual CSV column names ***
+  # Run `econflow datasets` to explore built-in datasets with real column names.
+  # Tip: open data/processed/panel.csv and check the header row.
+  entity_col: "entity"   # cross-sectional unit column (e.g. "country", "firm", "id")
+  time_col:   "time"     # time period column  (e.g. "year", "quarter", "date")
 
-  # EconFlow will check that all of these columns exist in the CSV
+  # List every column your models reference — EconFlow checks these exist in the CSV
   required_columns:
-    - "entity"
-    - "time"
-    - "outcome"
-    - "treatment"
-    - "covariate_1"
+    - "entity"    # ← must match entity_col above
+    - "time"      # ← must match time_col above
+    - "outcome"   # ← your dependent variable
+    - "treatment" # ← your key regressor
+    - "covariate_1"  # ← additional controls; add or remove lines as needed
 
 # ------------------------------------------------------------
 # Variables — define your outcome and regressors
@@ -137,8 +139,8 @@ models:
   - id:            "pooled_ols"
     label:         "Pooled OLS"
     estimator:     "OLS"
-    dependent:     "outcome"
-    regressors:    ["treatment", "covariate_1"]
+    dependent:     "outcome"      # ← replace with your actual outcome column name
+    regressors:    ["treatment", "covariate_1"]  # ← replace with your regressor names
     entity_effects: false
     time_effects:   false
     description: >
@@ -189,8 +191,8 @@ outputs:
   base_dir: "../outputs"
 
   tables:
-    # Supported formats: csv, latex
-    formats: ["csv", "latex"]
+    # Supported formats: csv, latex, markdown, html, json
+    formats: ["csv", "latex", "markdown"]
 
     comparison_table:
       # Output filename (without extension — both .csv and .tex will be written)
@@ -570,7 +572,10 @@ def run_init(
     console.rule("[bold green]Project ready[/bold green]")
     console.print(f"\n  Project [cyan]{name}[/cyan] created at [dim]{directory}[/dim]\n")
     console.print("  Next steps:\n")
-    console.print("    1. Edit [bold]config/config.yaml[/bold] -- set data path and variable names")
+    console.print(
+        "    1. Edit [bold]config/config.yaml[/bold] -- replace placeholder column "
+        "names (entity, time, outcome, treatment, covariate_1) with your CSV column names"
+    )
     console.print("    2. Add your data to [bold]data/raw/[/bold]")
     console.print(
         "    3. Implement [bold]scripts/01_download_data.py[/bold]"

@@ -350,10 +350,12 @@ def _build_readme(
         "   ```",
     ]
 
+    # Step 2: run scripts or econflow run
+    step = 2
     if manifest.get("scripts"):
         sections += [
             "",
-            "2. Run the scripts in order:",
+            f"{step}. Run the scripts in order:",
             "   ```bash",
         ]
         for entry in manifest["scripts"]:
@@ -361,10 +363,23 @@ def _build_readme(
             sections.append(f"   # {label}")
             sections.append(f"   python {entry['dest']}")
         sections.append("   ```")
+        step += 1
+    elif manifest.get("configs"):
+        sections += [
+            "",
+            f"{step}. Run the analysis pipeline:",
+            "   ```bash",
+            "   econflow run \\",
+            "       --config  config/config.yaml \\",
+            "       --models  config/models.yaml \\",
+            "       --outputs config/outputs.yaml",
+            "   ```",
+        ]
+        step += 1
 
     sections += [
         "",
-        "3. Verify against the certificate:",
+        f"{step}. Verify against the certificate:",
         "   ```bash",
         "   econflow verify --baseline certificate.json",
         "   ```",

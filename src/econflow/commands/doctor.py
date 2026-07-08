@@ -412,6 +412,24 @@ def _run_external_checks() -> list[EnvCheck]:
             ),
         ))
 
+    # PATH check — warn if ~/.local/bin is not on PATH (common on Linux after pip install --user)
+    local_bin = os.path.join(os.path.expanduser("~"), ".local", "bin")
+    path_dirs = os.environ.get("PATH", "").split(os.pathsep)
+    if sys.platform != "win32" and local_bin not in path_dirs:
+        checks.append(EnvCheck(
+            code="EXT-07",
+            label="~/.local/bin on PATH",
+            status="warn",
+            detail=(
+                f"{local_bin} is not on your PATH.  "
+                "The 'econflow' script installed here may not be found."
+            ),
+            fix=(
+                "Add to your shell profile:  "
+                f'export PATH="{local_bin}:$PATH"'
+            ),
+        ))
+
     return checks
 
 

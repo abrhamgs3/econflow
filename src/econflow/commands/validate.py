@@ -134,6 +134,26 @@ def run_validate(
         config_path, models_path, outputs_path, check_data=check_data
     )
 
+    # -- Data preview (show even if no errors, so user knows the file was read) --
+    if check_data and result.project_cfg is not None:
+        try:
+            import pandas as pd
+            data_path = config_path.parent / result.project_cfg.data.path
+            entity_col = result.project_cfg.data.entity_col
+            time_col   = result.project_cfg.data.time_col
+            df = pd.read_csv(data_path)
+            n_obs      = len(df)
+            n_entities = df[entity_col].nunique() if entity_col in df.columns else "?"
+            n_periods  = df[time_col].nunique()   if time_col  in df.columns else "?"
+            console.print(
+                f"  [dim]Data loaded:[/dim] {n_obs:,} rows · "
+                f"{n_entities} {escape(entity_col)}s · "
+                f"{n_periods} {escape(time_col)}s"
+            )
+            console.print()
+        except Exception:
+            pass  # silently skip if anything goes wrong
+
     all_stage_keys = ["yaml_syntax", "schema", "semantic", "cross_file"]
     if check_data:
         all_stage_keys.append("data")
