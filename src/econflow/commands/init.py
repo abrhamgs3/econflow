@@ -79,8 +79,10 @@ project:
 # Data — point to your processed panel CSV
 # ------------------------------------------------------------
 data:
-  # Path to the processed panel CSV (relative to this config file's directory)
-  path: "data/processed/panel.csv"
+  # Path to the processed panel CSV.
+  # Paths are relative to this config file's directory (config/).
+  # The default value points one level up into the project root data/ folder.
+  path: "../data/processed/panel.csv"
 
   # Column names for the two panel dimensions
   entity_col: "entity"   # cross-sectional unit (firm, country, individual, ...)
@@ -181,8 +183,10 @@ _OUTPUTS_YAML = """\
 # Controls where results are written and in which formats.
 
 outputs:
-  # All outputs are placed under this directory (relative to project root)
-  base_dir: "outputs"
+  # All outputs are placed under this directory.
+  # Relative to this config file's directory (config/); '../outputs' resolves
+  # to the project root outputs/ folder.
+  base_dir: "../outputs"
 
   tables:
     # Supported formats: csv, latex
@@ -572,9 +576,12 @@ def run_init(
         "    3. Implement [bold]scripts/01_download_data.py[/bold]"
         " and [bold]scripts/02_clean_data.py[/bold]"
     )
-    console.print("    4. Run [bold]econflow validate[/bold] to check configuration")
     console.print(
-        "    5. Run [bold]econflow run --config config/config.yaml ...[/bold] to estimate"
+        "    4. Run [bold]econflow validate config/[/bold] to check configuration"
+    )
+    console.print(
+        "    5. Run [bold]econflow run --config config/config.yaml"
+        " --models config/models.yaml --outputs config/outputs.yaml[/bold] to estimate"
     )
     console.print()
 

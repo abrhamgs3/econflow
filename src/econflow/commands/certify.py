@@ -129,7 +129,15 @@ def run_certify(
     console.print(f"  Status:     {status_fmt}")
     console.print(f"  Cert ID:    [dim]{cert.certificate_id}[/dim]")
     git_commit = cert.environment.git.get("commit") or "(none)"
+    git_dirty = cert.environment.git.get("dirty", False)
     console.print(f"  Git commit: [dim]{git_commit[:12]}[/dim]")
+    if git_dirty:
+        console.print(
+            "  [bold yellow]⚠  Dirty working tree:[/bold yellow] your working directory\n"
+            "     has uncommitted changes.  For a fully reproducible certificate,\n"
+            "     commit or stash all changes before running [bold]econflow certify[/bold].\n"
+            "     This flag is recorded in the certificate so reviewers are aware."
+        )
     console.print(f"  Data files: {len(cert.data)}")
     console.print(f"  Checks run: {len(cert.check_results)}")
     console.print()
@@ -151,22 +159,3 @@ def _print_check_summary(
 
     table = Table(show_header=True, header_style="bold", box=None, padding=(0, 1))
     table.add_column("Check")
-    table.add_column("Status", width=8)
-    table.add_column("Message")
-
-    status_fmt = {
-        "pass": "[green]pass[/green]",
-        "warn": "[yellow]warn[/yellow]",
-        "fail": "[red]fail[/red]",
-        "skip": "[dim]skip[/dim]",
-    }
-
-    for r in results:
-        table.add_row(
-            r.name,
-            status_fmt.get(r.status, r.status),
-            r.message[:80] if r.message else "",
-        )
-
-    console.print(table)
-    console.print()

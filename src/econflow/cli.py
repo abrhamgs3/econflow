@@ -658,7 +658,13 @@ def report(
         help="Path to project config.yaml.",
     ),
 ) -> None:
-    """Render a PublicationBundle from the last pipeline run.
+    """[beta] Render a PublicationBundle from the last pipeline run.
+
+    NOTE: This command is a beta feature.  'econflow run' already writes
+    tables to the outputs/tables/ directory defined in outputs.yaml.
+    Use those files for publication tables.  This command provides an
+    additional publication bundle format and will be fully integrated
+    in a future release.
 
     Writes tables (CSV, LaTeX, Markdown, HTML) and figures (JSON) into
     a structured directory.  Run 'econflow run' first to generate

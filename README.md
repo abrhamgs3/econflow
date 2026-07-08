@@ -26,16 +26,21 @@ any panel study, regardless of dataset, discipline, or research question.
 
 ## Installation
 
-```bash
-pip install econflow
-```
-
-For development:
+EconFlow is not yet published to PyPI. Install directly from source:
 
 ```bash
 git clone https://github.com/abrhamgs3/econflow.git
 cd econflow
 pip install -e ".[dev]"
+```
+
+This installs EconFlow in editable mode with all dependencies, including
+`linearmodels`, `pandas`, `rich`, `pydantic`, and `pytest`.
+
+Verify the installation:
+
+```bash
+econflow doctor
 ```
 
 ---
@@ -142,15 +147,4 @@ econflow release-check  Run the release quality gate
 ## Testing
 
 ```bash
-pytest                   # full suite
-pytest tests/unit/       # unit tests only
-pytest tests/integration/ # integration tests
-```
-
----
-
-## Examples
-
-| Example | Description |
-|---------|-------------|
-| [`examples/ge
+pytest    

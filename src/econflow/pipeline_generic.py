@@ -304,13 +304,25 @@ def _write_latex(
     header = " & ".join(header_cells) + " \\\\"
 
     def _tex_escape(s: str) -> str:
-        return (
-            s.replace("R² within", "$R^2$ within")
-             .replace("***", "$^{***}$")
-             .replace("**", "$^{**}$")
-             .replace("*", "$^{*}$")
-             .replace("—", "---")
-        )
+        """Escape a table cell value for LaTeX.
+
+        Significance stars are converted in a single regex pass to avoid
+        the cascade problem: replacing '***' → '$^{***}$' then '**' on
+        the already-replaced string would corrupt the output.
+        """
+        import re
+
+        # Non-star substitutions first
+        s = s.replace("R² within", "$R^2$ within").replace("—", "---")
+
+        # Single-pass star replacement — longest match wins (re.sub is greedy)
+        _STAR_MAP = {3: "$^{***}$", 2: "$^{**}$", 1: "$^{*}$"}
+
+        def _star_sub(m: re.Match) -> str:
+            n = min(len(m.group()), 3)
+            return _STAR_MAP[n]
+
+        return re.sub(r"\*+", _star_sub, s)
 
     lines = [
         "\\begin{table}[htbp]",
