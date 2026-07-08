@@ -61,7 +61,29 @@ Status = Literal["pass", "fail", "warn", "skip"]
 
 @dataclass
 class CheckResult:
-    """Result of one quality gate check."""
+    """Result of one EconFlow Release Quality Gate check (QG-01 … QG-09).
+
+    Attributes
+    ----------
+    id : str
+        Gate identifier, e.g. ``"QG-01"``.
+    name : str
+        Short slug used in JSON output, e.g. ``"package_build"``.
+    label : str
+        Human-readable title shown in the release report.
+    status : Status
+        One of ``"pass"``, ``"warn"``, ``"fail"``, or ``"skip"``.
+    severity : Severity
+        ``"blocker"`` checks must pass for the gate to succeed.
+    detail : str
+        One-line outcome string shown alongside the status icon.
+    fix : str
+        Actionable hint shown when the check fails.
+    duration_ms : float
+        Wall-clock time taken by the check in milliseconds.
+    sub_results : list[dict]
+        Optional per-step breakdown for checks that run multiple sub-tasks.
+    """
 
     id: str                   # QG-01 … QG-09
     name: str                 # short slug

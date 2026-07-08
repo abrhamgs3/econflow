@@ -30,6 +30,20 @@ Optional Python packages
   [OPT-04]  jupyter        — notebook support
   [OPT-05]  streamlit      — interactive dashboard
 
+Project structure (when inside an EconFlow project)
+  [PRJ-00]  config/ directory present (advisory)
+  [PRJ-01]  config/config.yaml present
+  [PRJ-02]  config/models.yaml present
+  [PRJ-03]  config/outputs.yaml present
+  [PRJ-04]  data/processed/ directory present
+  [PRJ-05]  outputs/tables/ directory present
+
+Configuration validation (when config files found)
+  [CFG-01]  config.yaml -- YAML syntax valid
+  [CFG-02]  models.yaml -- YAML syntax valid
+  [CFG-03]  outputs.yaml -- YAML syntax valid
+  [CFG-04]  Schema + semantic validation (via ConfigValidator)
+
 Exit codes
 ----------
 0   All required checks pass (warnings allowed)
@@ -61,7 +75,21 @@ Status = Literal["pass", "warn", "fail", "info"]
 
 @dataclass
 class EnvCheck:
-    """Result of a single environment check."""
+    """Result of a single environment check produced by ``econflow doctor``.
+
+    Attributes
+    ----------
+    code : str
+        Short unique identifier, e.g. ``"SYS-01"``, ``"PKG-03"``.
+    label : str
+        Human-readable check name shown in the health report table.
+    status : Status
+        One of ``"pass"``, ``"warn"``, ``"fail"``, or ``"skip"``.
+    detail : str
+        Version string, path, or other diagnostic detail to display.
+    fix : str
+        Actionable hint shown when ``status`` is ``"fail"`` or ``"warn"``.
+    """
 
     code: str
     label: str
@@ -410,6 +438,164 @@ def _run_optional_checks() -> list[EnvCheck]:
     return checks
 
 
+
+
+# ---------------------------------------------------------------------------
+# Project structure check
+# ---------------------------------------------------------------------------
+
+_PROJECT_FILES = [
+    ("config/config.yaml",  "PRJ-01", "config.yaml",  True),
+    ("config/models.yaml",  "PRJ-02", "models.yaml",  True),
+    ("config/outputs.yaml", "PRJ-03", "outputs.yaml", True),
+]
+
+_PROJECT_DIRS = [
+    ("data/processed", "PRJ-04", "data/processed/"),
+    ("outputs/tables", "PRJ-05", "outputs/tables/"),
+]
+
+
+def _run_project_checks(cwd=None):
+    """Check whether the current directory is an EconFlow project.
+
+    These checks are advisory -- doctor exits 0 even when no project is found,
+    because it is valid to run ``econflow doctor`` outside any project directory.
+
+    Parameters
+    ----------
+    cwd:
+        Directory to inspect.  Defaults to ``Path.cwd()``.
+    """
+    import pathlib
+
+    root = pathlib.Path(cwd) if cwd else pathlib.Path.cwd()
+    checks = []
+
+    config_dir = root / "config"
+    if not config_dir.is_dir():
+        checks.append(EnvCheck(
+            code="PRJ-00",
+            label="EconFlow project",
+            status="info",
+            detail=f"No config/ directory in {root} -- not inside an EconFlow project",
+            fix="Run: econflow init <name>  to scaffold a new project",
+        ))
+        return checks
+
+    for rel_path, code, label, required in _PROJECT_FILES:
+        path = root / rel_path
+        if path.exists():
+            checks.append(EnvCheck(
+                code=code,
+                label=label,
+                status="pass",
+                detail=str(path.relative_to(root)),
+            ))
+        else:
+            checks.append(EnvCheck(
+                code=code,
+                label=label,
+                status="warn" if required else "info",
+                detail=f"{rel_path} not found",
+                fix="Run: econflow init --force  to recreate missing scaffold files",
+            ))
+
+    for rel_path, code, label in _PROJECT_DIRS:
+        path = root / rel_path
+        checks.append(EnvCheck(
+            code=code,
+            label=label,
+            status="pass" if path.is_dir() else "warn",
+            detail=str(path.relative_to(root)) if path.is_dir() else f"{rel_path}/ not found",
+            fix="" if path.is_dir() else "Run: econflow init --force  to recreate scaffold",
+        ))
+
+    return checks
+
+
+# ---------------------------------------------------------------------------
+# Configuration validation check
+# ---------------------------------------------------------------------------
+
+def _run_config_checks(cwd=None):
+    """Validate YAML syntax and basic schema of configuration files.
+
+    Only runs when config/config.yaml exists in *cwd*.
+
+    Parameters
+    ----------
+    cwd:
+        Directory to inspect.  Defaults to ``Path.cwd()``.
+    """
+    import pathlib
+
+    root = pathlib.Path(cwd) if cwd else pathlib.Path.cwd()
+    config_path  = root / "config" / "config.yaml"
+    models_path  = root / "config" / "models.yaml"
+    outputs_path = root / "config" / "outputs.yaml"
+    checks = []
+
+    if not config_path.exists():
+        return checks
+
+    import yaml as _yaml
+
+    for path, code, label in [
+        (config_path,  "CFG-01", "config.yaml syntax"),
+        (models_path,  "CFG-02", "models.yaml syntax"),
+        (outputs_path, "CFG-03", "outputs.yaml syntax"),
+    ]:
+        if not path.exists():
+            continue
+        try:
+            with open(path, encoding="utf-8") as fh:
+                _yaml.safe_load(fh)
+            checks.append(EnvCheck(code=code, label=label, status="pass", detail="valid YAML"))
+        except _yaml.YAMLError as exc:
+            checks.append(EnvCheck(
+                code=code,
+                label=label,
+                status="fail",
+                detail=str(exc).split("\n")[0],
+                fix=f"Fix the YAML syntax error in {path.name}",
+            ))
+
+    try:
+        from econflow.config.validator import ConfigValidator
+
+        result = ConfigValidator().validate(
+            config_path=config_path,
+            models_path=models_path,
+            outputs_path=outputs_path,
+        )
+        n_err  = result.error_count()
+        n_warn = result.warning_count()
+
+        if n_err == 0:
+            checks.append(EnvCheck(
+                code="CFG-04",
+                label="Schema + semantic validation",
+                status="pass",
+                detail=f"0 errors, {n_warn} warning(s)",
+            ))
+        else:
+            first = next(
+                (f.message for f in result.findings if f.severity == "error"),
+                "see econflow validate for details",
+            )
+            checks.append(EnvCheck(
+                code="CFG-04",
+                label="Schema + semantic validation",
+                status="fail",
+                detail=f"{n_err} error(s): {first}",
+                fix="Run: econflow validate  for the full report",
+            ))
+    except Exception:
+        pass
+
+    return checks
+
 # ---------------------------------------------------------------------------
 # Rendering
 # ---------------------------------------------------------------------------
@@ -447,14 +633,24 @@ def _render(checks: list[EnvCheck], title: str, console: Console) -> None:
 # Public entry point
 # ---------------------------------------------------------------------------
 
-def run_doctor(console: Console) -> int:
-    """
-    Run all environment checks and render a health report.
+def run_doctor(console, cwd=None):
+    """Run all environment checks and render a health report.
+
+    Sections:
+
+    - **System** -- Python version, OS, CPU, RAM
+    - **Core packages** -- all packages required to run the pipeline
+    - **External tools** -- git, LaTeX, pandoc, pip, uv
+    - **Optional packages** -- pytest, ruff, pyarrow, jupyter, streamlit
+    - **Project structure** -- config files and data directory
+    - **Configuration** -- YAML syntax + schema validation (when config found)
 
     Parameters
     ----------
     console:
         Rich console for output.
+    cwd:
+        Working directory for project checks.  Defaults to ``Path.cwd()``.
 
     Returns
     -------
@@ -468,13 +664,21 @@ def run_doctor(console: Console) -> int:
     package_checks  = _run_package_checks()
     external_checks = _run_external_checks()
     optional_checks = _run_optional_checks()
+    project_checks  = _run_project_checks(cwd)
+    config_checks   = _run_config_checks(cwd)
 
     _render(system_checks,   "System",            console)
     _render(package_checks,  "Core packages",     console)
     _render(external_checks, "External tools",    console)
     _render(optional_checks, "Optional packages", console)
+    _render(project_checks,  "Project structure", console)
+    if config_checks:
+        _render(config_checks, "Configuration",   console)
 
-    all_checks = system_checks + package_checks + external_checks + optional_checks
+    all_checks = (
+        system_checks + package_checks + external_checks
+        + optional_checks + project_checks + config_checks
+    )
     n_fail = sum(1 for c in all_checks if c.status == "fail")
     n_warn = sum(1 for c in all_checks if c.status == "warn")
     n_pass = sum(1 for c in all_checks if c.status == "pass")

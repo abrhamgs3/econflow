@@ -29,7 +29,31 @@ import pandas as pd
 
 @dataclass
 class IndicatorQuality:
-    """Quality metrics for a single indicator."""
+    """Quality metrics for a single panel data indicator column.
+
+    Produced by :func:`compute_quality_report` and collected into a
+    :class:`QualityReport`.  Used by ``econflow validate --data`` to surface
+    data quality issues before the pipeline runs.
+
+    Attributes
+    ----------
+    name : str
+        Column name of the indicator in the panel DataFrame.
+    n_obs : int
+        Total number of rows (entity × time observations).
+    n_missing : int
+        Number of rows where this indicator is NaN.
+    missing_pct : float
+        ``n_missing / n_obs * 100``.
+    n_countries : int
+        Number of unique entity IDs with at least one non-missing value.
+    n_years : int
+        Number of unique time periods with at least one non-missing value.
+    n_implausible : int
+        Rows flagged as implausible by domain-specific range checks.
+    flags : list[str]
+        Human-readable warning strings (e.g. ``"high missingness"``).
+    """
 
     name: str
     n_obs: int = 0

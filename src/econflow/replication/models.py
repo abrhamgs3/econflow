@@ -27,7 +27,21 @@ def _utc_now() -> str:
 
 @dataclass
 class ProjectCheck:
-    """Result of a single pre-flight check."""
+    """Result of a single pre-flight check run by ``econflow inspect``.
+
+    Attributes
+    ----------
+    check_id : str
+        Short unique identifier, e.g. ``"cfg-01"``, ``"data-02"``.
+    name : str
+        Human-readable check name.
+    status : {"pass", "warn", "fail", "skip"}
+        Outcome of the check.
+    message : str
+        Summary sentence shown in the inspect report.
+    detail : str
+        Optional extended detail or file path to display.
+    """
 
     check_id: str
     name: str

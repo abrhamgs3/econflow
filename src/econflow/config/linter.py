@@ -92,7 +92,22 @@ Severity = Literal["error", "warning", "info"]
 
 @dataclass
 class LintIssue:
-    """A single linting finding."""
+    """A single linting finding emitted by :class:`ConfigLinter`.
+
+    Instances are collected into :attr:`ConfigLinter.issues` and displayed
+    by ``econflow validate`` with the actionable ``fix`` hint.
+
+    Attributes
+    ----------
+    code : str
+        Rule code, e.g. ``"L-01"``.
+    severity : Severity
+        ``"error"``, ``"warning"``, or ``"info"``.
+    message : str
+        Plain-English description of the problem.
+    fix : str
+        Actionable fix instruction shown to the user.
+    """
 
     code: str
     """Rule code, e.g. ``"L-01"``."""

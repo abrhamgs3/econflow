@@ -361,7 +361,17 @@ class ModelSpec(BaseModel):
 
 
 class ModelsConfig(BaseModel):
-    """Root model for ``models.yaml``."""
+    """Root Pydantic v2 model for ``models.yaml``.
+
+    Validates the ordered list of regression model specifications loaded by
+    :func:`~econflow.config.loader.ConfigLoader`.  At least one model is required.
+
+    Attributes
+    ----------
+    models : list[ModelSpec]
+        Ordered list of regression model specifications.  Each entry ``id``
+        must be unique within this list.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -483,7 +493,18 @@ class FiguresModel(BaseModel):
 
 
 class OutputsBlock(BaseModel):
-    """The ``outputs:`` block in outputs.yaml."""
+    """The ``outputs:`` mapping block in ``outputs.yaml``.
+
+    Controls where EconFlow writes tables, figures, and provenance artefacts.
+
+    Attributes
+    ----------
+    base_dir : str
+        Root directory for all output artefacts.  Subdirectories
+        ``tables/`` and ``figures/`` are created relative to this path.
+    tables : TablesModel
+        Table output settings (directory, formats).
+    """
 
     model_config = ConfigDict(extra="allow")
 
@@ -506,7 +527,16 @@ class OutputsBlock(BaseModel):
 
 
 class OutputsConfig(BaseModel):
-    """Root model for ``outputs.yaml``."""
+    """Root Pydantic v2 model for ``outputs.yaml``.
+
+    Validates the outputs configuration loaded by
+    :func:`~econflow.config.loader.ConfigLoader`.
+
+    Attributes
+    ----------
+    outputs : OutputsBlock
+        All output configuration lives under this top-level key.
+    """
 
     model_config = ConfigDict(extra="forbid")
 

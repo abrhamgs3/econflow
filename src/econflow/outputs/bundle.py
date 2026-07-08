@@ -56,6 +56,18 @@ def _slugify(text: str) -> str:
 
 @dataclass
 class TableEntry:
+    """Internal record pairing a table with its publication slug and format list.
+
+    Attributes
+    ----------
+    table : ReportTable
+        The table data model to render.
+    slug : str
+        Unique filename stem used as the base name for all rendered output files
+        (e.g. ``"table_fe_results"`` → ``table_fe_results.csv``, ``.tex``, …).
+    formats : list[str]
+        Renderer IDs to apply.  Defaults to ``["csv", "latex", "markdown", "html"]``.
+    """
     table: ReportTable
     slug: str
     formats: list[str] = field(default_factory=lambda: ["csv", "latex", "markdown", "html"])
@@ -63,6 +75,15 @@ class TableEntry:
 
 @dataclass
 class FigureEntry:
+    """Internal record pairing a figure with its publication slug.
+
+    Attributes
+    ----------
+    figure : ReportFigure
+        The figure data model to render.
+    slug : str
+        Unique filename stem used as the base name for all rendered figure files.
+    """
     figure: ReportFigure
     slug: str
 

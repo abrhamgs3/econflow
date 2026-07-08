@@ -126,7 +126,35 @@ def main(
         help="Show version and exit.",
     ),
 ) -> None:
-    """EconFlow pipeline CLI."""
+    """EconFlow — reproducible panel econometrics platform.
+
+    Typical workflow for a new project:
+
+    \b
+        # 1. Check your environment
+        econflow doctor
+
+        # 2. Scaffold a new project
+        econflow init my_study
+        cd my_study
+
+        # 3. Validate configuration before running
+        econflow validate config/
+
+        # 4. Run the analysis pipeline
+        econflow run \\
+            --config  config/config.yaml \\
+            --models  config/models.yaml \\
+            --outputs config/outputs.yaml
+
+        # 5. Certify reproducibility
+        econflow certify --project-name "My Study" \\
+            --data data/processed/panel.csv \\
+            --config config/config.yaml
+
+    Run `econflow COMMAND --help` for full documentation on any command.
+    See `docs/user/CLI_GUIDE.md` or `examples/getting_started/` to get started.
+    """
 
 
 # ---------------------------------------------------------------------------
@@ -174,6 +202,32 @@ def init(
         econflow init my_study            # init in ./my_study/
 
         econflow init my_study --force    # overwrite existing files
+
+    Common mistakes:
+
+    \b
+        * Forgetting to cd into the new directory before running other commands.
+          Fix: cd my_study && econflow doctor
+
+        * Using a name with spaces — YAML keys cannot contain spaces.
+          Fix: econflow init my_study_2024  (use underscores, not spaces)
+
+        * Running econflow init twice without --force causes a "not empty" error.
+          Fix: econflow init my_study --force
+
+    Expected output:
+
+    \b
+        EconFlow init — creating project my_study …
+        ✔  config/config.yaml
+        ✔  config/models.yaml
+        ✔  config/outputs.yaml
+        ✔  data/raw/          (empty, for raw downloads)
+        ✔  data/processed/    (empty, place your panel.csv here)
+        ✔  outputs/tables/
+        ✔  README.md
+        Project scaffold complete.
+        Next: cd my_study && econflow doctor
     """
     from econflow.commands.init import run_init
 
@@ -195,10 +249,61 @@ def init(
 def doctor() -> None:
     """Inspect the environment and produce a health report.
 
-    Checks Python version, all required and optional packages,
-    external tools (git, LaTeX, pandoc), and operating system.
+    Checks performed:
+
+    \b
+        System          Python version, OS, CPU, RAM
+        Core packages   pandas, numpy, linearmodels, statsmodels, …
+        External tools  git, LaTeX (pdflatex/xelatex), pandoc, pip, uv
+        Optional        pytest, ruff, pyarrow, jupyter, streamlit
+        Project         config files present, data/outputs directories
+        Configuration   YAML syntax valid, schema + semantic rules pass
 
     Exit code is 0 when all required checks pass (warnings are allowed).
+
+    Examples:
+
+    \b
+        # Check environment from anywhere
+        econflow doctor
+
+        # Check environment inside a project
+        cd my_study
+        econflow doctor
+
+    Common mistakes:
+
+    \b
+        * Running doctor before activating your virtual environment —
+          package checks will fail even if the packages are installed.
+          Fix: activate venv first, then re-run econflow doctor.
+
+        * LaTeX showing WARN but tables still render to .tex — the .tex
+          file is written regardless; WARN means you cannot *compile* it
+          to PDF locally.  Install TeX Live to enable PDF compilation.
+
+    Expected output (abbreviated):
+
+    \b
+        EconFlow — environment health check
+
+        System
+          ✔  SYS-01  Python 3.11.9
+          ℹ  SYS-02  Operating system     Linux 6.5 (x86_64)
+
+        Core packages
+          ✔  PKG-01  pandas 2.2.2
+          ✔  PKG-04  linearmodels 6.1
+
+        External tools
+          ✔  EXT-01  git                  git version 2.43.0
+          ✔  EXT-02  LaTeX (pdflatex)     pdfTeX 3.141592653
+
+        Project structure
+          ✔  PRJ-01  config.yaml          config/config.yaml
+          ✔  PRJ-02  models.yaml          config/models.yaml
+
+        ✔ Ready  (24 passed, 2 warning(s))
     """
     from econflow.commands.doctor import run_doctor
 
@@ -279,6 +384,7 @@ def validate(
 
     Examples:
 
+    \b
         # Validate config/ sub-directory (default)
         econflow validate
 
@@ -296,6 +402,35 @@ def validate(
             --config  path/to/config.yaml \\
             --models  path/to/models.yaml \\
             --outputs path/to/outputs.yaml
+
+    Common mistakes:
+
+    \b
+        * Running econflow run before econflow validate — validation errors
+          surface as confusing runtime errors.
+          Fix: always run econflow validate first.
+
+        * Editing YAML with tabs instead of spaces — YAML parsers reject tabs.
+          Fix: configure your editor to use 2- or 4-space indentation.
+
+        * Specifying regressors that don't exist in the data file.
+          Fix: econflow validate --data checks column presence.
+
+    Expected output:
+
+    \b
+        EconFlow validate
+
+        Schema validation
+          ✔  CFG-01  config.yaml syntax valid
+          ✔  CFG-02  models.yaml syntax valid
+          ✔  CFG-03  outputs.yaml syntax valid
+
+        Semantic validation
+          ✔  L-01  project_name present
+          ✔  L-04  dependent column present in data
+
+        ✔ Validation passed  (0 errors, 0 warnings)
     """
     from econflow.commands.validate import run_validate
 
@@ -353,6 +488,7 @@ def info(
 
     Examples:
 
+    \b
         # Show platform info + estimator registry (no project needed)
         econflow info
 
@@ -361,6 +497,31 @@ def info(
             --config  config/config.yaml \\
             --models  config/models.yaml \\
             --outputs config/outputs.yaml
+
+    Common mistakes:
+
+    \b
+        * Running econflow info from outside a project — config files will
+          not be found.  This is fine; you still see the platform summary.
+
+        * Stale provenance data — the "last run" section reflects the most
+          recent outputs/provenance/ record; re-run to refresh.
+
+    Expected output (abbreviated):
+
+    \b
+        EconFlow 0.1.0 · Python 3.11.9
+
+        Platform
+          Project   my_study
+          Root      /home/user/my_study
+
+        Estimators (8 registered)
+          entity_fe  · ols  · two_way_fe  · …
+
+        Models
+          (1) investment ~ value + capital  [entity_fe]
+          (2) investment ~ value + capital  [two_way_fe]
     """
     from econflow.commands.info import run_info
 
@@ -438,14 +599,60 @@ def run(
 ) -> None:
     """Run the EconFlow analysis pipeline.
 
-    Requires three YAML configuration files produced by ``econflow init``:
+    Requires three YAML configuration files produced by ``econflow init``.
+    Run ``econflow validate`` first to catch configuration errors before
+    the pipeline starts.
 
+    Examples:
+
+    \b
+        # Standard run (config-driven)
         econflow run \\
             --config  config/config.yaml \\
             --models  config/models.yaml \\
             --outputs config/outputs.yaml
 
-    See ``examples/getting_started/`` for a complete worked example.
+        # Getting-started example (bundled)
+        econflow run \\
+            --config  examples/getting_started/config/config.yaml \\
+            --models  examples/getting_started/config/models.yaml \\
+            --outputs examples/getting_started/config/outputs.yaml
+
+        # With verbose logging
+        econflow run \\
+            --config  config/config.yaml \\
+            --models  config/models.yaml \\
+            --outputs config/outputs.yaml \\
+            --verbose
+
+    Common mistakes:
+
+    \b
+        * Passing config files in the wrong order — each flag has a specific
+          role: --config is the project config, --models is the estimator
+          list, --outputs controls where files are written.
+
+        * Missing or misnamed data file — if the path in config.yaml does
+          not match an existing file the pipeline exits immediately.
+          Fix: econflow validate --data to check all paths before running.
+
+        * Omitting one of the three required flags — econflow run will print
+          an actionable error and exit with code 1.
+
+    Expected output (abbreviated):
+
+    \b
+        ──────────────── EconFlow 0.1.0 ────────────────
+
+        [1/3] entity_fe — Fixed Effects (Entity)  ✔
+        [2/3] two_way_fe — Fixed Effects (Two-Way)  ✔
+        [3/3] pooled_ols — Pooled OLS  ✔
+
+        ────────────────── Pipeline complete ──────────────────
+          Completed in 3.2 s
+
+        outputs/tables/table_fe_investment.csv
+        outputs/tables/table_fe_investment.tex
     """
     import logging
 
@@ -672,11 +879,38 @@ def report(
 
     Examples:
 
+    \b
         # Render with all default formats
         econflow report
 
         # Render to a custom directory with LaTeX + CSV only
         econflow report outputs/paper --formats csv,latex
+
+        # Render from an explicit config
+        econflow report --config config/config.yaml
+
+    Common mistakes:
+
+    \b
+        * Running econflow report before econflow run — there are no
+          estimation results to render yet.
+          Fix: econflow run ... first, then econflow report.
+
+        * Specifying an unknown format ID — valid IDs are:
+          csv, latex, markdown, html, json.
+
+    Expected output (abbreviated):
+
+    \b
+        EconFlow report [beta]
+
+        Rendering 2 table(s) in 4 format(s) …
+          ✔  table_regression_results.csv
+          ✔  table_regression_results.tex
+          ✔  table_regression_results.md
+          ✔  table_regression_results.html
+
+        Written to: outputs/econflow/
     """
     from econflow.commands.report import run_report
 
@@ -748,6 +982,37 @@ def certify(
             --data data/processed/panel.csv \\
             --config config/config.yaml \\
             --output outputs/certificate.json
+
+        # Include data fingerprints for multiple datasets
+        econflow certify \\
+            --project-name "Multi-source Study" \\
+            --data data/processed/panel_a.csv \\
+            --data data/processed/panel_b.csv \\
+            --config config/config.yaml
+
+    Common mistakes:
+
+    \b
+        * Certifying before committing changes — the git SHA recorded in
+          the certificate will differ from the published commit.
+          Fix: git commit first, then econflow certify.
+
+        * Forgetting --data — the certificate omits data fingerprints and
+          a reviewer cannot verify the inputs.
+          Fix: always pass --data for every input dataset.
+
+    Expected output:
+
+    \b
+        EconFlow certify
+
+        ✔  Git SHA         4f3b2af
+        ✔  Python          3.11.9
+        ✔  pandas          2.2.2
+        ✔  data/processed/panel.csv  sha256: a1b2c3…
+        ✔  config/config.yaml        sha256: d4e5f6…
+
+        Certificate written: outputs/certificate.json
     """
     from econflow.commands.certify import run_certify
 
@@ -807,6 +1072,31 @@ def verify(
             --baseline outputs/baseline_cert.json \\
             --current outputs/current_cert.json \\
             --output outputs/drift_report.json
+
+    Common mistakes:
+
+    \b
+        * Comparing certificates from different projects — version and
+          package drift will be flagged; data drift will be meaningless.
+          Fix: always compare certificates from the same project.
+
+        * Treating "warn" exit code (0) as a pass without reviewing the
+          report — warnings indicate package version changes that may
+          affect numeric results.
+
+    Expected output:
+
+    \b
+        EconFlow verify
+
+        Drift report
+          ✔  Git SHA      match   4f3b2af
+          ✔  Python       match   3.11.9
+          ⚠  pandas       drift   2.1.4 → 2.2.2
+          ✔  data inputs  match   (SHA-256 identical)
+
+        Status: warn  (1 package version changed)
+        Exit code: 0
     """
     from econflow.commands.verify import run_verify
 
@@ -888,6 +1178,32 @@ def package_cmd(
             --script scripts/01_download.py \\
             --script scripts/02_run.py \\
             --output-dir replication_package/
+
+    Common mistakes:
+
+    \b
+        * Omitting --certificate — the package README will note that no
+          certificate was provided, reducing reproducibility guarantees.
+
+        * Not including all config files — a reviewer cannot reproduce
+          the analysis without config.yaml, models.yaml, and outputs.yaml.
+          Fix: pass all three with --config.
+
+    Expected output:
+
+    \b
+        EconFlow package
+
+        Building replication package …
+          ✔  README.md
+          ✔  certificate.json
+          ✔  environment.txt
+          ✔  config/config.yaml
+          ✔  config/models.yaml
+          ✔  scripts/01_download.py
+          ✔  manifest.json
+
+        Package written to: replication_package/  (7 files)
     """
     from econflow.commands.package_cmd import run_package
 
@@ -979,6 +1295,37 @@ def fetch(
             --param indicators=NY.GDP.MKTP.CD \\
             --force \\
             --manifest outputs/manifest.json
+
+    Common mistakes:
+
+    \b
+        * Misspelling the connector ID — use econflow datasets to see
+          all registered IDs.
+
+        * Omitting required parameters — each connector has mandatory
+          params; the error message lists them when any are missing.
+
+        * Passing a list as a single --param string: use comma separation
+          (--param series_ids=A,B) not multiple equals signs.
+
+    Expected output:
+
+    \b
+        EconFlow fetch — world_bank
+
+        Connector  World Bank Open Data
+        Indicators IT.NET.USER.ZS
+        Years      2000 – 2022
+
+        ✔  Downloaded  1 indicator × 45 countries × 23 years
+        ✔  Validated   no missing entity-year keys
+        ✔  Cached      .cache/econflow/a1b2c3…/
+
+        Metadata
+          Source     World Bank Open Data API
+          Retrieved  2024-01-15
+          Rows       1035
+          Columns    country, year, IT.NET.USER.ZS
     """
     from econflow.commands.fetch_cmd import _parse_param_value, run_fetch
 
@@ -1026,7 +1373,28 @@ def cache_list(
         show_default=True,
     ),
 ) -> None:
-    """List all cached datasets."""
+    """List all cached datasets.
+
+    Shows cache key, connector ID, retrieval date, row count, and size
+    for every slot in the cache directory.
+
+    Examples:
+
+    \b
+        econflow cache list
+
+        econflow cache list --cache-dir /data/.cache/econflow
+
+    Expected output:
+
+    \b
+        EconFlow cache — 3 slot(s)
+
+        Key       Connector    Date        Rows   Size
+        a1b2c3…   world_bank   2024-01-15  1035   128 KB
+        d4e5f6…   fred         2024-01-10   480    42 KB
+        a7b8c9…   csv          2024-01-08   200     8 KB
+    """
     from econflow.commands.cache_cmd import run_cache_list
 
     exit_code = run_cache_list(cache_dir=cache_dir, console=console)
@@ -1044,7 +1412,30 @@ def cache_inspect(
         show_default=True,
     ),
 ) -> None:
-    """Show detailed metadata for one cache slot."""
+    """Show detailed metadata for one cache slot.
+
+    Prints the full metadata record stored alongside the cached dataset,
+    including connector parameters, validation results, and file paths.
+
+    Examples:
+
+    \b
+        # Get the key from: econflow cache list
+        econflow cache inspect a1b2c3def456
+
+    Expected output:
+
+    \b
+        Cache slot: a1b2c3def456
+
+        Connector    world_bank
+        Retrieved    2024-01-15T10:23:45
+        Rows         1035
+        Columns      country, year, IT.NET.USER.ZS
+        Parameters   indicators=IT.NET.USER.ZS year_start=2000 year_end=2022
+        Validated    True
+        File         .cache/econflow/a1b2c3…/data.parquet
+    """
     from econflow.commands.cache_cmd import run_cache_inspect
 
     exit_code = run_cache_inspect(key=key, cache_dir=cache_dir, console=console)
@@ -1068,11 +1459,26 @@ def cache_clear(
 ) -> None:
     """Delete all cached datasets.
 
-    Requires --yes to confirm.
+    Requires --yes to confirm.  This action is irreversible — datasets
+    will need to be re-downloaded on the next econflow fetch call.
 
-    Example:
+    Examples:
 
+    \b
         econflow cache clear --yes
+
+        econflow cache clear --cache-dir /data/.cache/econflow --yes
+
+    Common mistakes:
+
+    \b
+        * Running without --yes — the command exits immediately without
+          deleting anything.  This is intentional.
+
+    Expected output:
+
+    \b
+        Deleted 3 cache slot(s) from .cache/econflow/
     """
     from econflow.commands.cache_cmd import run_cache_clear
 
@@ -1091,7 +1497,20 @@ def cache_purge(
         show_default=True,
     ),
 ) -> None:
-    """Delete one cache slot by key."""
+    """Delete one cache slot by key.
+
+    Use ``econflow cache list`` to find the key for the slot to delete.
+
+    Examples:
+
+    \b
+        econflow cache purge a1b2c3def456
+
+    Expected output:
+
+    \b
+        Deleted cache slot: a1b2c3def456
+    """
     from econflow.commands.cache_cmd import run_cache_purge
 
     exit_code = run_cache_purge(key=key, cache_dir=cache_dir, console=console)
@@ -1117,8 +1536,28 @@ def datasets(
 
     Examples:
 
+    \b
         econflow datasets                # list all connectors
         econflow datasets --filter world # show only connectors matching 'world'
+
+    Common mistakes:
+
+    \b
+        * Confusing the connector ID (used with econflow fetch) with the
+          connector label (human-readable name shown in this table).
+          Fix: use the ID column value with econflow fetch.
+
+    Expected output:
+
+    \b
+        EconFlow data connectors (5 registered)
+
+        ID           Label                  Status    Notes
+        world_bank   World Bank Open Data   ready     WDI API
+        fred         FRED (St. Louis Fed)   ready     requires API key
+        oecd         OECD.Stat              ready     SDMX API
+        pwt          Penn World Tables      ready     direct download
+        csv          Local CSV              ready     path= required
     """
     from econflow.commands.datasets_cmd import run_datasets
 
@@ -1159,9 +1598,32 @@ def inspect(
 
     Examples:
 
+    \b
         econflow inspect .
         econflow inspect examples/my_study/ --strict
         econflow inspect examples/my_study/ --output inspection.json
+
+    Common mistakes:
+
+    \b
+        * Using --strict in CI when the project has known warnings — every
+          warning becomes a failure.  Reserve --strict for final release
+          verification.
+
+        * Running inspect on a directory without a config/ subdirectory —
+          it will report missing configuration files rather than erroring out.
+
+    Expected output:
+
+    \b
+        EconFlow inspect: examples/my_study/
+
+        Configuration  ✔  config.yaml · models.yaml · outputs.yaml
+        Data           ✔  data/processed/panel.csv  (200 rows)
+        Estimators     ✔  entity_fe · two_way_fe  (both registered)
+        Dependencies   ✔  all required packages present
+
+        ✔ Ready to reproduce  (0 errors, 0 warnings)
     """
     from econflow.commands.inspect import run_inspect
 
@@ -1226,11 +1688,36 @@ def reproduce(
 
     Examples:
 
+    \b
         econflow reproduce .
         econflow reproduce examples/blind_replication/
         econflow reproduce examples/my_study/ --output-dir /tmp/replica/
         econflow reproduce examples/my_study/ --tolerance 1e-4
         econflow reproduce examples/my_study/ --skip-inspect --no-compare
+
+    Common mistakes:
+
+    \b
+        * Missing original_outputs/ — if the directory does not exist the
+          comparison step is skipped automatically (this is not an error).
+          To enable comparison: copy your expected outputs there first.
+
+        * Numeric comparison failures from floating-point platform drift —
+          try a looser tolerance: econflow reproduce --tolerance 1e-4.
+
+        * Subprocess timeout on large datasets — increase with --timeout 1200.
+
+    Expected output:
+
+    \b
+        EconFlow reproduce: examples/my_study/
+
+        Pre-flight (inspect) … ✔
+        Pipeline run …         ✔  (3.2 s)
+        Output comparison …    ✔  3/3 files match (tolerance 1e-6)
+
+        ✔ Reproduction successful
+        Report: examples/my_study/replication_outputs/report.md
     """
     from econflow.commands.reproduce import run_reproduce
 
@@ -1281,9 +1768,35 @@ def compare(
 
     Examples:
 
+    \b
         econflow compare examples/my_study/original_outputs/ /tmp/replica/tables/
         econflow compare baseline/ replica/ --tolerance 1e-4
         econflow compare baseline/ replica/ --output comparison.json
+
+    Common mistakes:
+
+    \b
+        * Comparing directories with different file sets — a missing file
+          is reported as "missing", not "match".  Both directories should
+          contain the same filenames.
+
+        * Using too tight a tolerance across machines — floating-point
+          results differ slightly between OS/BLAS versions.
+          Fix: econflow compare --tolerance 1e-4 for cross-platform runs.
+
+    Expected output:
+
+    \b
+        EconFlow compare
+
+        baseline/   3 files
+        replica/    3 files
+
+        table_fe_investment.csv   ✔  match
+        table_fe_investment.tex   ✔  match
+        table_ols_results.csv     ✔  match
+
+        ✔ All 3 file(s) match  (tolerance 1e-6)
     """
     from econflow.commands.compare import run_compare
 
@@ -1362,6 +1875,34 @@ def release_check(
 
         # Save a full report
         econflow release-check --output docs/release/gate_report.md --json gate.json
+
+    Common mistakes:
+
+    \b
+        * Running release-check without the package installed in editable
+          mode — QG-01 (package build) and QG-02 (imports) may fail.
+          Fix: pip install -e ".[dev]" first.
+
+        * Using --quick for a final release gate — --quick skips QG-01
+          (build), QG-06 (integration tests), and QG-07 (blind replication),
+          which are required for a genuine release pass.
+
+    Expected output (abbreviated):
+
+    \b
+        EconFlow Release Quality Gate
+
+          ✔  QG-01  package_build       Wheel built successfully
+          ✔  QG-02  package_import      All 12 sub-packages import cleanly
+          ✔  QG-03  cli_smoke           --version and doctor pass
+          ✔  QG-04  schema_validation   blind_replication config validates
+          ✔  QG-05  plugin_registry     8 estimators · 6 diagnostics
+          ✔  QG-06  integration_tests   pytest tests/integration/ 0 failures
+          ✔  QG-07  blind_replication   reproduce passed (tol 1e-6)
+          ✔  QG-08  doc_api_examples    all import patterns work
+          ✔  QG-09  api_consistency     all __all__ entries importable
+
+        ✔ Gate passed  (9/9 checks)  — safe to release
     """
     from econflow.commands.release_check import run_release_check
 
@@ -1420,11 +1961,23 @@ def docs(
 
     Examples:
 
+    \b
         econflow docs config
 
         econflow docs config --text --stdout
 
         econflow docs config --output path/to/config_reference.md
+
+    Common mistakes:
+
+    \b
+        * Passing an unknown topic — only 'config' is currently supported.
+          Additional topics (models, outputs) are planned for a future release.
+
+    Expected output:
+
+    \b
+        ✓ Written: docs/reference/configuration.md
     """
     if topic != "config":
         console.print(

@@ -27,14 +27,36 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class AuthorConfig(BaseModel):
-    """A single project author."""
+    """A single project author record stored under ``project.authors[]`` in config.yaml.
+
+    Attributes
+    ----------
+    name : str
+        Author full name (required).
+    email : str
+        Author contact email.  Defaults to an empty string when omitted.
+    """
 
     name: str = Field(..., description="Author full name.")
     email: str = Field("", description="Author contact email.")
 
 
 class ProjectMeta(BaseModel):
-    """Top-level project identification block."""
+    """Top-level project identification block read from the ``project:`` key in config.yaml.
+
+    Attributes
+    ----------
+    name : str
+        Human-readable project name recorded in provenance and certificates.
+    version : str
+        Semver project version string.  Defaults to ``"0.1.0"``.
+    description : str
+        Optional free-text project description.
+    authors : list[AuthorConfig]
+        List of project authors.
+    output_dir : Path
+        Root directory for pipeline output artefacts.  Defaults to ``outputs/``.
+    """
 
     name: str = Field(..., description="Human-readable project name.")
     version: str = Field("0.1.0", description="Semver project version string.")
@@ -75,7 +97,17 @@ class SampleConfig(BaseModel):
 
 
 class DataConfig(BaseModel):
-    """Aggregated data configuration block."""
+    """Aggregated data configuration block read from the ``data:`` key in config.yaml.
+
+    Attributes
+    ----------
+    sources : dict[str, DataSourceConfig]
+        Named data sources keyed by source ID.
+    sample : SampleConfig
+        Optional sample restriction (date range, entity filter).
+    cache_dir : Path
+        Raw-data download cache directory.  Defaults to ``.cache/downloads/``.
+    """
 
     sources: dict[str, DataSourceConfig] = Field(default_factory=dict)
     sample: SampleConfig = Field(default_factory=SampleConfig)

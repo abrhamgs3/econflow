@@ -37,7 +37,18 @@ class ARTestResult:
 
 @dataclass
 class ArellanoAbondResult:
-    """Combined AR(1) and AR(2) test output."""
+    """Combined output of the Arellano-Bond AR(1) and AR(2) serial correlation tests.
+
+    In a valid GMM/dynamic panel model, the AR(1) residuals should show
+    first-order serial correlation while AR(2) residuals should not.
+
+    Attributes
+    ----------
+    ar1 : ARTestResult
+        AR(1) test result.  Rejection is expected and *not* a problem.
+    ar2 : ARTestResult
+        AR(2) test result.  Rejection indicates the model is misspecified.
+    """
 
     ar1: ARTestResult
     ar2: ARTestResult
