@@ -241,11 +241,11 @@ class TestLaTeXRenderer:
         # underscore in label should be escaped
         assert r"\_" in tex or "x_1" in tex  # renderer may escape or not
 
-    def test_footer_uses_flushleft_not_tablenotes(self, simple_table):
-        """C1 regression: tablenotes requires threeparttable; flushleft does not."""
+    def test_footer_uses_threeparttable_tablenotes(self, simple_table):
+        """Sprint 11B: footer must use threeparttable/tablenotes for journal compliance."""
         tex = get_renderer("latex")().render(simple_table)
-        assert "tablenotes" not in tex
-        assert r"\begin{flushleft}" in tex
+        assert "tablenotes" in tex
+        assert r"\begin{threeparttable}" in tex
         assert r"\footnotesize" in tex
 
     def test_footer_content_present(self, simple_table):

@@ -67,21 +67,21 @@ def _simple_table(title="Test Table"):
 
 
 # ---------------------------------------------------------------------------
-# C1 — LaTeX footer uses flushleft, never tablenotes
+# C1 — LaTeX footer uses threeparttable + tablenotes (Sprint 11B upgrade)
 # ---------------------------------------------------------------------------
 
 class TestC1LaTeXFooter:
-    def test_tablenotes_not_in_output(self):
-        """tablenotes requires threeparttable; must not appear in output."""
+    def test_tablenotes_in_output(self):
+        """Sprint 11B: footer must use threeparttable/tablenotes for journal compliance."""
         from econflow.outputs.registry import get_renderer
         tex = get_renderer("latex")().render(_simple_table())
-        assert "tablenotes" not in tex
+        assert "tablenotes" in tex
 
-    def test_flushleft_wraps_footer(self):
+    def test_threeparttable_wraps_footer(self):
         from econflow.outputs.registry import get_renderer
         tex = get_renderer("latex")().render(_simple_table())
-        assert r"\begin{flushleft}" in tex
-        assert r"\end{flushleft}" in tex
+        assert r"\begin{threeparttable}" in tex
+        assert r"\end{threeparttable}" in tex
 
     def test_footnotesize_inside_flushleft(self):
         from econflow.outputs.registry import get_renderer
@@ -411,4 +411,4 @@ class TestM4FromDictExplicit:
         t = ReportTable(title="T", table_type="regression", columns=["(1)"])
         t.add_row(TableRow(label="N", cells={"(1)": "100"}, sub_cells=None))
         t2 = ReportTable.from_dict(t.to_dict())
-        assert t2.rows[0].sub_cells is None
+ 

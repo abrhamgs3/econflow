@@ -324,10 +324,20 @@ def _write_latex(
 
         return re.sub(r"\*+", _star_sub, s)
 
+    _CAPTION_SPECIAL = [
+        ("\\", r"\textbackslash{}"), ("&", r"\&"), ("%", r"\%"),
+        ("$", r"\$"), ("#", r"\#"), ("_", r"\_"), ("{", r"\{"),
+        ("}", r"\}"),
+    ]
+    caption_escaped = caption
+    for _old, _new in _CAPTION_SPECIAL:
+        caption_escaped = caption_escaped.replace(_old, _new)
+
     lines = [
         "\\begin{table}[htbp]",
         "\\centering",
-        f"\\caption{{{caption}}}",
+        f"\\caption{{{caption_escaped}}}",
+        "\\begin{threeparttable}",
         f"\\begin{{tabular}}{{{col_spec}}}",
         "\\toprule",
         header,
@@ -351,6 +361,11 @@ def _write_latex(
     lines += [
         "\\bottomrule",
         "\\end{tabular}",
+        "\\begin{tablenotes}[flushleft]",
+        "  \\footnotesize",
+        r"  \item $^{*}p<0.10$, $^{**}p<0.05$, $^{***}p<0.01$",
+        "\\end{tablenotes}",
+        "\\end{threeparttable}",
         "\\end{table}",
     ]
     path.write_text("\n".join(lines), encoding="utf-8")
