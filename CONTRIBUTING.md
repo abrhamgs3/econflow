@@ -34,7 +34,7 @@ pip install -e ".[dev]"
 Verify everything works:
 
 ```bash
-pytest          # 931+ tests should pass
+pytest          # 1,400+ tests should pass
 ruff check src/ tests/
 econflow doctor
 ```
@@ -187,4 +187,4 @@ Before submitting, confirm:
 5. Push: `git push origin main --tags`
 6. Build: `python -m build`
 7. Publish: `twine upload dist/*`
-8. Create a GitHub release using the tag with the release notes from `docs/release_notes/`
+8. Create a GitHub release using the tag with the release notes from `docs/release_notes

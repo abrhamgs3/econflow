@@ -249,8 +249,9 @@ def check_cli_smoke() -> CheckResult:
         [sys.executable, "-m", "econflow.cli", "--version"],
         capture_output=True, text=True, cwd=_repo_root(),
     )
-    # also try the entry point directly
-    if r_ver.returncode != 0:
+    # also try the entry-point binary if the module invocation returned empty
+    # stdout (Typer version callback writes via Rich, not always captured)
+    if r_ver.returncode != 0 or not r_ver.stdout.strip():
         r_ver = subprocess.run(
             ["econflow", "--version"],
             capture_output=True, text=True, cwd=_repo_root(),
@@ -451,8 +452,7 @@ def check_integration_tests() -> CheckResult:
         )
 
     result = subprocess.run(
-        [sys.executable, "-m", "pytest", str(tests_dir), "-q", "--tb=short",
-         "--timeout=120", "-x"],
+        [sys.executable, "-m", "pytest", str(tests_dir), "-q", "--tb=short", "-x"],
         capture_output=True,
         text=True,
         cwd=_repo_root(),

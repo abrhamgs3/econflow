@@ -1,5 +1,26 @@
 # Changelog
 
+## [Unreleased] — Sprint 11E: Release Candidate Audit
+
+### Fixed
+- `econflow release-check` QG-03: version-check false-negative when
+  `python3 -m econflow.cli --version` returns empty stdout via Rich Console;
+  fallback now triggers on `returncode != 0 OR empty stdout`.
+- `econflow release-check` QG-06: `--timeout=120` flag passed to pytest
+  subprocess requires `pytest-timeout` (not in dev deps), causing
+  `unrecognized arguments`; flag removed.
+- `examples/ai_productivity_paper/README.md`: added legacy-schema warning
+  banner so users understand why `econflow validate` fails on the pre-v0.8
+  config files.
+- `CONTRIBUTING.md`: updated stale test count (`931+` → `1,400+`).
+
+### Added
+- `docs/release/RC1_AUDIT.md` — complete release-candidate audit report
+  covering installation, CLI, examples, plugin system, API stability,
+  integrity framework, and documentation. Verdict: READY FOR PUBLIC BETA.
+
+---
+
 ## [Unreleased] — Sprint 11D: End-to-End Acceptance Test
 
 ### Added
@@ -553,17 +574,4 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `heterogeneity.py`.  Each module documents the full intended interface.
 - `src/econflow/outputs/figures/base.py`: `FigureBuilder` ABC.
 - `src/econflow/outputs/figures/coefficient_plot.py`: `CoefficientPlot` — full
-  implementation.  Forest-style coefficient plot data with CI bounds from
-  configurable z-score, sort options, variable subset and label mapping.
-- `src/econflow/outputs/figures/ci_plot.py`: `CIPlot` — full implementation.
-  Focal-variable CI comparison across specifications.
-- `src/econflow/outputs/figures/`: 4 stubs — `ResidualFigure`,
-  `DistributionFigure`, `EventStudyFigure`, `RobustnessComparisonFigure`.
-- `src/econflow/outputs/diagnostics_report.py`: `build_diagnostics_report()` —
-  converts `list[DiagnosticResult]` to a `ReportTable` with Pass/Fail/N/A
-  conclusions, optional grouping by estimator.
-- `src/econflow/outputs/bundle.py`: `PublicationBundle` — chainable API for
-  collecting tables and figures and writing them to a structured output
-  directory with `manifest.json`.
-- `src/econflow/outputs/__init__.py` (rewrite): complete public API re-exporting
-  all model objects, registry functions, table builders, fig
+  implementation.  Fore

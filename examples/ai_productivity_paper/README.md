@@ -1,5 +1,12 @@
 # AI & Productivity Paper — Replication Package
 
+> **Note (EconFlow v0.1.0):** The config files in this directory use the
+> pre-v0.8 schema and will not pass `econflow validate`. They are preserved
+> as-is to document the original research workflow.  
+> To run a new project, start with `econflow init <name>` which generates a
+> v0.8-compatible scaffold.  See `examples/getting_started/` for a working
+> end-to-end example.
+
 The original research project that motivated EconFlow's development:
 
 > *AI Adoption and Total Factor Productivity: Panel Evidence from 193 Countries*
