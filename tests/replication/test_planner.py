@@ -34,7 +34,9 @@ class TestBuildPlan:
     def test_validate_command_contains_config_path(self, project_dir: Path, tmp_path: Path) -> None:
         plan = build_plan(project_dir, output_dir=tmp_path / "out")
         validate = plan.steps[0]
-        assert "econflow" in validate.command
+        # F11 fix: command uses sys.executable -m econflow.cli instead of bare "econflow"
+        cmd_str = " ".join(validate.command)
+        assert "econflow" in cmd_str
         assert "validate" in validate.command
 
     def test_run_command_contains_config_paths(self, project_dir: Path, tmp_path: Path) -> None:

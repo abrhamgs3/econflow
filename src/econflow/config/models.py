@@ -466,6 +466,19 @@ class TablesModel(BaseModel):
         ),
         examples=[["csv", "latex"], ["csv", "markdown"]],
     )
+    decimal_places: int = Field(
+        4,
+        ge=1,
+        le=10,
+        description=(
+            "Number of decimal places for coefficient and standard-error values "
+            "in all table formats.  Increase when regressors are in very small "
+            "units (e.g. raw millimetres, fractions) and the default 4 digits "
+            "would round to 0.0000.  Tip: rescaling regressors to larger units "
+            "is preferable but ``decimal_places: 6`` is a quick fix."
+        ),
+        examples=[4, 6],
+    )
     comparison_table: ComparisonTableModel = Field(
         ...,
         description="Main coefficient comparison table settings.",

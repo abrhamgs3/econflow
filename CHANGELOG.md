@@ -1,5 +1,41 @@
 # Changelog
 
+## [Unreleased] — Sprint 11F: Evaluator-Reported Fixes
+
+### Fixed
+- **F1 — Windows Unicode crash**: `cli.py` now reconfigures `stdout`/`stderr`
+  to UTF-8 on `win32` at startup, preventing `UnicodeEncodeError` when the
+  Windows console (cp1252) cannot render Rich’s Unicode glyphs.
+- **F3 — README stub caveat**: README now documents GMM and panel quantile as
+  *planned for v1.0* and notes that `econflow validate` will warn if they are
+  referenced, rather than presenting them as currently available.
+- **F5 — Table decimal precision**: `TablesModel` gains a `decimal_places`
+  field (default 4, range 1–10). The pipeline reads it and passes it through
+  `_build_comparison_table`, `_fmt_coef`, and `_fmt_se`.
+- **F6 — Hardcoded "Firm FE" label**: The comparison-table row label for entity
+  fixed effects is now derived from the `entity_col` config key
+  (`entity_col.capitalize() + " FE"`) instead of the literal `"Firm FE"`.
+- **F7 — Silently dropped output formats**: `markdown`, `html`, and `json`
+  formats in `outputs.yaml` now produce files. Three new writer functions
+  (`_write_markdown`, `_write_html`, `_write_json`) are wired into the format
+  dispatch in `run_from_config`.
+- **F8 — Diagnostics not wired to CLI/YAML**: `_run_diagnostics` is completely
+  rewritten to compute VIF (per-regressor), Breusch-Pagan heteroskedasticity,
+  and Durbin-Watson serial correlation directly from raw `PanelResults` objects
+  and emits `tables/diagnostics.csv`.
+- **F9 — Replication package README missing `econflow run` step**: The
+  `_build_readme` function in `integrity/package.py` now includes an
+  `econflow run` step when the package contains config files but no custom
+  scripts.
+- **F10 — Wrong GitHub URL**: `integrity/package.py` README footer now links
+  to `https://github.com/abrhamgs3/econflow`.
+- **F11 — WinError 2 on Windows PATH**: `replication/planner.py` now builds
+  commands as `[sys.executable, "-m", "econflow.cli", ...]` instead of the
+  bare `"econflow"` entry-point, avoiding `FileNotFoundError` when the venv
+  `Scripts/` directory is not on the system `PATH`.
+
+---
+
 ## [Unreleased] — Sprint 11E: Release Candidate Audit
 
 ### Fixed

@@ -196,12 +196,12 @@ def _stars(pval: float) -> str:
     return ""
 
 
-def _fmt_coef(val: float, pval: float) -> str:
-    return f"{val:.4f}{_stars(pval)}"
+def _fmt_coef(val: float, pval: float, decimal_places: int = 4) -> str:
+    return f"{val:.{decimal_places}f}{_stars(pval)}"
 
 
-def _fmt_se(val: float) -> str:
-    return f"({val:.3f})"
+def _fmt_se(val: float, decimal_places: int = 4) -> str:
+    return f"({val:.{decimal_places}f})"
 
 
 def _fmt_r2(val: object) -> str:
@@ -216,11 +216,172 @@ def _fmt_r2(val: object) -> str:
         return "—"
 
 
+def _run_diagnostics(
+    results: dict,
+    model_specs: list[dict],
+    panel_df,
+    dependent: str,
+    regressors: list[str],
+    out_cfg: dict,
+    outputs_path: Path,
+) -> None:
+    """
+    Run post-estimation diagnostics and write results to
+    ``outputs/tables/diagnostics.csv``.
+
+    Computes directly from the raw linearmodels PanelResults objects:
+
+    - **VIF** — variance inflation factors for multicollinearity detection
+    - **Breusch-Pagan** — heteroskedasticity test (requires statsmodels)
+    - **Serial correlation AR(1)** — Durbin-Watson proxy on residuals
+
+    Results are written as ``diagnostics.csv`` alongside the main comparison
+    table so that every ``econflow run`` automatically produces this file
+    without extra YAML configuration.
+    """
+    import numpy as np
+
+    out_section = out_cfg.get("outputs", {})
+    _raw_base_dir = Path(out_section.get("base_dir", "outputs"))
+    if not _raw_base_dir.is_absolute():
+        base_dir = (outputs_path.parent / _raw_base_dir).resolve()
+    else:
+        base_dir = _raw_base_dir
+    diag_path = base_dir / "tables" / "diagnostics.csv"
+    diag_path.parent.mkdir(parents=True, exist_ok=True)
+
+    rows = []
+
+    for spec in model_specs:
+        mid = spec["id"]
+        result = results.get(mid)
+        if result is None:
+            continue
+
+        # Regressors for this model (exclude constant)
+        model_regs = [
+            r for r in list(spec.get("regressors", regressors))
+            if r.lower() not in ("const", "intercept", "constant")
+        ]
+
+        # ---- VIF (multicollinearity) ----------------------------------------
+        try:
+            X_data = panel_df[model_regs].dropna().values
+            if X_data.shape[0] > X_data.shape[1] + 1 and len(model_regs) >= 2:
+                try:
+                    from statsmodels.stats.outliers_influence import (
+                        variance_inflation_factor,
+                    )
+                    X_c = np.column_stack([np.ones(len(X_data)), X_data])
+                    vif_vals = {
+                        r: float(variance_inflation_factor(X_c, i + 1))
+                        for i, r in enumerate(model_regs)
+                    }
+                except Exception:
+                    # Fallback: manual R² approach
+                    vif_vals = {}
+                    for i, var in enumerate(model_regs):
+                        other_idx = [j for j in range(len(model_regs)) if j != i]
+                        y_v = X_data[:, i]
+                        Xo = np.column_stack([np.ones(len(X_data)), X_data[:, other_idx]])
+                        beta = np.linalg.lstsq(Xo, y_v, rcond=None)[0]
+                        yhat = Xo @ beta
+                        ss_res = np.sum((y_v - yhat) ** 2)
+                        ss_tot = np.sum((y_v - y_v.mean()) ** 2)
+                        r2 = 1 - ss_res / ss_tot if ss_tot > 0 else 0.0
+                        vif_vals[var] = 1 / (1 - r2) if r2 < 1 else float("inf")
+
+                max_vif = max(vif_vals.values(), default=float("nan"))
+                flagged = [v for v, val in vif_vals.items() if val > 10.0]
+                if flagged:
+                    concl = (
+                        f"Multicollinearity concern: {flagged} "
+                        f"have VIF > 10 (max={max_vif:.2f})"
+                    )
+                else:
+                    concl = f"No multicollinearity concern (max VIF = {max_vif:.2f} < 10)"
+                rows.append({
+                    "model_id": mid,
+                    "diagnostic": "VIF (max)",
+                    "statistic": round(max_vif, 4),
+                    "p_value": None,
+                    "conclusion": concl,
+                })
+        except Exception as exc:
+            log.debug("VIF failed for %s: %s", mid, exc)
+
+        # ---- Breusch-Pagan heteroskedasticity ----------------------------------
+        try:
+            from statsmodels.stats.diagnostic import het_breuschpagan
+            resids = np.array(result.resids)
+            X_data = panel_df[model_regs].dropna()
+            # Align index
+            common_idx = X_data.index.intersection(result.resids.index)
+            if len(common_idx) > len(model_regs) + 1:
+                resids_aligned = result.resids.loc[common_idx].values
+                X_aligned = np.column_stack([
+                    np.ones(len(common_idx)),
+                    X_data.loc[common_idx].values,
+                ])
+                lm, lm_pval, _, _ = het_breuschpagan(resids_aligned, X_aligned)
+                concl = (
+                    f"Heteroskedasticity detected (p={lm_pval:.4f} < 0.05) — use robust SEs"
+                    if lm_pval < 0.05
+                    else f"No heteroskedasticity concern (p={lm_pval:.4f})"
+                )
+                rows.append({
+                    "model_id": mid,
+                    "diagnostic": "Breusch-Pagan",
+                    "statistic": round(lm, 4),
+                    "p_value": round(lm_pval, 4),
+                    "conclusion": concl,
+                })
+        except Exception as exc:
+            log.debug("Breusch-Pagan failed for %s: %s", mid, exc)
+
+        # ---- Serial correlation AR(1) via Durbin-Watson ----------------------
+        try:
+            resids = np.array(result.resids)
+            if len(resids) > 2:
+                diff = np.diff(resids)
+                dw = np.sum(diff ** 2) / np.sum(resids ** 2)
+                # DW ≈ 2 → no autocorrelation; DW < 1.5 → positive autocorrelation
+                if dw < 1.5:
+                    concl = (
+                        f"Positive serial correlation likely (DW={dw:.4f} < 1.5) — "
+                        "consider clustered SEs or lag structure"
+                    )
+                elif dw > 2.5:
+                    concl = (
+                        f"Negative serial correlation possible (DW={dw:.4f} > 2.5)"
+                    )
+                else:
+                    concl = f"No strong serial correlation (DW={dw:.4f})"
+                rows.append({
+                    "model_id": mid,
+                    "diagnostic": "Serial Correlation (DW)",
+                    "statistic": round(dw, 4),
+                    "p_value": None,
+                    "conclusion": concl,
+                })
+        except Exception as exc:
+            log.debug("Serial correlation failed for %s: %s", mid, exc)
+
+    if rows:
+        diag_df = pd.DataFrame(rows)
+        diag_df.to_csv(diag_path, index=False)
+        log.info("Diagnostics written: %s", diag_path)
+    else:
+        log.info("No diagnostics produced")
+
+
 def _build_comparison_table(
     results: dict,
     model_specs: list[dict],
     regressors: list[str],
     table_cfg: dict,
+    entity_col: str = "Entity",
+    decimal_places: int = 4,
 ) -> pd.DataFrame:
     """
     Build a wide-format comparison table DataFrame.
@@ -241,16 +402,18 @@ def _build_comparison_table(
         for mid in model_ids:
             res = results[mid]
             if reg in res.params.index:
-                coef_row.append(_fmt_coef(res.params[reg], res.pvalues[reg]))
-                se_row.append(_fmt_se(res.std_errors[reg]))
+                coef_row.append(_fmt_coef(res.params[reg], res.pvalues[reg],
+                                          decimal_places))
+                se_row.append(_fmt_se(res.std_errors[reg], decimal_places))
             else:
                 coef_row.append("—")
                 se_row.append("—")
         rows.append(coef_row)
         rows.append(se_row)
 
-    # Fixed effects indicator rows
-    entity_row: list = ["Firm FE"]
+    # Fixed effects indicator rows (use actual entity/time column names)
+    entity_fe_label = f"{entity_col.capitalize()} FE"
+    entity_row: list = [entity_fe_label]
     time_row: list = ["Year FE"]
     for mid in model_ids:
         spec = next(s for s in model_specs if s["id"] == mid)
@@ -372,11 +535,32 @@ def _write_latex(
     log.info("LaTeX table written: %s", path)
 
 
+def _write_markdown(df, path):
+    """Write a GitHub-Flavored Markdown table."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(df.to_markdown(index=False), encoding="utf-8")
+    log.info("Markdown table written: %s", path)
+
+
+def _write_html(df, path):
+    """Write an HTML table."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(df.to_html(index=False, border=1), encoding="utf-8")
+    log.info("HTML table written: %s", path)
+
+
+def _write_json(df, path):
+    """Write a JSON array of records."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(df.to_json(orient="records", indent=2), encoding="utf-8")
+    log.info("JSON table written: %s", path)
+
+
 # ---------------------------------------------------------------------------
 # Provenance
 # ---------------------------------------------------------------------------
 
-def _sha256(path: Path) -> str:
+def _sha256(path):
     h = hashlib.sha256()
     with path.open("rb") as f:
         for chunk in iter(lambda: f.read(65536), b""):
@@ -384,14 +568,7 @@ def _sha256(path: Path) -> str:
     return h.hexdigest()
 
 
-def _record_provenance(
-    config_path: Path,
-    models_path: Path,
-    outputs_path: Path,
-    data_path: Path,
-    model_ids: list[str],
-    out_dir: Path,
-) -> None:
+def _record_provenance(config_path, models_path, outputs_path, data_path, model_ids, out_dir):
     """Write run_metadata.json with SHA-256 hashes and run details."""
     meta = {
         "run_id": str(uuid.uuid4()),
@@ -422,26 +599,18 @@ def _record_provenance(
 # Public entry point
 # ---------------------------------------------------------------------------
 
-def run_from_config(
-    config_path: Path,
-    models_path: Path,
-    outputs_path: Path,
-) -> None:
+def run_from_config(config_path, models_path, outputs_path):
     """
     Execute the generic config-driven panel pipeline.
 
     Parameters
     ----------
     config_path:
-        Path to ``config.yaml``.  Must contain ``data.path``,
-        ``data.entity_col``, ``data.time_col``, ``variables.dependent``,
-        and ``variables.regressors``.
+        Path to ``config.yaml``.
     models_path:
-        Path to ``models.yaml``.  Must contain a ``models`` list, each
-        entry being a model specification dict.
+        Path to ``models.yaml``.
     outputs_path:
-        Path to ``outputs.yaml``.  Must contain ``outputs.base_dir`` and
-        ``outputs.tables.comparison_table.filename``.
+        Path to ``outputs.yaml``.
     """
     # ------------------------------------------------------------------ Load
     log.info("Reading configuration from %s", config_path)
@@ -451,8 +620,6 @@ def run_from_config(
 
     data_cfg = cfg["data"]
     _raw_data_path = Path(data_cfg["path"])
-    # Resolve relative paths against the config file's directory so the project
-    # is self-contained regardless of the working directory the CLI is called from.
     if not _raw_data_path.is_absolute():
         data_path = (config_path.parent / _raw_data_path).resolve()
     else:
@@ -487,7 +654,6 @@ def run_from_config(
     log.info("[2/5] Validating panel structure")
     panel_df = _prepare_panel(df, entity_col, time_col)
 
-    # Check for missing values in analysis columns
     analysis_cols = [dependent] + regressors
     n_missing = panel_df[analysis_cols].isnull().sum().sum()
     if n_missing:
@@ -503,11 +669,22 @@ def run_from_config(
         mid = spec["id"]
         results[mid] = _run_model(panel_df, spec)
 
+    # -------------------------------------------------------- [3.5/5] Run diagnostics
+    log.info("[3.5/5] Running diagnostics")
+    _run_diagnostics(
+        results=results,
+        model_specs=model_specs,
+        panel_df=panel_df,
+        dependent=dependent,
+        regressors=regressors,
+        out_cfg=out_cfg,
+        outputs_path=outputs_path,
+    )
+
     # --------------------------------------------------------------- [4/5] Export tables
     log.info("[4/5] Exporting tables")
     out_section = out_cfg["outputs"]
     _raw_base_dir = Path(out_section["base_dir"])
-    # Resolve relative paths against the outputs config file's directory.
     if not _raw_base_dir.is_absolute():
         base_dir = (outputs_path.parent / _raw_base_dir).resolve()
     else:
@@ -516,17 +693,25 @@ def run_from_config(
     tables_dir = base_dir / "tables"
     table_filename = tables_section["comparison_table"]["filename"]
     formats = tables_section.get("formats", ["csv"])
+    decimal_places = int(tables_section.get("decimal_places", 4))
 
     table_df = _build_comparison_table(
         results,
         model_specs,
         regressors,
         tables_section,
+        entity_col=entity_col,
+        decimal_places=decimal_places,
+    )
+
+    _stem = (
+        table_filename
+        .removesuffix(".csv").removesuffix(".CSV")
+        .removesuffix(".tex").removesuffix(".TEX")
+        .removesuffix(".md").removesuffix(".html").removesuffix(".json")
     )
 
     if "csv" in formats:
-        # Strip extension if already present (e.g. config declares "table.csv")
-        _stem = table_filename.removesuffix(".csv").removesuffix(".CSV")
         _write_csv(table_df, tables_dir / f"{_stem}.csv")
     if "latex" in formats:
         project_name = cfg.get("project", {}).get("name", "panel regression")
@@ -536,6 +721,12 @@ def run_from_config(
             regressors,
             caption=f"Panel regression results -- {project_name}",
         )
+    if "markdown" in formats:
+        _write_markdown(table_df, tables_dir / f"{_stem}.md")
+    if "html" in formats:
+        _write_html(table_df, tables_dir / f"{_stem}.html")
+    if "json" in formats:
+        _write_json(table_df, tables_dir / f"{_stem}.json")
 
     # --------------------------------------------------------- [5/5] Record provenance
     log.info("[5/5] Recording provenance")

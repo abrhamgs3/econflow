@@ -16,7 +16,7 @@ any panel study, regardless of dataset, discipline, or research question.
 ## Features
 
 - **End-to-end pipeline** — ingest → validate → estimate → diagnose → render → certify
-- **Panel econometrics** — FE, two-way FE, RE, IV, GMM, quantile estimators via `linearmodels`
+- **Panel econometrics** — FE, two-way FE, RE, IV estimators via `linearmodels` (GMM and panel quantile are planned for v1.0 — `econflow validate` will warn if you reference them)
 - **Reproducibility** — every run produces a provenance certificate with SHA-256 fingerprints
 - **Config-driven** — projects defined by three YAML files; no code changes to run a new study
 - **Integrity chain** — `certify` → `verify` → `package` → `reproduce` for full replication support
@@ -139,12 +139,4 @@ econflow info         Show platform and project information
 econflow fetch        Fetch data from an external connector
 econflow cache        Manage the local data cache
 econflow datasets     List available data connectors
-econflow release-check  Run the release quality gate
-```
-
----
-
-## Testing
-
-```bash
-pytest    
+econfl

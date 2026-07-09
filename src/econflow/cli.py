@@ -88,6 +88,7 @@ Examples
 
 from __future__ import annotations
 
+import sys
 import time
 from pathlib import Path
 
@@ -95,6 +96,28 @@ import typer
 from rich.console import Console
 
 from econflow import __version__
+
+# ---------------------------------------------------------------------------
+# Windows Unicode compatibility (F1 fix)
+# ---------------------------------------------------------------------------
+# On a stock Windows terminal (default cp1252 codepage), Rich's Unicode
+# glyphs (✔, ✘, ─, …) raise UnicodeEncodeError when stdout is written.
+# Reconfiguring stdout/stderr to UTF-8 before the first Console call fixes
+# this transparently.  PYTHONIOENCODING=utf-8 achieves the same result but
+# requires the user to know about the workaround; we handle it automatically.
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
+        sys.stderr.reconfigure(encoding="utf-8")  # type: ignore[union-attr]
+    except AttributeError:
+        # Fallback for environments where reconfigure is unavailable
+        import io
+        sys.stdout = io.TextIOWrapper(
+            sys.stdout.buffer, encoding="utf-8", errors="replace"
+        )
+        sys.stderr = io.TextIOWrapper(
+            sys.stderr.buffer, encoding="utf-8", errors="replace"
+        )
 
 app = typer.Typer(
     name="econflow",
@@ -1999,7 +2022,6 @@ def docs(
 
     written = write_config_reference(path=output, format=fmt)
     console.print(f"[green]✓[/green] Written: {written}")
-
 
 # ---------------------------------------------------------------------------
 # Internal helpers
