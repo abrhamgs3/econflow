@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import pandas as pd
 
+from econflow.estimation._diagnostics import compute_standard_diagnostics
 from econflow.estimation.base import BaseEstimator, EstimationResult, EstimatorError
 from econflow.estimation.registry import register
 from econflow.estimation.result import DiagnosticResult
@@ -85,12 +86,19 @@ class PooledOLS(BaseEstimator):
 
         panel = self._to_panel(data.dropna(subset=[dep, *regs]), entity_col, time_col)
         y = panel[dep]
-        X = panel[regs]
+        # Add constant column to match legacy _run_model() behaviour
+        # (sm.add_constant prepends "const"; replicate that with pandas).
+        X = pd.concat(
+            [pd.Series(1.0, index=panel.index, name="const"), panel[regs]],
+            axis=1,
+        )
 
         try:
             mod = _PooledOLS(y, X)
             if cov_type == "clustered":
                 res = mod.fit(cov_type="clustered", cluster_entity=cluster_entity)
+            elif cov_type == "unadjusted":
+                res = mod.fit(cov_type="unadjusted")
             else:
                 res = mod.fit(cov_type="robust")
         except Exception as exc:
@@ -108,6 +116,10 @@ class PooledOLS(BaseEstimator):
         entities = sorted(panel.index.get_level_values(0).unique().tolist())
         times = sorted(panel.index.get_level_values(1).unique().tolist())
 
+        _rsq = float(res.rsquared)
+        _nobs = int(res.nobs)
+        _df_resid = int(res.df_resid)
+        _rsq_adj = 1.0 - (1.0 - _rsq) * (_nobs - 1) / _df_resid
         return EstimationResult(
             estimator_id=self.estimator_id,
             estimator_name=self.name,
@@ -115,11 +127,11 @@ class PooledOLS(BaseEstimator):
             std_err=res.std_errors,
             conf_int=ci,
             pvalues=res.pvalues,
-            nobs=int(res.nobs),
+            nobs=_nobs,
             ngroups=len(entities),
-            df_resid=int(res.df_resid),
-            rsquared=float(res.rsquared),
-            rsquared_adj=float(res.rsquared),
+            df_resid=_df_resid,
+            rsquared=_rsq,
+            rsquared_adj=_rsq_adj,
             f_statistic=float(res.f_statistic.stat) if hasattr(res, "f_statistic") else None,
             f_pvalue=float(res.f_statistic.pval) if hasattr(res, "f_statistic") else None,
             entity_col=entity_col,
@@ -127,8 +139,34 @@ class PooledOLS(BaseEstimator):
             entities=[str(e) for e in entities],
             time_periods=times,
             provenance=self._provenance_stamp(),
-            extra={"cov_type": cov_type},
+            extra={
+                "cov_type": cov_type,
+                # Diagnostic data — consumed by diagnostics() in Phase 3.
+                # residuals: standard OLS residuals from linearmodels PooledOLS,
+                #   in (entity, time) sorted order.
+                # residuals_index: MultiIndex tuples so EstimationResult.resids
+                #   can reconstruct a properly-indexed pd.Series (used by tests).
+                # X_vif_values: raw regressor matrix WITHOUT constant (correct for VIF).
+                # X_vif_columns: regressor names (no constant).
+                "residuals": res.resids.values.tolist(),
+                "residuals_index": [list(t) for t in res.resids.index.tolist()],
+                "X_vif_values": panel[regs].values.tolist(),
+                "X_vif_columns": list(regs),
+            },
         )
 
     def diagnostics(self, result: EstimationResult) -> list[DiagnosticResult]:
-        return []
+        """
+        Post-estimation diagnostics for Pooled OLS.
+
+        Returns
+        -------
+        list[DiagnosticResult]
+            Three diagnostics in order: VIF, Breusch-Pagan, Durbin-Watson.
+            Residuals are standard OLS residuals (no within-transformation).
+
+        Notes
+        -----
+        Semantics identical to ``EntityFE.diagnostics()`` with OLS residuals.
+        """
+        return compute_standard_diagnostics(result)

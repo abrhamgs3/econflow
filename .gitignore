@@ -98,3 +98,11 @@ secrets.yml
 examples/*/outputs/tables/
 examples/*/outputs/figures/
 examples/*/outputs/provenance/
+
+# ============================================================
+# User-generated study directories (created by econflow init)
+# These are workspace projects, not platform code.
+# ============================================================
+my_test_study/
+*_study/
+*_project/

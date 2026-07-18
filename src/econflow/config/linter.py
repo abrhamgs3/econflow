@@ -1,7 +1,7 @@
 """
 econflow.config.linter — Configuration linter for EconFlow YAML files.
 
-Architecture Stabilization Milestone 4.
+Architecture Stabilization Milestone 4 | Phase 4 (registry-driven validation).
 
 The linter runs *semantic* checks that go beyond JSON-schema validation:
 field types and presence are verified by the Pydantic models in
@@ -28,8 +28,13 @@ Lint rules
      - ``sample.start_year >= sample.end_year``
      - error
    * - L-04
-     - Unknown estimator string — suggests closest match
+     - Unknown estimator — not found in the live registry; suggests closest
+       registered ID and provides plugin registration guidance
      - warning
+   * - L-04b
+     - Estimator is registered with ``status="stub"`` — present in the registry
+       but raises ``NotImplementedError`` at runtime
+     - error
    * - L-05
      - Model regressors not declared in ``variables.regressors``
      - warning
@@ -57,6 +62,29 @@ Lint rules
    * - L-13
      - ``outputs.tables.formats`` contains an unrecognised renderer ID
      - warning
+   * - L-14
+     - ``cluster`` value is not one of ``"entity"``, ``"time"``, or ``""``
+       (empty); the pipeline does not silently fall back to entity clustering
+     - error
+
+Phase 4 note
+------------
+Rules L-04 and L-04b no longer compare against a hard-coded frozenset of
+estimator names.  Instead they call
+:func:`~econflow.estimation.dispatcher.EstimationDispatcher.resolve_id` and
+then :func:`~econflow.estimation.registry.get_estimator` to check whether the
+ID is in the **live registry** at validation time.  This means:
+
+* Plugin estimators registered via ``[project.entry-points."econflow.plugins"]``
+  are automatically accepted.
+* Stub estimators are detected via the ``status`` field in registry metadata
+  (``status="stub"``) rather than a second hardcoded frozenset.
+* Error messages list the currently registered estimators, not a hardcoded
+  list.
+
+If the estimation package is unavailable at validation time (e.g. in a CI
+environment where only the config dependencies are installed), the linter
+silently skips the L-04/L-04b checks rather than crashing.
 
 Usage
 -----
@@ -151,47 +179,155 @@ _SEMVER_RE = re.compile(
 
 _SUPPORTED_EXTENSIONS = frozenset({".csv", ".parquet", ".tsv"})
 
-# Canonical lower-case estimator IDs for implemented estimators.
-# gmm and quantile are registered stubs — they raise NotImplementedError at runtime
-# and are blocked by L-04b below.
-_CANONICAL_ESTIMATORS: frozenset[str] = frozenset(
-    {"ols", "fe", "twfe", "re", "fd", "iv"}
-)
-
-# Stub estimator IDs — present in registry but not yet implemented
-_STUB_ESTIMATORS: frozenset[str] = frozenset({"gmm", "quantile"})
-
-# Common aliases accepted by the validate command (implemented estimators only)
-_ESTIMATOR_ALIASES: dict[str, str] = {
-    "OLS": "ols", "FE": "fe", "TWFE": "twfe",
-    "RE": "re", "FD": "fd", "IV": "iv",
-    "PooledOLS": "ols", "EntityFE": "fe", "TwoWayFE": "twfe",
-    "RandomEffects": "re", "FirstDifference": "fd",
-    # Stub aliases preserved for detection (L-04b)
-    "GMM": "gmm", "QUANTILE": "quantile",
-    "SystemGMM": "gmm", "PanelQuantile": "quantile",
-    # Lowercase stub IDs so _resolve_estimator("gmm") returns "gmm" → L-04b fires
-    "gmm": "gmm", "quantile": "quantile",
-}
-
-
 #: Supported renderer IDs for L-13
 _SUPPORTED_FORMATS: frozenset[str] = frozenset(
     {"csv", "latex", "markdown", "html", "json"}
 )
 
+# ---------------------------------------------------------------------------
+# Phase 4 — registry-driven estimator validation
+# ---------------------------------------------------------------------------
 
-def _resolve_estimator(raw: str) -> str | None:
-    """Return the canonical estimator ID for *raw*, or None if not recognised."""
-    if raw in _CANONICAL_ESTIMATORS:
-        return raw
-    if raw in _ESTIMATOR_ALIASES:
-        return _ESTIMATOR_ALIASES[raw]
-    # Try canonical lookup after lower-casing
-    lower = raw.lower()
-    if lower in _CANONICAL_ESTIMATORS:
-        return lower
-    return None
+#: Valid values for the ``cluster`` field (L-14).
+#: ``"entity"`` and ``"time"`` are the two clustering dimensions accepted by
+#: :func:`~econflow.estimation.dispatcher._translate_cov`; empty string means
+#: no clustering.  Any other value is an error — the dispatcher does NOT
+#: silently fall back to entity clustering.
+_VALID_CLUSTER_VALUES: frozenset[str] = frozenset({"entity", "time", ""})
+
+#: Guidance shown in L-04 warnings so users know how to register plugins.
+_PLUGIN_REGISTRATION_HINT: str = (
+    "If you installed a plugin estimator, ensure it declares itself in "
+    "pyproject.toml under [project.entry-points.\"econflow.plugins\"].  "
+    "Run `econflow info` to list all currently registered estimators."
+)
+
+
+def _fmt_estimator_error(
+    raw: str,
+    suggestions: list[str],
+    available: list[str],
+) -> str:
+    """Build a human-readable L-04 error string.
+
+    Parameters
+    ----------
+    raw:
+        The unrecognised estimator string from the YAML file.
+    suggestions:
+        Closest registered estimator IDs (from :func:`difflib.get_close_matches`).
+    available:
+        All estimator IDs currently in the live registry.
+
+    Returns
+    -------
+    str
+        Ready-to-embed message fragment (no trailing newline).
+    """
+    parts: list[str] = [f"Unknown estimator '{raw}'."]
+    if suggestions:
+        parts.append(
+            f"Did you mean: {', '.join(repr(s) for s in suggestions)}?"
+        )
+    parts.append(f"Registered estimators: {available}.")
+    return "  ".join(parts)
+
+
+def _resolve_via_registry(
+    spec: dict,
+    live_estimator_ids: frozenset[str] | None,
+) -> tuple[str, bool, str | None]:
+    """
+    Resolve the estimator in *spec* against the live registry.
+
+    This is the single entry point for L-04 / L-04b logic.  All estimation
+    imports are deferred inside this function so the linter remains importable
+    even when the estimation package is not installed.
+
+    Parameters
+    ----------
+    spec:
+        Model spec dict from ``_lint_models()`` — must contain at minimum
+        ``"estimator"``, and optionally ``"entity_effects"`` / ``"time_effects"``
+        for the FE adapter in
+        :meth:`~econflow.estimation.dispatcher.EstimationDispatcher.resolve_id`.
+    live_estimator_ids:
+        If not ``None``, bypass the live registry entirely and check the
+        estimator against this set instead.  Intended for test isolation only:
+        pass ``frozenset({"ols", "fe", ...})`` to avoid importing the
+        estimation package in a unit test.
+
+    Returns
+    -------
+    tuple[str, bool, str | None]
+        ``(resolved_id, is_stub, error_message)``
+
+        * ``resolved_id`` — the dispatcher-resolved (lowercased) ID; best-effort
+          if the estimator is unknown.
+        * ``is_stub`` — ``True`` if the estimator is registered with
+          ``status="stub"`` in :data:`~econflow.estimation.registry._REGISTRY_META`.
+        * ``error_message`` — ``None`` when the estimator is valid and
+          implemented; a non-empty string when it is unknown (L-04) or when
+          the check could not be performed (caller should treat as valid).
+    """
+    raw = str(spec.get("estimator", "")).strip()
+
+    # ------------------------------------------------------------------
+    # Override path: test-isolation via live_estimator_ids
+    # ------------------------------------------------------------------
+    if live_estimator_ids is not None:
+        lower = raw.lower()
+        if lower in live_estimator_ids:
+            return lower, False, None
+        available = sorted(live_estimator_ids)
+        suggestions = get_close_matches(lower, available, n=2, cutoff=0.4)
+        return lower, False, _fmt_estimator_error(raw, suggestions, available)
+
+    # ------------------------------------------------------------------
+    # Live registry path (default)
+    # ------------------------------------------------------------------
+    # Lazy imports: keep the linter importable without the estimation package.
+    try:
+        import warnings as _warnings  # noqa: PLC0415
+        from econflow.estimation.dispatcher import (  # noqa: PLC0415
+            EstimationDispatcher as _Dispatcher,
+        )
+        from econflow.estimation.registry import (  # noqa: PLC0415
+            RegistryError as _RegistryError,
+            get_estimator as _get_estimator,
+            list_estimators as _list_estimators,
+        )
+    except ImportError:
+        # Estimation package unavailable — skip estimator validation silently.
+        return raw.lower(), False, None
+
+    # Resolve via dispatcher (handles case normalisation and the FE adapter).
+    try:
+        with _warnings.catch_warnings():
+            _warnings.simplefilter("ignore", DeprecationWarning)
+            resolved = _Dispatcher.resolve_id(spec)
+    except Exception:  # noqa: BLE001
+        resolved = raw.lower()
+
+    # Check whether the resolved ID is in the registry.
+    try:
+        _get_estimator(resolved)
+    except _RegistryError:
+        available = sorted(e["id"] for e in _list_estimators())
+        suggestions = get_close_matches(raw.lower(), available, n=2, cutoff=0.4)
+        return resolved, False, _fmt_estimator_error(raw, suggestions, available)
+    except Exception:  # noqa: BLE001
+        # Unexpected error — don't crash the linter; treat as valid.
+        return resolved, False, None
+
+    # Valid estimator — check stub status via registry metadata.
+    try:
+        meta_map = {e["id"]: e for e in _list_estimators()}
+        is_stub = meta_map.get(resolved, {}).get("status") == "stub"
+    except Exception:  # noqa: BLE001
+        is_stub = False
+
+    return resolved, is_stub, None
 
 
 # ---------------------------------------------------------------------------
@@ -209,16 +345,23 @@ class ConfigLinter:
     Parameters
     ----------
     live_estimator_ids:
-        Override the set of known estimator IDs.  Defaults to the built-in
-        set of 8 estimators.  Pass the result of
-        ``{e["id"] for e in list_estimators()}`` to use the live registry.
+        Override for estimator ID validation.  When ``None`` (the default),
+        L-04 and L-04b resolve estimators through the live registry via
+        :func:`~econflow.estimation.dispatcher.EstimationDispatcher.resolve_id`
+        and :func:`~econflow.estimation.registry.get_estimator`.
+
+        Pass a ``frozenset[str]`` to bypass the live registry entirely —
+        useful in unit tests that need to isolate from the estimation package.
+        The set should contain only lowercase registry keys (e.g.
+        ``frozenset({"ols", "fe", "twfe"})``).
     """
 
     def __init__(
         self,
         live_estimator_ids: frozenset[str] | None = None,
     ) -> None:
-        self._estimator_ids = live_estimator_ids or _CANONICAL_ESTIMATORS
+        # None means "use the live registry"; a frozenset is a test override.
+        self._estimator_ids = live_estimator_ids
 
     # ------------------------------------------------------------------
     # Public API
@@ -433,6 +576,7 @@ class ConfigLinter:
                         "entity_effects": getattr(m, "entity_effects", False),
                         "time_effects": getattr(m, "time_effects", False),
                         "instruments": list(getattr(m, "instruments", None) or []),
+                        "cluster": str(getattr(m, "cluster", "") or ""),
                     }
                     for m in cfg.models  # type: ignore[union-attr]
                 ]
@@ -446,6 +590,10 @@ class ConfigLinter:
                     "dependent": s.get("dependent", ""),
                     "regressors": list(s.get("regressors") or []),
                     "label": s.get("label", ""),
+                    "entity_effects": bool(s.get("entity_effects", False)),
+                    "time_effects": bool(s.get("time_effects", False)),
+                    "instruments": list(s.get("instruments") or []),
+                    "cluster": str(s.get("cluster", "") or ""),
                 }
                 for s in (raw.get("models") or [])
             ]
@@ -455,52 +603,79 @@ class ConfigLinter:
             loc = f"models.yaml: model '{mid}'"
 
             est_raw = spec["estimator"]
-            resolved = _resolve_estimator(est_raw)
 
-            # L-04: unknown estimator (with suggestion)
-            if est_raw and resolved is None:
-                suggestions = get_close_matches(
-                    est_raw.lower(),
-                    [e.lower() for e in self._estimator_ids],
-                    n=2,
-                    cutoff=0.5,
+            # ----------------------------------------------------------
+            # L-04 / L-04b — estimator resolution via live registry
+            # ----------------------------------------------------------
+            resolved_id: str = est_raw.lower() if est_raw else ""
+            if est_raw:
+                resolved_id, is_stub, err_msg = _resolve_via_registry(
+                    spec, self._estimator_ids
                 )
-                hint = ""
-                if suggestions:
-                    hint = f"  Did you mean: {', '.join(repr(s) for s in suggestions)}?"
-                issues.append(LintIssue(
-                    code="L-04",
-                    severity="warning",
-                    message=f"Unknown estimator '{est_raw}' in model '{mid}'.{hint}",
-                    fix=(
-                        "Use one of the registered estimator IDs.  "
-                        "Run `econflow info` to list all available estimators."
-                    ),
-                    example=(
-                        f"  estimator: \"fe\"  "
-                        f"# valid IDs: {sorted(self._estimator_ids)}"
-                    ),
-                    location=loc,
-                ))
 
-            # L-04b: stub estimator — exists in registry but not implemented
-            elif est_raw and resolved in _STUB_ESTIMATORS:
+                if err_msg is not None:
+                    # L-04: estimator not found in the live registry
+                    issues.append(LintIssue(
+                        code="L-04",
+                        severity="warning",
+                        message=f"Model '{mid}': {err_msg}",
+                        fix=_PLUGIN_REGISTRATION_HINT,
+                        example='  estimator: "fe"  # example of a valid built-in estimator',
+                        location=loc,
+                    ))
+
+                elif is_stub:
+                    # L-04b: estimator registered with status="stub"
+                    issues.append(LintIssue(
+                        code="L-04b",
+                        severity="error",
+                        message=(
+                            f"Estimator '{est_raw}' (resolved: '{resolved_id}') "
+                            "is registered but not yet implemented — it will raise "
+                            "NotImplementedError at runtime."
+                        ),
+                        fix=(
+                            "Use an implemented estimator.  "
+                            "Run `econflow info` to list all available estimators."
+                        ),
+                        example='  estimator: "fe"  # two-way fixed effects',
+                        location=loc,
+                    ))
+
+            # ----------------------------------------------------------
+            # L-14 — cluster value must be "entity", "time", or ""
+            # ----------------------------------------------------------
+            cluster_val = spec.get("cluster", "")
+            if cluster_val and cluster_val not in _VALID_CLUSTER_VALUES:
+                _cluster_candidates = sorted(_VALID_CLUSTER_VALUES - {""})
+                suggestions = get_close_matches(
+                    cluster_val, _cluster_candidates, n=1, cutoff=0.5
+                )
+                hint = f"  Did you mean: '{suggestions[0]}'?" if suggestions else ""
                 issues.append(LintIssue(
-                    code="L-04b",
+                    code="L-14",
                     severity="error",
                     message=(
-                        f"Estimator '{est_raw}' is registered but not yet implemented. "
-                        f"It will raise NotImplementedError at runtime."
+                        f"Model '{mid}': invalid cluster value '{cluster_val}'.{hint}  "
+                        f"Valid values: {_cluster_candidates} or '' (no clustering)."
                     ),
                     fix=(
-                        "Use an implemented estimator. "
-                        "Available: ols, fe, twfe, re, fd, iv."
+                        "Set cluster to 'entity' (cluster by cross-sectional unit), "
+                        "'time' (cluster by time period), or remove the field for "
+                        "heteroskedasticity-robust standard errors.  "
+                        "The pipeline does not silently fall back to entity clustering."
                     ),
-                    example='  estimator: "fe"  # two-way fixed effects',
-                    location=loc,
+                    example=(
+                        "  cluster: entity   # cluster by cross-sectional unit\n"
+                        "  # cluster: time   # cluster by time period\n"
+                        "  # cluster: \"\"    # no clustering (HC robust SEs)"
+                    ),
+                    location=f"{loc}: cluster",
                 ))
 
-            # L-05: model regressors not in config regressors
+            # ----------------------------------------------------------
+            # L-05 — model regressors not in config regressors
+            # ----------------------------------------------------------
             if config_regressors:
                 extra = set(spec["regressors"]) - config_regressors
                 if extra:
@@ -519,7 +694,9 @@ class ConfigLinter:
                         location=loc,
                     ))
 
-            # L-09: model dependent differs from config dependent
+            # ----------------------------------------------------------
+            # L-09 — model dependent differs from config dependent
+            # ----------------------------------------------------------
             if config_dep and spec["dependent"] and spec["dependent"] != config_dep:
                 issues.append(LintIssue(
                     code="L-09",
@@ -535,7 +712,9 @@ class ConfigLinter:
                     location=loc,
                 ))
 
-            # L-10: empty label
+            # ----------------------------------------------------------
+            # L-10 — empty label
+            # ----------------------------------------------------------
             if not spec.get("label"):
                 issues.append(LintIssue(
                     code="L-10",
@@ -545,10 +724,12 @@ class ConfigLinter:
                     location=loc,
                 ))
 
-            # L-11: IV estimator with no instruments
+            # ----------------------------------------------------------
+            # L-11 — IV estimator with no instruments
+            # ----------------------------------------------------------
             est_lower = (est_raw or "").lower()
             _iv_aliases = {"iv", "iv2sls", "2sls"}
-            if est_lower in _iv_aliases or (resolved == "iv"):
+            if est_lower in _iv_aliases or resolved_id == "iv":
                 instruments = spec.get("instruments") or []
                 if not instruments:
                     # Also check if instruments exist at config level
@@ -586,9 +767,11 @@ class ConfigLinter:
                             location=loc,
                         ))
 
-            # L-12: TWFE but effects flags not set
+            # ----------------------------------------------------------
+            # L-12 — TWFE but effects flags not set
+            # ----------------------------------------------------------
             _twfe_aliases = {"twfe", "two_way_fe", "twfe_robust"}
-            if est_lower in _twfe_aliases or (resolved == "twfe"):
+            if est_lower in _twfe_aliases or resolved_id == "twfe":
                 entity_fx = spec.get("entity_effects", False)
                 time_fx = spec.get("time_effects", False)
                 if not entity_fx and not time_fx:

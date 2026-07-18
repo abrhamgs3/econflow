@@ -76,14 +76,18 @@ econflow run \
 Expected output (abbreviated):
 
 ```
-─────────── EconFlow pipeline ───────────
-  Stage 1  Load data          ✔
-  Stage 2  Validate           ✔
-  Stage 3  Estimate models    ✔  (3 models)
-  Stage 4  Diagnostics        ✔
-  Stage 5  Render outputs     ✔
-─────────────────────────────────────────
-  Tables written to outputs/tables/
+──────────────── EconFlow 0.1.0 ────────────────
+
+INFO  [1/5] Loading data: data/processed/panel.csv
+INFO       200 obs | 10 firms | 20 times
+INFO  [2/5] Validating panel structure
+INFO  [3/5] Running models
+INFO  [3.5/5] Writing diagnostics
+INFO  [4/5] Exporting tables
+INFO  [5/5] Recording provenance
+
+────────────────── Pipeline complete ──────────────────
+  Completed in 3.2 s
 ```
 
 Check the output:

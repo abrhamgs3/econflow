@@ -51,7 +51,7 @@ Install EconFlow as a dependency of your plugin package:
 [project]
 name = "econflow-myplugin"
 version = "0.1.0"
-dependencies = ["econflow>=1.0,<2.0"]
+dependencies = ["econflow>=0.1.0"]
 ```
 
 Write a plugin module:
@@ -73,9 +73,10 @@ class MyOLS(BaseEstimator):
     def fit(self, data):
         # ... your implementation ...
         return EstimationResult(
-            params=..., std_err=..., pvalues=...,
-            nobs=len(data), rsq=0.0,
-            estimator_id="my_ols",
+            estimator_id="my_ols", estimator_name="My OLS",
+            params=..., std_err=..., conf_int=..., pvalues=...,
+            nobs=len(data), ngroups=0, df_resid=len(data) - 1,
+            rsquared=0.0, rsquared_adj=0.0,
         )
 
     def diagnostics(self, result):
@@ -231,14 +232,19 @@ class BaseEstimator(abc.ABC):
         Returns
         -------
         EstimationResult
-            Must contain at minimum:
+            Must contain at minimum (all are required, non-default fields):
+            - ``estimator_id``: str matching the registered ID.
+            - ``estimator_name``: human-readable estimator name.
             - ``params``: pd.Series of coefficient estimates, indexed
               by variable name.
             - ``std_err``: pd.Series of standard errors, same index.
+            - ``conf_int``: pd.DataFrame with columns ``["lower", "upper"]``.
             - ``pvalues``: pd.Series of p-values, same index.
             - ``nobs``: int, number of observations used.
-            - ``rsq``: float or None.
-            - ``estimator_id``: str matching the registered ID.
+            - ``ngroups``: int, number of unique entities (0 if not applicable).
+            - ``df_resid``: int, residual degrees of freedom.
+            - ``rsquared``: float. R-squared, or within-R² for FE models.
+            - ``rsquared_adj``: float. Adjusted R-squared.
 
         Raises
         ------
@@ -281,7 +287,7 @@ class BaseEstimator(abc.ABC):
         Notes
         -----
         This method must not raise an exception. If a diagnostic cannot
-        be computed, return a ``DiagnosticResult`` with ``level="warn"``
+        be computed, return a ``DiagnosticResult`` with ``level="warning"``
         and an explanatory message rather than raising.
         """
 
@@ -364,6 +370,13 @@ class BaseEstimator(abc.ABC):
 
 ### 2.3 `EstimationResult` — the return contract
 
+> **Corrected 2026-07-17** against the live dataclass in
+> `src/econflow/estimation/result.py`. The field is `rsquared`, not `rsq`,
+> and the required-fields list below was previously missing `estimator_name`,
+> `conf_int`, `ngroups`, `df_resid`, and `rsquared_adj` — all five are
+> non-optional dataclass fields with no default, so every estimator must set
+> them.
+
 ```python
 from dataclasses import dataclass, field
 from typing import Any
@@ -372,13 +385,18 @@ from econflow.estimation import DiagnosticResult
 
 @dataclass
 class EstimationResult:
-    # Required fields — must be set by every estimator
+    # Required fields — must be set by every estimator (no defaults)
+    estimator_id: str          # matches the registered ID
+    estimator_name: str        # human-readable estimator name
     params: pd.Series          # coefficient estimates
     std_err: pd.Series         # standard errors (same index as params)
+    conf_int: pd.DataFrame     # 95% CI — columns ["lower", "upper"]
     pvalues: pd.Series         # p-values (same index as params)
     nobs: int                  # number of observations used
-    rsq: float | None          # R-squared; None if not meaningful
-    estimator_id: str          # matches the registered ID
+    ngroups: int               # number of unique entities (0 if not applicable)
+    df_resid: int              # residual degrees of freedom
+    rsquared: float            # R-squared, or within-R² for FE models
+    rsquared_adj: float        # adjusted R-squared
 
     # Strongly recommended
     f_statistic: float | None = None
@@ -556,18 +574,30 @@ class DriscollKraayEstimator(BaseEstimator):
         pvals = 2 * t_dist.sf(np.abs(t_stats), df=T - 1)
 
         index = X.columns.tolist()
-        rsq = float(1 - np.var(resid) / np.var(y)) if np.var(y) > 0 else None
+        rsquared = float(1 - np.var(resid) / np.var(y)) if np.var(y) > 0 else 0.0
+        df_resid = int(n - k)
+        rsquared_adj = 1.0 - (1.0 - rsquared) * (n - 1) / df_resid if df_resid > 0 else rsquared
+        entities = df[entity_col].unique().tolist()
+        ci_crit = t_dist.ppf(0.975, df=T - 1)
+        conf_int = pd.DataFrame(
+            {"lower": beta - ci_crit * se, "upper": beta + ci_crit * se}, index=index
+        )
 
         return EstimationResult(
+            estimator_id="driscoll_kraay",
+            estimator_name="Driscoll-Kraay OLS",
             params=pd.Series(beta, index=index),
             std_err=pd.Series(se, index=index),
+            conf_int=conf_int,
             pvalues=pd.Series(pvals, index=index),
             nobs=int(n),
-            rsq=rsq,
-            estimator_id="driscoll_kraay",
+            ngroups=len(entities),
+            df_resid=df_resid,
+            rsquared=rsquared,
+            rsquared_adj=rsquared_adj,
             entity_col=entity_col,
             time_col=time_col,
-            entities=df[entity_col].unique().tolist(),
+            entities=entities,
             time_periods=sorted(df[time_col].unique().tolist()),
         )
 
@@ -1369,8 +1399,16 @@ from econflow.estimation import DiagnosticResult, EstimationResult
 
 ### 4.2 Contract: `BaseDiagnostic`
 
+> **Corrected 2026-07-17** against the live class in
+> `src/econflow/diagnostics/base.py`. The abstract `run()` takes `**kwargs`,
+> not a fixed `data` parameter; `supported_estimators` defaults to `["*"]`,
+> not `None`; and the returned `DiagnosticResult`'s field is `diagnostic_id`
+> (not `check`), with `level` values `"info"` / `"warning"` / `"error"` /
+> `"skip"` (not `"warn"` / `"fail"`).
+
 ```python
 import abc
+from typing import Any
 from econflow.estimation import DiagnosticResult, EstimationResult
 
 class BaseDiagnostic(abc.ABC):
@@ -1388,22 +1426,22 @@ class BaseDiagnostic(abc.ABC):
     description : str
         One-sentence description of what the test checks.
 
-    supported_estimators : list[str] | None
-        List of estimator IDs this diagnostic supports, or ``None``
-        to support all estimators. Override ``supports()`` for complex
+    supported_estimators : list[str]
+        List of estimator IDs this diagnostic supports. Defaults to
+        ``["*"]`` (all estimators). Override ``supports()`` for complex
         logic.
     """
 
-    diagnostic_id: str = ""
-    name: str = ""
+    diagnostic_id: str = "base"
+    name: str = "BaseDiagnostic"
     description: str = ""
-    supported_estimators: list[str] | None = None
+    supported_estimators: list[str] = ["*"]
 
     @abc.abstractmethod
     def run(
         self,
         result: EstimationResult,
-        data: "pd.DataFrame | None" = None,
+        **kwargs: "Any",
     ) -> DiagnosticResult:
         """
         Run the diagnostic and return a structured result.
@@ -1413,18 +1451,24 @@ class BaseDiagnostic(abc.ABC):
         result : EstimationResult
             The estimation result to diagnose.
 
-        data : pd.DataFrame, optional
-            The original panel dataset. Required by some diagnostics
-            (e.g., those that re-estimate auxiliary regressions).
-            Optional for diagnostics that work from the result alone.
+        **kwargs
+            Diagnostic-specific keyword arguments (e.g. alternative
+            estimator results for a Hausman test, or the original panel
+            DataFrame for diagnostics that re-estimate auxiliary
+            regressions). There is no fixed ``data=`` parameter in the
+            base signature; each diagnostic declares whatever kwargs
+            it needs.
 
         Returns
         -------
         DiagnosticResult
-            Fields:
+            Fields (see ``src/econflow/estimation/result.py``):
 
-            ``check`` (str)
-                Name of the test.
+            ``diagnostic_id`` (str)
+                Registry ID of the diagnostic (e.g. ``"hausman"``).
+
+            ``diagnostic_name`` (str)
+                Human-readable name of the test.
 
             ``statistic`` (float or None)
                 Test statistic value.
@@ -1437,7 +1481,13 @@ class BaseDiagnostic(abc.ABC):
                 ``"Reject H0: evidence of endogeneity (p=0.012)"``.
 
             ``level`` (str)
-                ``"info"``, ``"warn"``, or ``"error"``.
+                ``"info"``, ``"warning"``, ``"error"``, or ``"skip"``.
+                (``"skip"`` is set directly by ``_not_applicable()``; there
+                is no separate ``status`` field.)
+
+            ``estimator_id`` (str)
+                Populated automatically by ``run_with_context()`` — do
+                not set it yourself inside ``run()``.
 
             ``extra`` (dict)
                 Additional output (degrees of freedom, critical values, etc.).
@@ -1459,7 +1509,7 @@ class BaseDiagnostic(abc.ABC):
         """
         Return True if this diagnostic supports the given estimator.
 
-        Default: returns True if ``supported_estimators`` is None,
+        Default: returns True if ``supported_estimators == ["*"]``,
         or if ``estimator_id`` is in ``supported_estimators``.
         Override for complex logic.
         """
@@ -1468,30 +1518,47 @@ class BaseDiagnostic(abc.ABC):
     def run_with_context(
         self,
         result: EstimationResult,
-        data: "pd.DataFrame | None" = None,
+        **kwargs: "Any",
     ) -> DiagnosticResult:
         """
-        Check ``supports()`` before calling ``run()``. Stamps
-        ``estimator_id`` on the returned result. Intended for use by
-        the pipeline. Do not call ``run()`` directly from the pipeline.
+        Call ``run()`` and stamp ``estimator_id`` on the returned result
+        from ``result.estimator_id``. This is the preferred entry point
+        for pipeline code — do not call ``run()`` directly from the
+        pipeline. Note: this method does not itself check ``supports()``;
+        the pipeline is responsible for calling ``supports()`` before
+        deciding whether to invoke a diagnostic at all.
         """
         ...
 
     def _not_applicable(self, reason: str = "") -> DiagnosticResult:
-        """Return a DiagnosticResult with level="info" and status="skip"."""
+        """
+        Return a skipped / not-applicable ``DiagnosticResult`` with
+        ``level="skip"`` set directly (there is no separate ``status``
+        field). ``conclusion`` is ``f"Not applicable: {reason}"`` if a
+        reason is given, else ``"Not applicable."``.
+        """
+        ...
+
+    def _not_applicable(self, reason: str = "") -> DiagnosticResult:
+        """Return a DiagnosticResult with level="skip" set directly
+        (there is no separate status field)."""
         ...
 ```
 
 ### 4.3 `DiagnosticResult` — the return contract
 
+> **Corrected 2026-07-17** against the live dataclass in
+> `src/econflow/estimation/result.py`.
+
 ```python
 @dataclass
 class DiagnosticResult:
-    check: str               # name of the diagnostic
+    diagnostic_id: str       # registry ID of the diagnostic, e.g. "hausman"
+    diagnostic_name: str     # human-readable name
     statistic: float | None = None
     pvalue: float | None = None
     conclusion: str = ""     # human-readable conclusion
-    level: str = "info"      # "info" | "warn" | "error"
+    level: str = "info"      # "info" | "warning" | "error" | "skip"
     estimator_id: str = ""   # set automatically by run_with_context()
     extra: dict = field(default_factory=dict)
 ```
@@ -1588,7 +1655,7 @@ class MoransITest(BaseDiagnostic):
             statistic=float(I),
             pvalue=pvalue,
             conclusion=conclusion,
-            level="warn" if pvalue < 0.05 else "info",
+            level="warning" if pvalue < 0.05 else "info",
             extra={"z_score": float(z), "E_I": float(E_I)},
         )
 ```
@@ -2348,7 +2415,7 @@ python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
 
 # Install EconFlow as a dependency
-pip install "econflow>=1.0,<2.0"
+pip install "econflow>=0.1.0"
 
 # Install development tools
 pip install pytest pytest-cov ruff mypy
@@ -2376,7 +2443,7 @@ name = "econflow-my-estimator"
 version = "0.1.0"
 description = "My custom estimator plugin for EconFlow"
 requires-python = ">=3.10"
-dependencies = ["econflow>=1.0,<2.0"]
+dependencies = ["econflow>=0.1.0"]
 
 [project.entry-points."econflow.plugins"]
 my_estimator = "my_econflow_plugin.my_estimator"
@@ -2468,7 +2535,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - run: pip install "econflow>=1.0,<2.0" pytest ruff mypy
+      - run: pip install "econflow>=0.1.0" pytest ruff mypy
       - run: pip install -e .
       - run: ruff check src/ tests/
       - run: mypy --strict src/
@@ -2540,13 +2607,21 @@ raise `RegistryError` immediately. Others are caught at runtime.
 
 ### 11.1 EconFlow version pinning
 
-All plugins should pin to a minor-version range:
+EconFlow is currently at v0.1.0 (pre-v1.0). Use a lower-bound-only pin until
+EconFlow reaches v1.0:
+
+```toml
+dependencies = ["econflow>=0.1.0"]
+```
+
+Once EconFlow reaches v1.0 and the full semver compatibility promise applies
+(see §11.2), tighten to a minor-version range:
 
 ```toml
 dependencies = ["econflow>=1.0,<2.0"]
 ```
 
-This is correct because:
+This is correct at v1.0+ because:
 - EconFlow follows Semantic Versioning 2.0.0.
 - Plugin interfaces are frozen within all v1.x releases (see §13).
 - Breaking changes to plugin interfaces only occur in major version bumps
@@ -2554,10 +2629,10 @@ This is correct because:
 - New plugin types, new optional methods, and new optional parameters may be
   added in minor releases without breaking existing plugins.
 
-Do not pin to a patch version (`econflow==1.0.3`). Patch releases fix bugs;
+Do not pin to a patch version (`econflow==0.1.3`). Patch releases fix bugs;
 pinning prevents researchers from receiving security and correctness fixes.
 
-Do not pin across a major version (`econflow>=1.0,<3.0`). Major versions may
+Do not pin across a major version (`econflow>=0.1,<2.0`). Major versions may
 change plugin interfaces.
 
 ### 11.2 EconFlow's compatibility commitment to plugins
@@ -2657,13 +2732,13 @@ not be called during a pipeline run.
 ```python
 # In a pytest fixture — restore registry state after each test
 import pytest
-from econflow.estimation import register_estimator, _unregister_estimator
+from econflow.estimation import register_estimator, unregister_estimator
 
 @pytest.fixture(autouse=True)
 def clean_registry():
     """Ensure test estimators do not persist between tests."""
     yield
-    _unregister_estimator("test_estimator")  # underscore: internal
+    unregister_estimator("test_estimator")
 ```
 
 Do not use `unregister_*()` in production code.
@@ -2747,15 +2822,23 @@ register_config_extension(extension_id)
 
 ### 13.3 Frozen: result type fields
 
-The following fields of `EstimationResult` will not be removed or renamed:
+The following fields of `EstimationResult` will not be removed or renamed
+(corrected 2026-07-17 against `src/econflow/estimation/result.py`; the
+field is `rsquared`, not `rsq`, and this list previously omitted five
+required fields — `estimator_name`, `conf_int`, `ngroups`, `df_resid`,
+and `rsquared_adj`):
 
-`params`, `std_err`, `pvalues`, `nobs`, `rsq`, `estimator_id`,
+`estimator_id`, `estimator_name`, `params`, `std_err`, `conf_int`,
+`pvalues`, `nobs`, `ngroups`, `df_resid`, `rsquared`, `rsquared_adj`,
 `f_statistic`, `f_pvalue`, `entity_col`, `time_col`, `entities`,
 `time_periods`, `diagnostic_results`, `warnings`, `provenance`, `extra`.
 
-The following fields of `DiagnosticResult` will not be removed or renamed:
+The following fields of `DiagnosticResult` will not be removed or renamed
+(corrected 2026-07-17: the field is `diagnostic_id`, not `check`, and
+`diagnostic_name` was previously omitted):
 
-`check`, `statistic`, `pvalue`, `conclusion`, `level`, `estimator_id`, `extra`.
+`diagnostic_id`, `diagnostic_name`, `statistic`, `pvalue`, `conclusion`,
+`level`, `estimator_id`, `extra`.
 
 The following fields of `IntegrityCheckResult` will not be removed or renamed:
 
@@ -2809,8 +2892,8 @@ stub behavior.
 Before releasing a new version of your plugin, verify compatibility:
 
 ```bash
-# Install the latest EconFlow minor release
-pip install "econflow>=1.0,<2.0" --upgrade
+# Install the latest EconFlow release
+pip install "econflow>=0.1.0" --upgrade
 
 # Re-run your test suite
 pytest --tb=short
@@ -2864,7 +2947,7 @@ Before publishing your plugin, confirm each of the following:
 - [ ] Tests do not require network access by default (use mocks).
 
 **Packaging**
-- [ ] `pyproject.toml` pins `econflow>=1.0,<2.0`.
+- [ ] `pyproject.toml` depends on `econflow>=0.1.0` (tighten to `econflow>=1.0,<2.0` once EconFlow reaches v1.0).
 - [ ] Entry point declared under `econflow.plugins`.
 - [ ] `__init__.py` imports the plugin module to trigger registration.
 

@@ -46,7 +46,7 @@ from typing import Any
 # ---------------------------------------------------------------------------
 
 @dataclass
-class ValidationIssue:
+class DataValidationIssue:
     """A single validation issue -- an error or a warning."""
 
     code: str           # e.g. "V-02"
@@ -83,7 +83,7 @@ class DataValidationReport:
     row_count: int
     col_count: int
     columns: list[str] = field(default_factory=list)
-    issues: list[ValidationIssue] = field(default_factory=list)
+    issues: list[DataValidationIssue] = field(default_factory=list)
 
     # ------------------------------------------------------------------
     # Mutators
@@ -91,13 +91,13 @@ class DataValidationReport:
 
     def add_error(self, code: str, check: str, message: str, detail: str = "") -> None:
         """Append an error-level issue."""
-        self.issues.append(ValidationIssue(
+        self.issues.append(DataValidationIssue(
             code=code, check=check, level="error", message=message, detail=detail
         ))
 
     def add_warning(self, code: str, check: str, message: str, detail: str = "") -> None:
         """Append a warning-level issue."""
-        self.issues.append(ValidationIssue(
+        self.issues.append(DataValidationIssue(
             code=code, check=check, level="warning", message=message, detail=detail
         ))
 
@@ -398,3 +398,12 @@ class DataValidator:
                 f"{len(missing)} expected year(s) absent from {tc!r}: {missing[:10]}"
                 f"{'...' if len(missing) > 10 else ''}",
             )
+
+
+# ---------------------------------------------------------------------------
+# Backward-compatibility alias (deprecated — will be removed in v2.0)
+# ---------------------------------------------------------------------------
+
+#: Deprecated alias for :class:`DataValidationIssue`.
+#: Use ``DataValidationIssue`` in all new code.
+ValidationIssue = DataValidationIssue

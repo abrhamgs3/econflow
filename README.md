@@ -139,4 +139,58 @@ econflow info         Show platform and project information
 econflow fetch        Fetch data from an external connector
 econflow cache        Manage the local data cache
 econflow datasets     List available data connectors
-econfl
+econflow release-check  Run the release quality gate
+```
+
+---
+
+## Testing
+
+```bash
+pytest                   # full suite
+pytest tests/unit/       # unit tests only
+pytest tests/integration/ # integration tests
+```
+
+---
+
+## Examples
+
+| Example | Description |
+|---------|-------------|
+| [`examples/getting_started/`](examples/getting_started/) | 10-minute tutorial — Grunfeld firm investment panel (1935–1954) |
+| [`examples/blind_replication/`](examples/blind_replication/) | Blind replication walkthrough |
+| [`examples/ai_productivity_paper/`](examples/ai_productivity_paper/) | The original research project that motivated EconFlow's development — *AI Adoption and Total Factor Productivity: Panel Evidence from 193 Countries* |
+
+---
+
+## Contributing
+
+Contributions are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md)
+before opening a pull request. Bug reports and feature requests go in
+[GitHub Issues](https://github.com/abrhamgs3/econflow/issues).
+
+---
+
+## Citation
+
+If you use EconFlow in academic work, please cite it:
+
+```bibtex
+@software{econflow2026,
+  author  = {Meressa, Abrha Megos},
+  title   = {{EconFlow}: Open-source platform for reproducible panel econometric research},
+  year    = {2026},
+  version = {0.1.0},
+  url     = {https://github.com/abrhamgs3/econflow},
+  license = {MIT}
+}
+```
+
+A `CITATION.cff` file is also provided for tools that read it automatically.
+
+---
+
+## License
+
+[MIT](LICENSE) © 2026 Abrha Megos Meressa

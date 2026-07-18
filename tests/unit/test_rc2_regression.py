@@ -411,4 +411,4 @@ class TestM4FromDictExplicit:
         t = ReportTable(title="T", table_type="regression", columns=["(1)"])
         t.add_row(TableRow(label="N", cells={"(1)": "100"}, sub_cells=None))
         t2 = ReportTable.from_dict(t.to_dict())
- 
+        assert t2.rows[0].sub_cells is None

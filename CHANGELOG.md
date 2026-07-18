@@ -1,5 +1,171 @@
 # Changelog
 
+## [Unreleased] — Repository Integrity Repair (2026-07-18)
+
+Follows an independent Repository Integrity Audit
+(`docs/release/REPOSITORY_INTEGRITY_REPORT.md`) that found the dispatcher
+migration and Sprint S1/S2 scientific corrections below existed only in the
+working tree, several regression fixtures had gone stale relative to the
+Sprint S1 changes, and `docs/sdk/PLUGIN_SDK.md` had six confirmed mismatches
+against the live `EstimationResult`/`DiagnosticResult`/`BaseDiagnostic`
+interfaces. This entry documents the repair pass; the entries below it
+(Architecture Freeze / dispatcher migration / Sprint S1 / Sprint S2) were
+themselves previously undocumented in this file despite being complete in
+source, which was itself one of the audit's findings.
+
+### Fixed
+- **Stale regression tests for Sprint S1's FE adjusted-R² fix**:
+  `tests/unit/test_estimation_fixed_effects.py` was written against the
+  pre-Sprint-S1 "Phase 1" formula (`(N-1)/df_resid`, OLS-style) and pinned
+  expected values (EntityFE adj-R² ≈0.7531, TwoWayFE ≈0.680, TwoWayFE
+  rsquared ≈0.7253 overall). Sprint S1 (SC-1, SC-2, and the TwoWayFE
+  Blocker-1 correction) deliberately superseded these with the "fixest
+  convention" within-adjusted R² and within-R² as the primary `rsquared`
+  field. Updated all affected assertions/docstrings to the current,
+  committee-reviewed formula and values (EntityFE adj-R² ≈0.7644, TwoWayFE
+  adj-R² ≈0.7540, TwoWayFE rsquared ≈0.7566).
+- **Stale clustered-SE pin**: `test_std_err_unchanged` (EntityFE) pinned
+  `0.01443801842296304`; the currently-installed linearmodels 7.0, called
+  with the exact same `PanelOLS(...).fit(cov_type="clustered",
+  cluster_entity=True)` signature econflow's source uses, returns
+  `0.014404865638860937`. Verified directly against a fresh linearmodels
+  call before repinning — this is dependency-version-sensitive output, not
+  an econflow computation, and Sprint S1 explicitly did not touch SE
+  computation.
+- **Broken fixture-regeneration helper**: `_run_pipeline()` in
+  `tests/integration/test_pipeline_baseline.py` passed the config path as a
+  bare positional CLI argument; `econflow run` only accepts `--config`.
+  This made the helper a silent no-op (dead code — never called elsewhere
+  in the file either). Fixed to pass `--config` explicitly.
+- **Stale baseline fixtures**: `tests/integration/fixtures/baseline/{diagnostics.csv,comparison_table.csv,comparison_table.tex}`
+  and `examples/getting_started/expected_outputs/{diagnostics.csv,table_fe_investment.csv,table_fe_investment.tex}`
+  were captured before the Sprint S1 Bhargava-Franzini-Narendranathan (1982)
+  panel Durbin-Watson formula and the comparison-table label-lookup
+  behavior existed (confirmed independently by file mtime: fixtures dated
+  2026-07-10 08:4x, `_diagnostics.py`'s last change dated 2026-07-12).
+  Regenerated from a live `econflow run` against the current source and
+  updated the file's self-consistency tests (`test_baseline_csv_has_three_model_columns`
+  and related) to expect label-based column headers ("Pooled OLS", "Entity FE",
+  "Two-Way FE") instead of raw registry ids.
+- **`docs/sdk/PLUGIN_SDK.md`** — six confirmed documentation defects
+  corrected against live source (`src/econflow/estimation/result.py`,
+  `src/econflow/diagnostics/base.py`): `EstimationResult.rsq` → `rsquared`;
+  required-fields list was missing `estimator_name`, `conf_int`, `ngroups`,
+  `df_resid`, `rsquared_adj`; `DiagnosticResult.check` → `diagnostic_id`
+  (plus the previously-omitted `diagnostic_name` field); `level` vocabulary
+  corrected from `"info"/"warn"/"error"` to the actual
+  `"info"/"warning"/"error"/"skip"`; `BaseDiagnostic.run()` signature
+  corrected from `run(self, result, data=None)` to `run(self, result,
+  **kwargs)`; `_not_applicable()` corrected to reflect that it sets
+  `level="skip"` directly (there is no separate `status` field).
+
+- **Stale pooled_ols BP/DW pins** (`tests/unit/test_sprint_s2.py`,
+  `tests/unit/test_estimation_diagnostics_phase3.py`,
+  `tests/unit/test_consistency_regression.py`'s `_PHASE6_PINS`): pinned
+  BP=82.2029 and DW=0.1883 for `pooled_ols` did not reproduce from current
+  source under any code path tried (direct `PooledOLS(...).diagnostics()`
+  call, full `econflow run`, and the exact fixture construction these test
+  files themselves use) — all three independently and consistently give
+  BP=65.228, DW=0.2076. The `entity_fe`/`twoway_fe` pins in the same files
+  were independently re-verified and are correct as-is; only the
+  `pooled_ols` pins were wrong. Also removed/corrected the now-falsified
+  claim (in both a test docstring and a code comment) that the
+  "estimator-level" and "pipeline" diagnostic paths legitimately produce
+  different BP values for `pooled_ols` due to constant-column handling —
+  they do not, under current source.
+- **Stale EntityFE clustered-SE pin** in `tests/unit/test_estimation_dispatcher.py`
+  (`std_err["value"]`/`std_err["capital"]`): same root cause and correction
+  as the `test_std_err_unchanged` fix above (linearmodels-version-sensitive
+  output, verified directly against linearmodels 7.0).
+- **PooledOLS df_resid pins**: `tests/unit/test_estimation_ols.py` claimed
+  "framework PooledOLS has no constant" (`df_resid = nobs - k`). Current
+  `ols.py` unconditionally prepends a constant column before fitting, so
+  `df_resid = nobs - k - 1` (217, not 218, for the Grunfeld fixture) is the
+  correct, standard-OLS value — confirmed this is `res.df_resid` straight
+  from `linearmodels`, not an econflow computation. Also removed a related
+  stale claim about a second "pipeline" PooledOLS path without a constant;
+  there is only one PooledOLS implementation.
+- **`test_phase5c_pipeline.py`**: same stale-DW-pin pattern for `_DW_FE`;
+  two `KeyError`s in `TestNumericalEquivalence` from dict-nesting bugs
+  unrelated to Sprint S1 (`baseline["pooled_ols"]` instead of
+  `baseline["models"]["pooled_ols"]`; a nonexistent flat `"vif_max"` key
+  instead of filtering the `"diagnostics"` list) — both fixed without
+  needing to regenerate the underlying fixture; a VIF tolerance of `1e-6`
+  that compared a 4-decimal-place-rounded CSV value against a
+  full-precision JSON baseline (mathematically unsatisfiable) widened to
+  `1e-4` to match the CSV's actual precision.
+- **`tests/integration/test_validator_registry.py::TestValidateStrictRaisesOnL14`**:
+  both tests passed the shared `VALID/outputs.yaml` fixture (which
+  references model ids `pooled_ols`/`entity_fe`) alongside a models.yaml
+  generated by the shared `_write_models()` helper (which always writes a
+  single model id `"m1"`) — an unrelated cross-file model-ID mismatch that
+  made `test_validate_strict_succeeds_on_valid_cluster` fail for the wrong
+  reason and left `test_validate_strict_raises_on_invalid_cluster` passing
+  for a reason unrelated to the L-14 cluster check it claims to test. Added
+  a local `outputs.yaml` (model id `"m1"`) scoped to this test class so
+  both tests now exercise only the cluster-validation logic they're named
+  for.
+
+### Note
+- `tests/integration/fixtures/baseline/{comparison_table.md,comparison_table.html}`
+  and `numerical_results.json`'s/`diagnostics_full.json`'s DW entries for
+  `entity_fe`/`twoway_fe`/`pooled_ols` were **not** regenerated in this
+  pass — the example's `outputs.yaml` does not currently enable
+  markdown/html output, and `numerical_results.json`'s `entity_fe`/`twoway_fe`
+  blocks contain a `"const"` parameter that current `EntityFE`/`TwoWayFE`
+  fitting cannot produce at all (linearmodels `PanelOLS` with
+  `entity_effects=True` reports no separate intercept), indicating this
+  fixture predates the current estimator implementation at a structural
+  level, not just a numerical one. Needs full regeneration by someone who
+  can confirm the original production path; tracked as remaining technical
+  debt in `docs/release/REPOSITORY_INTEGRITY_REPORT.md`. Coefficient values
+  in this file were spot-checked and are NOT stale (Sprint S1 did not touch
+  coefficients).
+
+---
+
+## [Unreleased] — Architecture Freeze v1 / EstimationDispatcher Migration (Phase 5–6) / Sprint S1–S2 (2026-07-10 – 2026-07-12)
+
+Previously undocumented in this file despite being complete in source — see
+"Repository Integrity Repair" above. Full detail in
+`docs/architecture/ARCHITECTURE_FREEZE_v1.md`,
+`docs/architecture/PHASE5_COMPLETION_REPORT.md`,
+`docs/architecture/PHASE6_COMPLETION_REPORT.md`,
+`docs/release/SPRINT_S1_IMPLEMENTATION_REPORT.md`,
+`docs/release/SPRINT_S2_IMPLEMENTATION_REPORT.md`.
+
+### Changed
+- **Phase 5 — EstimationDispatcher as sole production execution path**:
+  `econflow run` migrated from ~89 lines of inline `linearmodels` estimation
+  code in `pipeline_generic.py` to `EstimationDispatcher.dispatch()`. Legacy
+  `_run_model()` and the `_USE_DISPATCHER` flag removed.
+- **Phase 6 — unified diagnostics**: `pipeline_generic._run_diagnostics()`
+  (173 lines of inline VIF/BP/DW computation) replaced with
+  `_write_diagnostics()`, a thin writer reading
+  `EstimationResult.diagnostic_results`. Diagnostics are now computed
+  exactly once, inside each estimator's `diagnostics()` method via
+  `compute_standard_diagnostics()` in `econflow.estimation._diagnostics`.
+- **Architecture Freeze v1** declared over the resulting interfaces
+  (`BaseEstimator`, `EstimationResult`, `DiagnosticResult`,
+  `PipelineContext`, `EstimationDispatcher`, CLI contract, YAML schema,
+  Plugin SDK, Reporting/Integrity interfaces) — 8 invariants (I-1–I-8), 10
+  forbidden changes (F-1–F-10).
+- **Sprint S1 — scientific corrections** (Scientific Validation Committee
+  findings SC-1 through SC-7): panel Durbin-Watson replaced with the
+  Bhargava-Franzini-Narendranathan (1982) within-entity formula;
+  `EstimationResult.rsquared` for EntityFE/TwoWayFE changed from overall R²
+  to within-R² (matches Stata `xtreg,fe` / R `plm` / R `fixest`);
+  `rsquared_adj` for FE models corrected to the within-adjusted "fixest
+  convention" formula; `rsquared_adj = rsquared` bug fixed for
+  RandomEffects/FirstDifference/IV2SLS (was silently skipping the
+  degrees-of-freedom adjustment).
+- **Sprint S2 — diagnostic additions** (no estimator mathematics changed):
+  IV first-stage F / Sargan-Hansen / Wu-Hausman diagnostics; IV pooled-data
+  warning; cluster-count validation warning (<10 clusters); within-VIF for
+  FE models.
+
+---
+
 ## [Unreleased] — Sprint 11F: Evaluator-Reported Fixes
 
 ### Fixed

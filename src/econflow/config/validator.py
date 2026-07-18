@@ -22,7 +22,7 @@ Public API
 ----------
 ::
 
-    from econflow.config.validator import ConfigValidator, ValidationResult, ValidationIssue
+    from econflow.config.validator import ConfigValidator, ValidationResult, ConfigValidationIssue
 
     validator = ConfigValidator()
 
@@ -67,12 +67,12 @@ Stage = Literal["yaml_syntax", "schema", "semantic", "cross_file", "data"]
 Severity = Literal["error", "warning", "info"]
 
 # ---------------------------------------------------------------------------
-# ValidationIssue
+# ConfigValidationIssue
 # ---------------------------------------------------------------------------
 
 
 @dataclass
-class ValidationIssue:
+class ConfigValidationIssue:
     """
     A single finding produced during configuration validation.
 
@@ -127,13 +127,13 @@ class ValidationResult:
 
     Attributes
     ----------
-    issues : list[ValidationIssue]
+    issues : list[ConfigValidationIssue]
         All findings, ordered by stage then severity.
     project_cfg, models_cfg, outputs_cfg:
         Parsed Pydantic model instances; ``None`` if validation failed.
     """
 
-    issues: list[ValidationIssue] = field(default_factory=list)
+    issues: list[ConfigValidationIssue] = field(default_factory=list)
     project_cfg: Any | None = None    # ProjectConfig | None
     models_cfg: Any | None = None     # ModelsConfig | None
     outputs_cfg: Any | None = None    # OutputsConfig | None
@@ -149,25 +149,25 @@ class ValidationResult:
         return not any(i.severity == "error" for i in self.issues)
 
     @property
-    def errors(self) -> list[ValidationIssue]:
+    def errors(self) -> list[ConfigValidationIssue]:
         """All error-severity issues."""
         return [i for i in self.issues if i.severity == "error"]
 
     @property
-    def warnings(self) -> list[ValidationIssue]:
+    def warnings(self) -> list[ConfigValidationIssue]:
         """All warning-severity issues."""
         return [i for i in self.issues if i.severity == "warning"]
 
     @property
-    def infos(self) -> list[ValidationIssue]:
+    def infos(self) -> list[ConfigValidationIssue]:
         """All info-severity issues."""
         return [i for i in self.issues if i.severity == "info"]
 
-    def by_stage(self, stage: Stage) -> list[ValidationIssue]:
+    def by_stage(self, stage: Stage) -> list[ConfigValidationIssue]:
         """Return issues filtered to *stage*."""
         return [i for i in self.issues if i.stage == stage]
 
-    def by_source(self, source: str) -> list[ValidationIssue]:
+    def by_source(self, source: str) -> list[ConfigValidationIssue]:
         """Return issues filtered to *source* filename."""
         return [i for i in self.issues if i.source == source]
 
@@ -223,14 +223,14 @@ def _stage_yaml(
     config_path: Path,
     models_path: Path,
     outputs_path: Path,
-) -> tuple[list[ValidationIssue], dict | None, dict | None, dict | None]:
+) -> tuple[list[ConfigValidationIssue], dict | None, dict | None, dict | None]:
     """
     Load and parse all three YAML files.
 
     Returns a list of issues plus the raw dicts (None on failure).
     This stage never raises; syntax errors are collected as issues.
     """
-    issues: list[ValidationIssue] = []
+    issues: list[ConfigValidationIssue] = []
     raws: list[dict | None] = []
 
     for label, path in [
@@ -239,7 +239,7 @@ def _stage_yaml(
         ("outputs.yaml", outputs_path),
     ]:
         if not path.exists():
-            issues.append(ValidationIssue(
+            issues.append(ConfigValidationIssue(
                 stage="yaml_syntax",
                 severity="error",
                 source=label,
@@ -259,7 +259,7 @@ def _stage_yaml(
             if raw is None:
                 raw = {}
             if not isinstance(raw, dict):
-                issues.append(ValidationIssue(
+                issues.append(ConfigValidationIssue(
                     stage="yaml_syntax",
                     severity="error",
                     source=label,
@@ -279,7 +279,7 @@ def _stage_yaml(
             if hasattr(exc, "problem_mark") and exc.problem_mark is not None:  # type: ignore[union-attr]
                 mark = exc.problem_mark  # type: ignore[union-attr]
                 loc = f"line {mark.line + 1}, column {mark.column + 1}"
-            issues.append(ValidationIssue(
+            issues.append(ConfigValidationIssue(
                 stage="yaml_syntax",
                 severity="error",
                 source=label,
@@ -304,7 +304,7 @@ def _stage_schema(
     raw_config: dict | None,
     raw_models: dict | None,
     raw_outputs: dict | None,
-) -> tuple[list[ValidationIssue], Any, Any, Any]:
+) -> tuple[list[ConfigValidationIssue], Any, Any, Any]:
     """
     Validate raw dicts against Pydantic v2 models.
 
@@ -319,7 +319,7 @@ def _stage_schema(
     except ImportError:
         ValidationError = Exception  # type: ignore[misc,assignment]
 
-    issues: list[ValidationIssue] = []
+    issues: list[ConfigValidationIssue] = []
     results = []
 
     for label, raw, model_class in [
@@ -339,7 +339,7 @@ def _stage_schema(
                 loc = _pydantic_loc_str(e.get("loc", ()))
                 msg = e.get("msg", "")
                 fix = _pydantic_fix(label, loc, msg, e)
-                issues.append(ValidationIssue(
+                issues.append(ConfigValidationIssue(
                     stage="schema",
                     severity="error",
                     source=label,
@@ -363,11 +363,21 @@ def _stage_semantic(
     raw_config: dict | None,
     raw_models: dict | None,
     raw_outputs: dict | None,
-) -> list[ValidationIssue]:
-    """Run ConfigLinter rules L-01 through L-13 and map results to ValidationIssue."""
+    *,
+    live_estimator_ids: frozenset[str] | None = None,
+) -> list[ConfigValidationIssue]:
+    """Run ConfigLinter rules L-01 through L-14 and map results to ConfigValidationIssue.
+
+    Parameters
+    ----------
+    live_estimator_ids:
+        Forwarded to :class:`~econflow.config.linter.ConfigLinter`.  When
+        ``None`` (the default), the linter uses the live registry for
+        estimator validation.  Pass a frozenset to override (test isolation).
+    """
     from econflow.config.linter import ConfigLinter
 
-    linter = ConfigLinter()
+    linter = ConfigLinter(live_estimator_ids=live_estimator_ids)
     lint_issues = linter.lint(
         project_cfg=project_cfg,
         models_cfg=models_cfg,
@@ -377,11 +387,11 @@ def _stage_semantic(
         raw_outputs=raw_outputs,
     )
 
-    issues: list[ValidationIssue] = []
+    issues: list[ConfigValidationIssue] = []
     for li in lint_issues:
         sev: Severity = li.severity if li.severity in ("error", "warning", "info") else "warning"
         source = li.location.split(":")[0].strip() if ":" in li.location else "config"
-        issues.append(ValidationIssue(
+        issues.append(ConfigValidationIssue(
             stage="semantic",
             severity=sev,
             source=source,
@@ -404,7 +414,7 @@ def _stage_cross_file(
     raw_config: dict | None,
     raw_models: dict | None,
     raw_outputs: dict | None,
-) -> list[ValidationIssue]:
+) -> list[ConfigValidationIssue]:
     """
     Verify relationships that span multiple files.
 
@@ -417,7 +427,7 @@ def _stage_cross_file(
     X-03  Model dependent variable not in config.yaml variables.regressors
           or variables.dependent (info — may be intentional for robustness).
     """
-    issues: list[ValidationIssue] = []
+    issues: list[ConfigValidationIssue] = []
 
     # --- collect model IDs -------------------------------------------------
     model_ids: list[str] = []
@@ -449,7 +459,7 @@ def _stage_cross_file(
         id_set = set(model_ids)
         missing = [mid for mid in output_refs if mid not in id_set]
         if missing:
-            issues.append(ValidationIssue(
+            issues.append(ConfigValidationIssue(
                 stage="cross_file",
                 severity="error",
                 source="outputs.yaml",
@@ -479,7 +489,7 @@ def _stage_cross_file(
             for m in models_cfg.models:
                 extra = set(m.regressors or []) - cfg_regressors
                 if extra:
-                    issues.append(ValidationIssue(
+                    issues.append(ConfigValidationIssue(
                         stage="cross_file",
                         severity="error",
                         source="models.yaml",
@@ -510,7 +520,7 @@ def _stage_data(
     project_cfg: Any,
     raw_config: dict | None,
     config_path: Path,
-) -> list[ValidationIssue]:
+) -> list[ConfigValidationIssue]:
     """
     Verify that the CSV file referenced by ``data.path`` exists and contains
     every column declared in ``config.yaml``.
@@ -518,7 +528,7 @@ def _stage_data(
     This stage is *optional*; it is skipped if the data file does not exist
     yet (a warning is emitted instead of an error in that case).
     """
-    issues: list[ValidationIssue] = []
+    issues: list[ConfigValidationIssue] = []
 
     # Extract field values from typed or raw config
     if project_cfg is not None:
@@ -550,7 +560,7 @@ def _stage_data(
         return issues
 
     if not data_path_str:
-        issues.append(ValidationIssue(
+        issues.append(ConfigValidationIssue(
             stage="data",
             severity="warning",
             source="config.yaml",
@@ -568,7 +578,7 @@ def _stage_data(
     )
 
     if not data_path.exists():
-        issues.append(ValidationIssue(
+        issues.append(ConfigValidationIssue(
             stage="data",
             severity="error",
             source="data file",
@@ -588,7 +598,7 @@ def _stage_data(
             headers = next(reader, [])
             rows = list(reader)
     except Exception as exc:
-        issues.append(ValidationIssue(
+        issues.append(ConfigValidationIssue(
             stage="data",
             severity="error",
             source="data file",
@@ -603,7 +613,7 @@ def _stage_data(
     # D-01: entity and time dimension columns
     missing_dims = [c for c in [entity_col, time_col] if c and c not in col_set]
     if missing_dims:
-        issues.append(ValidationIssue(
+        issues.append(ConfigValidationIssue(
             stage="data",
             severity="error",
             source="data file",
@@ -621,7 +631,7 @@ def _stage_data(
     needed = ([dep] if dep else []) + regressors + instruments + controls
     missing_vars = [c for c in needed if c and c not in col_set]
     if missing_vars:
-        issues.append(ValidationIssue(
+        issues.append(ConfigValidationIssue(
             stage="data",
             severity="error",
             source="data file",
@@ -645,7 +655,7 @@ def _stage_data(
         ]
         n_dupes = len(keys) - len(set(keys))
         if n_dupes > 0:
-            issues.append(ValidationIssue(
+            issues.append(ConfigValidationIssue(
                 stage="data",
                 severity="warning",
                 source="data file",
@@ -732,7 +742,7 @@ class ConfigValidator:
         Run all validation stages and return a :class:`ValidationResult`.
 
         This method *never raises* (unless an unexpected internal error
-        occurs).  All findings are returned as :class:`ValidationIssue`
+        occurs).  All findings are returned as :class:`ConfigValidationIssue`
         objects in the result.
 
         Parameters
@@ -751,7 +761,7 @@ class ConfigValidator:
         models_path = Path(models_path)
         outputs_path = Path(outputs_path)
 
-        all_issues: list[ValidationIssue] = []
+        all_issues: list[ConfigValidationIssue] = []
 
         # Stage 1 — YAML syntax
         yaml_issues, raw_config, raw_models, raw_outputs = _stage_yaml(
@@ -769,6 +779,7 @@ class ConfigValidator:
         sem_issues = _stage_semantic(
             project_cfg, models_cfg, outputs_cfg,
             raw_config, raw_models, raw_outputs,
+            live_estimator_ids=self._estimator_ids,
         )
         all_issues.extend(sem_issues)
 
@@ -842,3 +853,12 @@ class ConfigValidator:
         if not result.ok:
             raise ConfigValidationError(result.issues, config_path=config_path)
         return result.project_cfg, result.models_cfg, result.outputs_cfg
+
+
+# ---------------------------------------------------------------------------
+# Backward-compatibility alias (deprecated — will be removed in v2.0)
+# ---------------------------------------------------------------------------
+
+#: Deprecated alias for :class:`ConfigValidationIssue`.
+#: Use ``ConfigValidationIssue`` in all new code.
+ValidationIssue = ConfigValidationIssue

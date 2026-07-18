@@ -21,7 +21,12 @@ from pathlib import Path
 import pytest
 import yaml
 
-from econflow.config.validator import ConfigValidator, ValidationIssue, ValidationResult
+from econflow.config.validator import (
+    ConfigValidationIssue,
+    ConfigValidator,
+    ValidationIssue,  # deprecated alias — backward-compat import
+    ValidationResult,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers / fixtures
@@ -757,8 +762,8 @@ class TestProgrammaticAPI:
         assert result.ok
 
     def test_validation_issue_fields(self):
-        """ValidationIssue dataclass must have all required fields."""
-        issue = ValidationIssue(
+        """ConfigValidationIssue dataclass must have all required fields."""
+        issue = ConfigValidationIssue(
             stage="schema",
             severity="error",
             source="config.yaml",
@@ -771,3 +776,17 @@ class TestProgrammaticAPI:
         assert issue.severity == "error"
         assert issue.source == "config.yaml"
         assert issue.code == "T-01"
+
+    def test_validation_issue_alias_is_config_validation_issue(self):
+        """Deprecated alias ValidationIssue resolves to ConfigValidationIssue."""
+        assert ValidationIssue is ConfigValidationIssue
+
+    def test_config_package_exports_new_name(self):
+        """ConfigValidationIssue is accessible from econflow.config."""
+        from econflow.config import ConfigValidationIssue as CVI
+        assert CVI is ConfigValidationIssue
+
+    def test_alias_still_importable_from_config_package(self):
+        """Old import path econflow.config.ValidationIssue still works."""
+        from econflow.config import ValidationIssue as VI
+        assert VI is ConfigValidationIssue

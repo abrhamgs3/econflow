@@ -667,15 +667,15 @@ def run(
     \b
         ──────────────── EconFlow 0.1.0 ────────────────
 
-        [1/3] entity_fe — Fixed Effects (Entity)  ✔
-        [2/3] two_way_fe — Fixed Effects (Two-Way)  ✔
-        [3/3] pooled_ols — Pooled OLS  ✔
+        INFO  [1/5] Loading data: data/processed/panel.csv
+        INFO  [2/5] Validating panel structure
+        INFO  [3/5] Running models
+        INFO  [3.5/5] Writing diagnostics
+        INFO  [4/5] Exporting tables
+        INFO  [5/5] Recording provenance
 
         ────────────────── Pipeline complete ──────────────────
           Completed in 3.2 s
-
-        outputs/tables/table_fe_investment.csv
-        outputs/tables/table_fe_investment.tex
     """
     import logging
 
@@ -868,7 +868,9 @@ def report(
     output_dir: Path = typer.Argument(
         None,
         help="Directory where output files are written.  "
-             "Defaults to outputs/econflow/ inside the project directory.",
+             "Defaults to outputs/econflow/ relative to the current working directory.  "
+             "Note: the canonical publication tables are in outputs/tables/ (written by "
+             "'econflow run'); this command produces an additional bundle.",
     ),
     formats: str = typer.Option(
         "csv,latex,markdown,html",
@@ -1038,6 +1040,16 @@ def certify(
         Certificate written: outputs/certificate.json
     """
     from econflow.commands.certify import run_certify
+
+    if not project_name:
+        console.print(
+            "[bold yellow]⚠  Warning:[/bold yellow] --project-name is empty.  "
+            "The certificate will not identify the study."
+        )
+        console.print(
+            "  Tip: [dim]econflow certify --project-name \"My Study\" ...[/dim]"
+        )
+        console.print()
 
     exit_code = run_certify(
         project_name=project_name,

@@ -35,6 +35,15 @@ Built-in estimators
 .. autoclass:: econflow.estimation.iv.IV2SLS
 .. autoclass:: econflow.estimation.gmm.SystemGMM
 .. autoclass:: econflow.estimation.quantile.PanelQuantile
+
+Pipeline integration (Phase 5C+)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. autoclass:: econflow.estimation.dispatcher.PipelineContext
+.. autoclass:: econflow.estimation.dispatcher.EstimationDispatcher
+
+EstimationDispatcher is the sole production path for running models via
+``econflow run``.  All pipeline model dispatch goes through
+``EstimationDispatcher.dispatch()``.
 """
 
 from __future__ import annotations
@@ -57,7 +66,7 @@ from econflow.estimation.backends import (
 )
 
 # Core abstractions (also re-exports EstimationResult for backward compat)
-from econflow.estimation.base import BaseEstimator, EstimatorError
+from econflow.estimation.base import BaseEstimator, EstimatorError, ModelSpecificationError
 from econflow.estimation.first_difference import FirstDifference
 from econflow.estimation.fixed_effects import EntityFE, TwoWayFE
 from econflow.estimation.gmm import SystemGMM
@@ -93,6 +102,9 @@ from econflow.estimation.registry import (
 # Result objects
 from econflow.estimation.result import DiagnosticResult, EstimationResult
 
+# Pipeline integration — Phase 5C+: EstimationDispatcher is the sole production path
+from econflow.estimation.dispatcher import EstimationDispatcher, PipelineContext
+
 __all__ = [
     # Result objects
     "EstimationResult",
@@ -100,6 +112,7 @@ __all__ = [
     # Abstractions
     "BaseEstimator",
     "EstimatorError",
+    "ModelSpecificationError",
     # Protocol (Milestone 3)
     "EstimatorProtocol",
     "BackendCapabilities",
@@ -134,4 +147,7 @@ __all__ = [
     "IV2SLS",
     "SystemGMM",
     "PanelQuantile",
+    # Pipeline integration — Phase 5C+
+    "PipelineContext",
+    "EstimationDispatcher",
 ]

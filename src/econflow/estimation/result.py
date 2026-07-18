@@ -178,6 +178,30 @@ class EstimationResult:
     # ------------------------------------------------------------------
 
     @property
+    def resids(self) -> "pd.Series | None":
+        """
+        Residuals as a ``pd.Series``, with the panel ``(entity, time)``
+        MultiIndex when available.
+
+        Populated by every registered estimator via ``extra["residuals"]``
+        and ``extra["residuals_index"]``.  Returns ``None`` if the estimator
+        did not store residuals (e.g. a stub implementation that raises
+        ``NotImplementedError`` before producing a result).
+
+        :func:`~econflow.pipeline_generic._write_diagnostics` skips
+        ``DiagnosticResult`` objects with a ``None`` statistic, so models
+        whose estimators cannot produce residuals are handled cleanly.
+        """
+        raw = self.extra.get("residuals")
+        if raw is None:
+            return None
+        idx_raw = self.extra.get("residuals_index")
+        if idx_raw is not None:
+            idx = pd.MultiIndex.from_tuples([tuple(i) for i in idx_raw])
+            return pd.Series(raw, index=idx)
+        return pd.Series(raw)
+
+    @property
     def tvalues(self) -> pd.Series:
         """t-statistics: ``params / std_err``."""
         return self.params / self.std_err

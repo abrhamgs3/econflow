@@ -38,7 +38,7 @@ Validation
 .. autoclass:: econflow.ingestion.validation.DataValidator
 .. autoclass:: econflow.ingestion.validation.DataValidationConfig
 .. autoclass:: econflow.ingestion.validation.DataValidationReport
-.. autoclass:: econflow.ingestion.validation.ValidationIssue
+.. autoclass:: econflow.ingestion.validation.DataValidationIssue
 """
 
 from __future__ import annotations
@@ -71,9 +71,10 @@ from econflow.ingestion.registry import (
 # Validation
 from econflow.ingestion.validation import (
     DataValidationConfig,
+    DataValidationIssue,
     DataValidationReport,
     DataValidator,
-    ValidationIssue,
+    ValidationIssue,  # deprecated alias — kept for backward compat
 )
 
 __all__ = [
@@ -100,5 +101,7 @@ __all__ = [
     "DataValidator",
     "DataValidationConfig",
     "DataValidationReport",
+    "DataValidationIssue",
+    # Deprecated alias — will be removed in v2.0; use DataValidationIssue
     "ValidationIssue",
 ]

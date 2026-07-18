@@ -88,6 +88,13 @@ class FirstDifference(BaseEstimator):
         )
         entities = sorted(panel.index.get_level_values(0).unique().tolist())
         times = sorted(panel.index.get_level_values(1).unique().tolist())
+        # --- Sprint S1: Correct rsquared_adj (was incorrectly copying rsquared) ---
+        # FD nobs = N × (T-1) for balanced panels — the differenced observation count.
+        # linearmodels reports this correctly; df_resid = nobs - k.
+        _nobs = int(res.nobs)
+        _df_resid = int(res.df_resid)
+        _rsq = float(res.rsquared)
+        _rsq_adj = 1.0 - (1.0 - _rsq) * (_nobs - 1) / _df_resid
 
         return EstimationResult(
             estimator_id=self.estimator_id,
@@ -96,11 +103,11 @@ class FirstDifference(BaseEstimator):
             std_err=res.std_errors,
             conf_int=ci,
             pvalues=res.pvalues,
-            nobs=int(res.nobs),
+            nobs=_nobs,
             ngroups=len(entities),
-            df_resid=int(res.df_resid),
-            rsquared=float(res.rsquared),
-            rsquared_adj=float(res.rsquared),
+            df_resid=_df_resid,
+            rsquared=_rsq,
+            rsquared_adj=_rsq_adj,
             entity_col=entity_col,
             time_col=time_col,
             entities=[str(e) for e in entities],

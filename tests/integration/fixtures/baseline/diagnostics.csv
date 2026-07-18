@@ -1,0 +1,10 @@
+model_id,diagnostic,statistic,p_value,conclusion
+pooled_ols,VIF (max),1.3562,,No multicollinearity concern (max VIF = 1.36 < 10.0)
+pooled_ols,Breusch-Pagan,65.228,0.0,Heteroskedasticity detected (p=0.0000 < 0.05) — use robust SEs
+pooled_ols,Serial Correlation (DW),0.2076,,Positive serial correlation likely (DW=0.2076 < 1.5) — consider clustered SEs or lag structure
+entity_fe,VIF (max),1.3562,,No multicollinearity concern (max VIF = 1.36 < 10.0)
+entity_fe,Breusch-Pagan,77.8714,0.0,Heteroskedasticity detected (p=0.0000 < 0.05) — use robust SEs
+entity_fe,Serial Correlation (DW),0.6845,,Positive serial correlation likely (DW=0.6845 < 1.5) — consider clustered SEs or lag structure
+twoway_fe,VIF (max),1.3562,,No multicollinearity concern (max VIF = 1.36 < 10.0)
+twoway_fe,Breusch-Pagan,68.776,0.0,Heteroskedasticity detected (p=0.0000 < 0.05) — use robust SEs
+twoway_fe,Serial Correlation (DW),0.685,,Positive serial correlation likely (DW=0.6850 < 1.5) — consider clustered SEs or lag structure

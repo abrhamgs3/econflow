@@ -1,0 +1,83 @@
+{
+  "meta": {
+    "note": "Full-precision diagnostic values. The rounded values in diagnostics.csv are derived from these.",
+    "vif_vars": ["value", "capital"]
+  },
+  "diagnostics": [
+    {
+      "model_id": "pooled_ols",
+      "diagnostic": "VIF (max)",
+      "statistic_full": 1.3561562146291226,
+      "p_value_full": null,
+      "conclusion": "No multicollinearity concern (max VIF = 1.36 < 10)",
+      "per_variable_vif": {
+        "value": 1.3561562146291226,
+        "capital": 1.3561562146291226
+      }
+    },
+    {
+      "model_id": "pooled_ols",
+      "diagnostic": "Breusch-Pagan",
+      "statistic_full": 65.22800988589293,
+      "p_value_full": 6.853582114159583e-15,
+      "conclusion": "Heteroskedasticity detected (p=0.0000 < 0.05) — use robust SEs"
+    },
+    {
+      "model_id": "pooled_ols",
+      "diagnostic": "Serial Correlation (DW)",
+      "statistic_full": 0.3706676929553949,
+      "p_value_full": null,
+      "conclusion": "Positive serial correlation likely (DW=0.3707 < 1.5) — consider clustered SEs or lag structure"
+    },
+    {
+      "model_id": "entity_fe",
+      "diagnostic": "VIF (max)",
+      "statistic_full": 1.3561562146291226,
+      "p_value_full": null,
+      "conclusion": "No multicollinearity concern (max VIF = 1.36 < 10)",
+      "per_variable_vif": {
+        "value": 1.3561562146291226,
+        "capital": 1.3561562146291226
+      }
+    },
+    {
+      "model_id": "entity_fe",
+      "diagnostic": "Breusch-Pagan",
+      "statistic_full": 77.87137086492373,
+      "p_value_full": 1.2315347409307072e-17,
+      "conclusion": "Heteroskedasticity detected (p=0.0000 < 0.05) — use robust SEs"
+    },
+    {
+      "model_id": "entity_fe",
+      "diagnostic": "Serial Correlation (DW)",
+      "statistic_full": 0.9718254058239162,
+      "p_value_full": null,
+      "conclusion": "Positive serial correlation likely (DW=0.9718 < 1.5) — consider clustered SEs or lag structure"
+    },
+    {
+      "model_id": "twoway_fe",
+      "diagnostic": "VIF (max)",
+      "statistic_full": 1.3561562146291226,
+      "p_value_full": null,
+      "conclusion": "No multicollinearity concern (max VIF = 1.36 < 10)",
+      "per_variable_vif": {
+        "value": 1.3561562146291226,
+        "capital": 1.3561562146291226
+      }
+    },
+    {
+      "model_id": "twoway_fe",
+      "diagnostic": "Breusch-Pagan",
+      "statistic_full": 68.77598623708374,
+      "p_value_full": 1.1627446365335215e-15,
+      "conclusion": "Heteroskedasticity detected (p=0.0000 < 0.05) — use robust SEs"
+    },
+    {
+      "model_id": "twoway_fe",
+      "diagnostic": "Serial Correlation (DW)",
+      "statistic_full": 0.9161226607249308,
+      "p_value_full": null,
+      "conclusion": "Positive serial correlation likely (DW=0.9161 < 1.5) — consider clustered SEs or lag structure"
+    }
+  ]
+}

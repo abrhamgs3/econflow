@@ -57,45 +57,29 @@ import pandas as pd
 # import EstimationResult from here).
 from econflow.estimation.result import DiagnosticResult, EstimationResult
 
-__all__ = ["BaseEstimator", "EstimationResult", "DiagnosticResult", "EstimatorError"]
-
-
 # ---------------------------------------------------------------------------
-# Estimator-level exception
+# Estimator exceptions — canonical definitions live in econflow.exceptions
+# (Release Sprint R1, C-1 fix).  Re-exported here so that all existing imports
+# of the form ``from econflow.estimation.base import EstimatorError`` continue
+# to work without modification.
+#
+# Before R1:  EstimatorError(Exception) and ModelSpecificationError(EstimatorError)
+#             were defined locally in this module.  The econflow.exceptions module
+#             had a SEPARATE ModelSpecificationError(EconFlowError) class.
+#
+# After R1:   Single canonical definitions in econflow.exceptions:
+#               EconFlowError → EstimatorError → ModelSpecificationError
+#             This module re-exports both for full backward compatibility.
 # ---------------------------------------------------------------------------
+from econflow.exceptions import EstimatorError, ModelSpecificationError  # noqa: E402
 
-class EstimatorError(Exception):
-    """
-    Raised when an estimator cannot complete its work.
-
-    Parameters
-    ----------
-    message:
-        Human-readable description of the failure.
-    estimator_id:
-        Registry ID of the failing estimator.
-    cause:
-        Original exception, if any.
-    """
-
-    def __init__(
-        self,
-        message: str,
-        *,
-        estimator_id: str = "",
-        cause: Exception | None = None,
-    ) -> None:
-        super().__init__(message)
-        self.estimator_id = estimator_id
-        self.cause = cause
-
-    def __str__(self) -> str:
-        base = super().__str__()
-        if self.estimator_id:
-            base = f"[{self.estimator_id}] {base}"
-        if self.cause:
-            base = f"{base}\nCaused by: {self.cause!r}"
-        return base
+__all__ = [
+    "BaseEstimator",
+    "EstimationResult",
+    "DiagnosticResult",
+    "EstimatorError",
+    "ModelSpecificationError",
+]
 
 
 # ---------------------------------------------------------------------------

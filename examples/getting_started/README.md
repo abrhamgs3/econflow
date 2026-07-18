@@ -96,8 +96,12 @@ too — but it makes interpreting R² within cleaner.
 
 ## Step 1 — Install and Verify
 
+EconFlow is not yet published to PyPI. Install directly from source:
+
 ```bash
-pip install econflow
+git clone https://github.com/abrhamgs3/econflow.git
+cd econflow
+pip install -e ".[dev]"
 econflow doctor
 ```
 

@@ -31,15 +31,28 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import statsmodels.api as sm
 import yaml
-from linearmodels.panel import PanelOLS, PooledOLS
 
 from econflow import __version__
+from econflow.core.exceptions import RegistryError
+from econflow.estimation.dispatcher import EstimationDispatcher, PipelineContext
 from econflow.exceptions import EconFlowError, ModelSpecificationError
 from econflow.logging import get_logger
 
 log = get_logger(__name__)
+
+# ---------------------------------------------------------------------------
+# Phase 6 diagnostic-label mapping
+# ---------------------------------------------------------------------------
+# Maps DiagnosticResult.diagnostic_id → the CSV ``diagnostic`` column label
+# used since Phase 0.  The label values are frozen by the Architecture Freeze
+# (§I-8: diagnostics.csv schema must not change).  Adding a new diagnostic
+# requires a new entry here AND a schema migration document.
+_DIAG_CSV_LABEL: dict[str, str] = {
+    "vif":           "VIF (max)",
+    "breusch_pagan": "Breusch-Pagan",
+    "durbin_watson": "Serial Correlation (DW)",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -88,101 +101,6 @@ def _prepare_panel(
 
 
 # ---------------------------------------------------------------------------
-# Estimation
-# ---------------------------------------------------------------------------
-
-def _run_model(panel_df: pd.DataFrame, spec: dict) -> object:
-    """
-    Estimate one model from its YAML specification dict.
-
-    Supported estimators
-    --------------------
-    ``"OLS"``
-        Pooled OLS via :class:`linearmodels.panel.PooledOLS`.
-        Ignores entity and time effects.  Covariance type: robust.
-    ``"FE"`` (default)
-        Within estimator via :class:`linearmodels.panel.PanelOLS`.
-        Respects ``entity_effects``, ``time_effects``, and ``cluster``.
-
-    Parameters
-    ----------
-    panel_df:
-        DataFrame with a (entity, time) MultiIndex.
-    spec:
-        Model specification dict as parsed from models.yaml.  Keys:
-
-        - ``id`` (str) — unique model identifier
-        - ``estimator`` (str) — ``"OLS"`` or ``"FE"``
-        - ``dependent`` (str) — dependent variable column name
-        - ``regressors`` (list[str]) — regressor column names
-        - ``entity_effects`` (bool, default False)
-        - ``time_effects`` (bool, default False)
-        - ``cluster`` (str | None) — ``"entity"`` or ``"time"`` or None
-
-    Returns
-    -------
-    linearmodels result object
-    """
-    estimator = spec.get("estimator", "FE").upper()
-    model_id = spec.get("id", spec.get("dependent", "model"))
-    dependent = spec["dependent"]
-    regressors = list(spec["regressors"])
-    entity_effects = spec.get("entity_effects", False)
-    time_effects = spec.get("time_effects", False)
-    cluster = spec.get("cluster", None)
-
-    needed = [dependent] + regressors
-    model_df = panel_df[needed].dropna()
-
-    n_entities = model_df.index.get_level_values(0).nunique()
-    log.info(
-        "Estimating %-20s  estimator=%-3s  obs=%d  entities=%d  "
-        "entity_fe=%s  time_fe=%s  cluster=%s",
-        model_id, estimator, len(model_df), n_entities,
-        entity_effects, time_effects, cluster,
-    )
-
-    y = model_df[dependent]
-    X = sm.add_constant(model_df[regressors])
-
-    try:
-        if estimator == "OLS":
-            # Use classic (unadjusted) SEs for pooled OLS — matches standard
-            # textbook presentation and avoids overstating SE robustness.
-            model = PooledOLS(y, X)
-            result = model.fit(cov_type="unadjusted")
-        else:
-            model = PanelOLS(
-                y,
-                X,
-                entity_effects=entity_effects,
-                time_effects=time_effects,
-                drop_absorbed=True,
-            )
-            if cluster == "entity":
-                result = model.fit(cov_type="clustered", cluster_entity=True)
-            elif cluster == "time":
-                result = model.fit(cov_type="clustered", cluster_time=True)
-            else:
-                result = model.fit(cov_type="robust")
-
-        # Quick sanity log
-        for reg in regressors[:2]:
-            if reg in result.params.index:
-                log.info(
-                    "    %-12s  coef=%+.4f  p=%.4f",
-                    reg, result.params[reg], result.pvalues[reg],
-                )
-
-        return result
-
-    except Exception as exc:
-        raise ModelSpecificationError(
-            f"Model '{model_id}' estimation failed: {exc}"
-        ) from exc
-
-
-# ---------------------------------------------------------------------------
 # Table formatting
 # ---------------------------------------------------------------------------
 
@@ -216,31 +134,34 @@ def _fmt_r2(val: object) -> str:
         return "—"
 
 
-def _run_diagnostics(
+def _write_diagnostics(
     results: dict,
-    model_specs: list[dict],
-    panel_df,
-    dependent: str,
-    regressors: list[str],
     out_cfg: dict,
     outputs_path: Path,
 ) -> None:
     """
-    Run post-estimation diagnostics and write results to
-    ``outputs/tables/diagnostics.csv``.
+    Write ``outputs/tables/diagnostics.csv`` from pre-computed diagnostics.
 
-    Computes directly from the raw linearmodels PanelResults objects:
+    Phase 6 thin writer — reads
+    :attr:`~econflow.estimation.result.EstimationResult.diagnostic_results`
+    on each :class:`~econflow.estimation.result.EstimationResult` and writes
+    one CSV row per recognised diagnostic.  Diagnostic values are produced by
+    :func:`~econflow.estimation._diagnostics.compute_standard_diagnostics`
+    inside each estimator's ``diagnostics()`` method; no re-computation is done
+    here.
 
-    - **VIF** — variance inflation factors for multicollinearity detection
-    - **Breusch-Pagan** — heteroskedasticity test (requires statsmodels)
-    - **Serial correlation AR(1)** — Durbin-Watson proxy on residuals
+    CSV schema (unchanged from Phase 0):
 
-    Results are written as ``diagnostics.csv`` alongside the main comparison
-    table so that every ``econflow run`` automatically produces this file
-    without extra YAML configuration.
+    .. code-block:: text
+
+        model_id, diagnostic, statistic, p_value, conclusion
+
+    The ``diagnostic`` column uses the frozen labels defined in
+    :data:`_DIAG_CSV_LABEL` (see Architecture Freeze §I-8).  Any
+    :class:`~econflow.estimation.result.DiagnosticResult` with an unknown
+    ``diagnostic_id`` or a ``None`` statistic is silently skipped, matching
+    the historical behaviour of the Phase 0–5 inline implementation.
     """
-    import numpy as np
-
     out_section = out_cfg.get("outputs", {})
     _raw_base_dir = Path(out_section.get("base_dir", "outputs"))
     if not _raw_base_dir.is_absolute():
@@ -251,121 +172,29 @@ def _run_diagnostics(
     diag_path.parent.mkdir(parents=True, exist_ok=True)
 
     rows = []
-
-    for spec in model_specs:
-        mid = spec["id"]
-        result = results.get(mid)
-        if result is None:
-            continue
-
-        # Regressors for this model (exclude constant)
-        model_regs = [
-            r for r in list(spec.get("regressors", regressors))
-            if r.lower() not in ("const", "intercept", "constant")
-        ]
-
-        # ---- VIF (multicollinearity) ----------------------------------------
-        try:
-            X_data = panel_df[model_regs].dropna().values
-            if X_data.shape[0] > X_data.shape[1] + 1 and len(model_regs) >= 2:
-                try:
-                    from statsmodels.stats.outliers_influence import (
-                        variance_inflation_factor,
-                    )
-                    X_c = np.column_stack([np.ones(len(X_data)), X_data])
-                    vif_vals = {
-                        r: float(variance_inflation_factor(X_c, i + 1))
-                        for i, r in enumerate(model_regs)
-                    }
-                except Exception:
-                    # Fallback: manual R² approach
-                    vif_vals = {}
-                    for i, var in enumerate(model_regs):
-                        other_idx = [j for j in range(len(model_regs)) if j != i]
-                        y_v = X_data[:, i]
-                        Xo = np.column_stack([np.ones(len(X_data)), X_data[:, other_idx]])
-                        beta = np.linalg.lstsq(Xo, y_v, rcond=None)[0]
-                        yhat = Xo @ beta
-                        ss_res = np.sum((y_v - yhat) ** 2)
-                        ss_tot = np.sum((y_v - y_v.mean()) ** 2)
-                        r2 = 1 - ss_res / ss_tot if ss_tot > 0 else 0.0
-                        vif_vals[var] = 1 / (1 - r2) if r2 < 1 else float("inf")
-
-                max_vif = max(vif_vals.values(), default=float("nan"))
-                flagged = [v for v, val in vif_vals.items() if val > 10.0]
-                if flagged:
-                    concl = (
-                        f"Multicollinearity concern: {flagged} "
-                        f"have VIF > 10 (max={max_vif:.2f})"
-                    )
-                else:
-                    concl = f"No multicollinearity concern (max VIF = {max_vif:.2f} < 10)"
-                rows.append({
-                    "model_id": mid,
-                    "diagnostic": "VIF (max)",
-                    "statistic": round(max_vif, 4),
-                    "p_value": None,
-                    "conclusion": concl,
-                })
-        except Exception as exc:
-            log.debug("VIF failed for %s: %s", mid, exc)
-
-        # ---- Breusch-Pagan heteroskedasticity ----------------------------------
-        try:
-            from statsmodels.stats.diagnostic import het_breuschpagan
-            resids = np.array(result.resids)
-            X_data = panel_df[model_regs].dropna()
-            # Align index
-            common_idx = X_data.index.intersection(result.resids.index)
-            if len(common_idx) > len(model_regs) + 1:
-                resids_aligned = result.resids.loc[common_idx].values
-                X_aligned = np.column_stack([
-                    np.ones(len(common_idx)),
-                    X_data.loc[common_idx].values,
-                ])
-                lm, lm_pval, _, _ = het_breuschpagan(resids_aligned, X_aligned)
-                concl = (
-                    f"Heteroskedasticity detected (p={lm_pval:.4f} < 0.05) — use robust SEs"
-                    if lm_pval < 0.05
-                    else f"No heteroskedasticity concern (p={lm_pval:.4f})"
+    for mid, result in results.items():
+        for diag in result.diagnostic_results:
+            label = _DIAG_CSV_LABEL.get(diag.diagnostic_id)
+            if label is None:
+                log.debug(
+                    "Skipping unknown diagnostic_id %r for model %s",
+                    diag.diagnostic_id, mid,
                 )
-                rows.append({
-                    "model_id": mid,
-                    "diagnostic": "Breusch-Pagan",
-                    "statistic": round(lm, 4),
-                    "p_value": round(lm_pval, 4),
-                    "conclusion": concl,
-                })
-        except Exception as exc:
-            log.debug("Breusch-Pagan failed for %s: %s", mid, exc)
-
-        # ---- Serial correlation AR(1) via Durbin-Watson ----------------------
-        try:
-            resids = np.array(result.resids)
-            if len(resids) > 2:
-                diff = np.diff(resids)
-                dw = np.sum(diff ** 2) / np.sum(resids ** 2)
-                # DW ≈ 2 → no autocorrelation; DW < 1.5 → positive autocorrelation
-                if dw < 1.5:
-                    concl = (
-                        f"Positive serial correlation likely (DW={dw:.4f} < 1.5) — "
-                        "consider clustered SEs or lag structure"
-                    )
-                elif dw > 2.5:
-                    concl = (
-                        f"Negative serial correlation possible (DW={dw:.4f} > 2.5)"
-                    )
-                else:
-                    concl = f"No strong serial correlation (DW={dw:.4f})"
-                rows.append({
-                    "model_id": mid,
-                    "diagnostic": "Serial Correlation (DW)",
-                    "statistic": round(dw, 4),
-                    "p_value": None,
-                    "conclusion": concl,
-                })
-        except Exception as exc:
-            log.debug("Serial correlation failed for %s: %s", mid, exc)
+                continue
+            if diag.statistic is None:
+                # Degenerate / not-applicable result (e.g. VIF with < 2 regressors)
+                log.debug(
+                    "Skipping %r for model %s: statistic is None",
+                    diag.diagnostic_id, mid,
+                )
+                continue
+            rows.append({
+                "model_id":   mid,
+                "diagnostic": label,
+                "statistic":  round(diag.statistic, 4),
+                "p_value":    round(diag.pvalue, 4) if diag.pvalue is not None else None,
+                "conclusion": diag.conclusion,
+            })
 
     if rows:
         diag_df = pd.DataFrame(rows)
@@ -384,10 +213,18 @@ def _build_comparison_table(
     decimal_places: int = 4,
 ) -> pd.DataFrame:
     """
-    Build a wide-format comparison table DataFrame.
+    Build a wide-format comparison table DataFrame from
+    :class:`~econflow.estimation.result.EstimationResult` objects.
 
     Rows: coefficient / SE for each regressor, then FE indicators, N, R² within.
     Columns: one per model in the order specified by ``comparison_table.models``.
+
+    R² within is read from ``extra["rsquared_within"]`` for FE estimators
+    (stored by :class:`~econflow.estimation.fixed_effects.EntityFE` and
+    :class:`~econflow.estimation.fixed_effects.TwoWayFE`) with a fallback to
+    ``rsquared`` for any estimator that does not populate that key.
+    Pooled OLS is suppressed with an em dash because its ``rsquared_within``
+    conflates within/between variation.
     """
     model_ids = table_cfg.get("models", list(results.keys()))
     id_to_label = {s["id"]: s.get("label", s["id"]) for s in model_specs}
@@ -402,9 +239,10 @@ def _build_comparison_table(
         for mid in model_ids:
             res = results[mid]
             if reg in res.params.index:
-                coef_row.append(_fmt_coef(res.params[reg], res.pvalues[reg],
-                                          decimal_places))
-                se_row.append(_fmt_se(res.std_errors[reg], decimal_places))
+                coef_row.append(
+                    _fmt_coef(res.params[reg], res.pvalues[reg], decimal_places)
+                )
+                se_row.append(_fmt_se(res.std_err[reg], decimal_places))
             else:
                 coef_row.append("—")
                 se_row.append("—")
@@ -428,19 +266,18 @@ def _build_comparison_table(
         n_row.append(str(int(results[mid].nobs)))
     rows.append(n_row)
 
-    # R² within — only meaningful for PanelOLS (within estimator).
-    # PooledOLS exposes rsquared_within but it conflates within/between
-    # variation; suppress it with em dash to avoid misinterpretation.
+    # R² within — use estimator_id to detect OLS (suppress with em dash).
+    # For FE estimators, use extra["rsquared_within"] (linearmodels within-R²)
+    # rather than rsquared (overall R²), which differ for two-way FE models.
     r2_row: list = ["R² within"]
-    id_to_spec = {s["id"]: s for s in model_specs}
     for mid in model_ids:
-        spec = id_to_spec.get(mid, {})
-        is_fe = spec.get("estimator", "FE").upper() != "OLS"
-        if not is_fe:
+        res = results[mid]
+        is_ols = getattr(res, "estimator_id", "").lower() == "ols"
+        if is_ols:
             r2_row.append("—")
         else:
-            val = getattr(results[mid], "rsquared_within", None)
-            r2_row.append(_fmt_r2(val))
+            r2w = res.extra.get("rsquared_within", res.rsquared)
+            r2_row.append(_fmt_r2(r2w))
     rows.append(r2_row)
 
     return pd.DataFrame(rows, columns=["Specification"] + col_names)
@@ -665,18 +502,27 @@ def run_from_config(config_path, models_path, outputs_path):
     log.info("[3/5] Running models")
     model_specs = models_cfg["models"]
     results: dict = {}
+
+    context = PipelineContext(entity_col=entity_col, time_col=time_col)
     for spec in model_specs:
         mid = spec["id"]
-        results[mid] = _run_model(panel_df, spec)
+        try:
+            results[mid] = EstimationDispatcher.dispatch(spec, df, context)
+        except NotImplementedError as exc:
+            resolved = EstimationDispatcher.resolve_id(spec)
+            raise ModelSpecificationError(
+                f"Estimator '{spec.get('estimator')}' "
+                f"(resolved: '{resolved}') is a stub and is not yet "
+                "implemented.  Remove it from models.yaml or wait for "
+                "the implementation in a future EconFlow release."
+            ) from exc
+        except RegistryError as exc:
+            raise ModelSpecificationError(str(exc)) from exc
 
-    # -------------------------------------------------------- [3.5/5] Run diagnostics
-    log.info("[3.5/5] Running diagnostics")
-    _run_diagnostics(
+    # -------------------------------------------------------- [3.5/5] Write diagnostics
+    log.info("[3.5/5] Writing diagnostics")
+    _write_diagnostics(
         results=results,
-        model_specs=model_specs,
-        panel_df=panel_df,
-        dependent=dependent,
-        regressors=regressors,
         out_cfg=out_cfg,
         outputs_path=outputs_path,
     )

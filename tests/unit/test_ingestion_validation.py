@@ -11,9 +11,10 @@ from pathlib import Path
 
 from econflow.ingestion.validation import (
     DataValidationConfig,
+    DataValidationIssue,
     DataValidationReport,
     DataValidator,
-    ValidationIssue,
+    ValidationIssue,  # deprecated alias — backward-compat import
 )
 
 # ---------------------------------------------------------------------------
@@ -45,16 +46,30 @@ def _panel(n: int = 3) -> list[dict]:
 
 class TestValidationIssue:
     def test_has_required_fields(self) -> None:
-        issue = ValidationIssue(code="V-01", check="required_columns",
-                                level="error", message="Missing columns")
+        issue = DataValidationIssue(code="V-01", check="required_columns",
+                                    level="error", message="Missing columns")
         assert issue.code == "V-01"
         assert issue.level == "error"
         assert issue.detail == ""
 
     def test_detail_optional(self) -> None:
-        issue = ValidationIssue(code="V-01", check="c", level="error",
-                                message="m", detail="details here")
+        issue = DataValidationIssue(code="V-01", check="c", level="error",
+                                    message="m", detail="details here")
         assert issue.detail == "details here"
+
+    def test_alias_is_data_validation_issue(self) -> None:
+        """Deprecated alias ValidationIssue resolves to DataValidationIssue."""
+        assert ValidationIssue is DataValidationIssue
+
+    def test_ingestion_package_exports_new_name(self) -> None:
+        """DataValidationIssue is accessible from econflow.ingestion."""
+        from econflow.ingestion import DataValidationIssue as DVI
+        assert DVI is DataValidationIssue
+
+    def test_alias_still_importable_from_ingestion_package(self) -> None:
+        """Old import path econflow.ingestion.ValidationIssue still works."""
+        from econflow.ingestion import ValidationIssue as VI
+        assert VI is DataValidationIssue
 
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,205 @@
+{
+  "meta": {
+    "dataset": "grunfeld",
+    "n_obs": 220,
+    "n_entities": 11,
+    "n_periods": 20,
+    "entity_col": "firm",
+    "time_col": "year",
+    "dependent": "invest",
+    "regressors": [
+      "value",
+      "capital"
+    ],
+    "entities": [
+      "American Steel",
+      "Atlantic Refining",
+      "Chrysler",
+      "Diamond Match",
+      "General Electric",
+      "General Motors",
+      "Goodyear",
+      "IBM",
+      "US Steel",
+      "Union Oil",
+      "Westinghouse"
+    ],
+    "time_periods": [
+      1935.0,
+      1936.0,
+      1937.0,
+      1938.0,
+      1939.0,
+      1940.0,
+      1941.0,
+      1942.0,
+      1943.0,
+      1944.0,
+      1945.0,
+      1946.0,
+      1947.0,
+      1948.0,
+      1949.0,
+      1950.0,
+      1951.0,
+      1952.0,
+      1953.0,
+      1954.0
+    ],
+    "linearmodels_version": "7.0",
+    "pandas_version": "2.3.3",
+    "numpy_version": "2.2.6"
+  },
+  "models": {
+    "pooled_ols": {
+      "spec": {
+        "id": "pooled_ols",
+        "estimator": "OLS",
+        "entity_effects": false,
+        "time_effects": false,
+        "cluster": null,
+        "cov_type": "unadjusted"
+      },
+      "params": {
+        "const": -38.41005398639206,
+        "value": 0.1145343630106262,
+        "capital": 0.2275141255498712
+      },
+      "std_errors": {
+        "const": 8.413370920943041,
+        "value": 0.0055188324151692275,
+        "capital": 0.024228250739041234
+      },
+      "tstats": {
+        "const": -4.565358445183912,
+        "value": 20.75336853784754,
+        "capital": 9.390447870149227
+      },
+      "pvalues": {
+        "const": 8.350435825699165e-06,
+        "value": 0.0,
+        "capital": 0.0
+      },
+      "conf_int": {
+        "lower": {
+          "const": -54.9924404116858,
+          "value": 0.10365698549040206,
+          "capital": 0.17976130210503755
+        },
+        "upper": {
+          "const": -21.827667561098316,
+          "value": 0.12541174053085033,
+          "capital": 0.27526694899470483
+        }
+      },
+      "nobs": 220,
+      "rsquared": 0.8178870315420232,
+      "rsquared_within": 0.735708900279129,
+      "rsquared_between": 0.8425879621561272,
+      "rsquared_overall": 0.8178870315420232,
+      "f_statistic": 487.28403953717776,
+      "f_pvalue": 1.1102230246251565e-16,
+      "loglik": -1301.299194788395
+    },
+    "entity_fe": {
+      "spec": {
+        "id": "entity_fe",
+        "estimator": "FE",
+        "entity_effects": true,
+        "time_effects": false,
+        "cluster": "entity",
+        "cov_type": "clustered"
+      },
+      "params": {
+        "const": -55.2715485765165,
+        "value": 0.11012911902575996,
+        "capital": 0.310033441875004
+      },
+      "std_errors": {
+        "const": 24.189716261772627,
+        "value": 0.01443801842296304,
+        "capital": 0.05014456928648409
+      },
+      "tstats": {
+        "const": -2.2849192598369976,
+        "value": 7.627717031487118,
+        "capital": 6.182792000938973
+      },
+      "pvalues": {
+        "const": 0.02333100555741674,
+        "value": 8.546496843564455e-13,
+        "capital": 3.304073237231364e-09
+      },
+      "conf_int": {
+        "lower": {
+          "const": -102.96134176855138,
+          "value": 0.08166470442731275,
+          "capital": 0.21117390532247193
+        },
+        "upper": {
+          "const": -7.581755384481625,
+          "value": 0.13859353362420718,
+          "capital": 0.408892978427536
+        }
+      },
+      "nobs": 220,
+      "rsquared": 0.7666706515488428,
+      "rsquared_within": 0.766670651548843,
+      "rsquared_between": 0.8192920326254056,
+      "rsquared_overall": 0.8071306507797606,
+      "f_statistic": 340.0790040431441,
+      "f_pvalue": 1.1102230246251565e-16,
+      "loglik": -1167.42553784263
+    },
+    "twoway_fe": {
+      "spec": {
+        "id": "twoway_fe",
+        "estimator": "FE",
+        "entity_effects": true,
+        "time_effects": true,
+        "cluster": "entity",
+        "cov_type": "clustered"
+      },
+      "params": {
+        "const": -72.39359594840614,
+        "value": 0.11668113209689107,
+        "capital": 0.35143569415740333
+      },
+      "std_errors": {
+        "const": 20.68364495532318,
+        "value": 0.011254271224770648,
+        "capital": 0.04696070001473767
+      },
+      "tstats": {
+        "const": -3.5000405443420064,
+        "value": 10.367719931973554,
+        "capital": 7.483612766571033
+      },
+      "pvalues": {
+        "const": 0.0005808586183526643,
+        "value": 0.0,
+        "capital": 2.7036151095671812e-12
+      },
+      "conf_int": {
+        "lower": {
+          "const": -113.19545069416802,
+          "value": 0.0944802511218809,
+          "capital": 0.2587980732303676
+        },
+        "upper": {
+          "const": -31.591741202644265,
+          "value": 0.13888201307190123,
+          "capital": 0.4440733150844391
+        }
+      },
+      "nobs": 220,
+      "rsquared": 0.7252669941886911,
+      "rsquared_within": 0.7565668429373535,
+      "rsquared_between": 0.794352381096271,
+      "rsquared_overall": 0.7856197262629593,
+      "f_statistic": 248.15037149399043,
+      "f_pvalue": 1.1102230246251565e-16,
+      "loglik": -1153.0118532903132
+    }
+  }
+}

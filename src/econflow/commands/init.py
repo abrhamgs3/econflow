@@ -246,7 +246,7 @@ Panel econometric analysis using [EconFlow](https://github.com/abrhamgs3/econflo
 
 ```bash
 # 1. Install EconFlow
-pip install -e /path/to/econflow   # or: pip install econflow (once published)
+pip install -e /path/to/econflow   # clone from https://github.com/abrhamgs3/econflow
 
 # 2. Download and prepare your data
 python scripts/01_download_data.py

@@ -31,7 +31,12 @@ from econflow.config.models import (
     OutputsConfig,
     ProjectConfig,
 )
-from econflow.config.validator import ConfigValidator, ValidationIssue, ValidationResult
+from econflow.config.validator import (
+    ConfigValidationIssue,
+    ConfigValidator,
+    ValidationIssue,  # deprecated alias — kept for backward compat
+    ValidationResult,
+)
 
 __all__ = [
     # Models
@@ -48,5 +53,7 @@ __all__ = [
     # Validator
     "ConfigValidator",
     "ValidationResult",
+    "ConfigValidationIssue",
+    # Deprecated alias — will be removed in v2.0; use ConfigValidationIssue
     "ValidationIssue",
 ]

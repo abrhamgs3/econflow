@@ -1,0 +1,29 @@
+{
+  "required_keys": [
+    "run_id",
+    "timestamp",
+    "econflow_version",
+    "python_version",
+    "platform",
+    "inputs",
+    "input_hashes",
+    "models_run"
+  ],
+  "required_inputs_keys": [
+    "config",
+    "models",
+    "outputs",
+    "data"
+  ],
+  "required_hashes_keys": [
+    "config",
+    "data"
+  ],
+  "data_sha256": "d73bb76112ccf74ef6c85d4780e7dc0fb7ded7c671f1f51cd94831b3472f2ff9",
+  "expected_models_run": [
+    "pooled_ols",
+    "entity_fe",
+    "twoway_fe"
+  ],
+  "note": "data_sha256 is the SHA-256 of grunfeld.csv. Any run against this dataset must produce this hash in input_hashes.data. run_id and timestamp are intentionally excluded from regression tests — they change per run."
+}

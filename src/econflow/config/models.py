@@ -250,7 +250,19 @@ class ProjectConfig(BaseModel):
 # models.yaml models
 # ===========================================================================
 
-#: Recognised estimator identifiers.  Kept in sync with the live registry.
+#: Recognised estimator identifiers.
+#:
+#: .. deprecated::
+#:     Since Phase 4 (registry-driven validation),
+#:     :class:`~econflow.config.linter.ConfigLinter` no longer uses this
+#:     frozenset to validate estimator IDs.  The live registry
+#:     (:func:`~econflow.estimation.registry.list_estimators`) is now the
+#:     single authoritative source.  This constant is retained for backward
+#:     compatibility with third-party code that may reference it, but it is
+#:     **not** updated automatically when plugins register new estimators.
+#:
+#:     Do not use this constant to validate estimator IDs at runtime.  Use
+#:     :func:`~econflow.estimation.registry.get_estimator` instead.
 KNOWN_ESTIMATORS: frozenset[str] = frozenset(
     {"ols", "fe", "twfe", "re", "fd", "iv", "gmm", "quantile",
      # Common aliases used in project YAML files
@@ -336,11 +348,15 @@ class ModelSpec(BaseModel):
     cluster: str = Field(
         "",
         description=(
-            "Column to cluster standard errors by.  Typical values: "
-            "'entity' (cluster by cross-sectional unit) or a column name.  "
-            "Leave empty for heteroskedasticity-robust (HC) standard errors."
+            "Clustering dimension for standard errors.  "
+            "Accepted values (validated by rule L-14):\n\n"
+            "* ``\"entity\"`` — cluster by cross-sectional unit.\n"
+            "* ``\"time\"`` — cluster by time period.\n"
+            "* ``\"\"`` (empty, default) — heteroskedasticity-robust (HC) SEs.\n\n"
+            "Any other value is a validation error.  "
+            "The pipeline does not silently fall back to entity clustering."
         ),
-        examples=["entity", "country", ""],
+        examples=["entity", "time", ""],
     )
     description: str = Field(
         "",
