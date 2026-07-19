@@ -2070,3 +2070,19 @@ def _output_summary(
     console.print()
     console.print(f"  Completed in [bold]{elapsed:.1f} s[/bold]")
     console.print()
+
+
+# ---------------------------------------------------------------------------
+# ``python -m econflow.cli`` entry point
+# ---------------------------------------------------------------------------
+# Without this guard, `python -m econflow.cli <command>` silently imports
+# this module and exits 0 without dispatching to any Typer command — the
+# module defines `app` but nothing ever calls it. This is not a hypothetical:
+# `econflow.replication.planner._econflow_cmd()` invokes the CLI exactly this
+# way (`[sys.executable, "-m", "econflow.cli"]`), specifically so `econflow
+# reproduce`'s subprocess steps work even when the `econflow` console-script
+# is not on PATH (e.g. on Windows). Without this guard, every subprocess step
+# `reproduce` runs (`validate`, `run`) exits 0 having done nothing, and
+# `reproduce` reports a false "successful" reproduction.
+if __name__ == "__main__":
+    app()

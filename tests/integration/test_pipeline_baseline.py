@@ -1,12 +1,30 @@
 """
 Phase 0 Baseline Regression Tests
 ===================================
-These tests establish the numerical gate for the EstimationDispatcher migration.
+These tests were written to establish a numerical gate for the EstimationDispatcher
+migration.
 
-Every test here compares the CURRENT pipeline output against the Phase 0 baseline
-fixtures in tests/integration/fixtures/baseline/.  Any numerical drift introduced
-by a migration phase (Phase 1 through Phase 7) will cause tests in this module to
-fail immediately, making regressions visible at the earliest possible point.
+> **Coverage note (added 2026-07-19, RC stabilization audit):** the `pipeline_results`
+> fixture below computes its comparison values via direct, standalone `linearmodels`
+> calls (`linearmodels.PanelOLS`/`PooledOLS`) — it does not import or call anything
+> from `econflow.estimation` (no `PooledOLS`, `EntityFE`, or `TwoWayFE` from
+> `econflow.estimation.*`, and no `pipeline_generic.py`/dispatcher code path).
+> Consequently, this module does **not** exercise "the CURRENT pipeline" or
+> econflow's actual estimator classes, and would **not** catch a regression
+> introduced in `econflow.estimation.fixed_effects`/`ols.py` (e.g. Sprint S1's
+> deliberate removal of the constant term from `EntityFE`/`TwoWayFE` results —
+> confirmed live: `EntityFE.fit(...).params.index` is `['value', 'capital']`,
+> with no `'const'`, while this fixture's frozen baseline and standalone
+> reimplementation both include one). What this module *does* verify: that
+> raw `linearmodels` (the fitting library econflow depends on) continues to
+> return the same numbers for a fixed model specification across dependency
+> upgrades — a real and useful check, just not the one the docstring
+> originally claimed. See `docs/release/FINAL_RELEASE_AUDIT_v1.0.md` Task 2
+> for the full investigation.
+
+Every test here compares a standalone `linearmodels` reference computation against
+the Phase 0 baseline fixtures in tests/integration/fixtures/baseline/. It does not
+directly exercise `econflow.estimation`'s estimator classes or `pipeline_generic.py`.
 
 Constraints (enforced by test_no_production_files_changed):
   - No production source files are modified by Phase 0
@@ -148,10 +166,17 @@ def baseline_provenance_schema():
 @pytest.fixture(scope="module")
 def pipeline_results(baseline_numerical):
     """
-    Run the pipeline once and return linearmodels result objects.
-    This fixture does NOT re-run the pipeline on disk — it re-estimates
-    in-process using the same logic as pipeline_generic.py, so the tests
-    work even if the CLI is unavailable (e.g. in CI without file writes).
+    Return linearmodels result objects computed directly via raw
+    ``linearmodels.PanelOLS``/``PooledOLS`` calls.
+
+    This is a standalone reference computation, not a call into
+    ``econflow.estimation`` or ``pipeline_generic.py`` — it deliberately
+    keeps an explicit ``const`` column even for the entity/time-effects
+    models, which is why this fixture's values differ from what
+    ``econflow.estimation.fixed_effects.EntityFE``/``TwoWayFE`` (the
+    classes ``econflow run`` actually uses) return for the same data —
+    those omit ``const`` entirely, since it is collinear with the
+    absorbed fixed effects. See the module docstring's coverage note.
     """
     import numpy as np
     from linearmodels import PanelOLS, PooledOLS

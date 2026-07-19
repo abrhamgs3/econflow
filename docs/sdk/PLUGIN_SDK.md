@@ -1381,8 +1381,25 @@ def test_connect_raises_without_indicators(tmp_path):
 
 Diagnostic plugins add post-estimation statistical tests. Once registered, a
 diagnostic can be run by `econflow.diagnostics.get_diagnostic(id).run(result)`.
-The pipeline runs all registered diagnostics that declare support for the estimator
-used.
+
+> **Status: experimental / library API, not wired into `econflow run`.**
+> As of v1.0, `pipeline_generic.py` and the estimator dispatcher do **not**
+> call `get_diagnostic()`, `list_diagnostics()`, or any `BaseDiagnostic`
+> subclass. `econflow run`'s `diagnostics.csv` output is produced by a
+> separate, hand-written code path
+> (`econflow.estimation._diagnostics.compute_standard_diagnostics()`),
+> which independently implements VIF and Breusch-Pagan directly against
+> each estimator's `EstimationResult.extra`. The Hausman test, Pesaran CD
+> test, and the registry/discovery mechanism itself are fully implemented
+> and covered by unit and integration tests
+> (`tests/unit/test_diagnostic_registry.py`,
+> `tests/integration/test_diagnostic_run.py`), but are usable today only
+> as a **library API you call yourself** — e.g.
+> `HausmanTest().run(fe_result, re_result=re_result)` — not as something
+> `econflow run` invokes automatically. There is no `diagnostics:` key in
+> `models.yaml`/`outputs.yaml`/`config.yaml` that drives this registry;
+> see the corrected note in §4.4 below. Wiring this into the CLI pipeline
+> is tracked as future work, not a v1.0 guarantee.
 
 ### 4.1 Imports
 
@@ -1571,9 +1588,12 @@ econflow_spatial_correlation.py
 
 Moran's I test for spatial autocorrelation in panel residuals.
 
-Usage in models.yaml:
-    diagnostics:
-      - spatial_moran
+Usage: this diagnostic is NOT auto-discovered from models.yaml/outputs.yaml
+(no such `diagnostics:` key exists in the current config schema — see the
+status note in §4). Call it directly from your own script or notebook:
+
+    from econflow.diagnostics import get_diagnostic
+    result = get_diagnostic("spatial_moran")().run(estimation_result)
 """
 
 from __future__ import annotations
@@ -2720,9 +2740,14 @@ EconFlow discovers plugins in the following order:
 
 ### 12.3 Runtime
 
-During a pipeline run, plugins are retrieved from the registry by their IDs as
-declared in `models.yaml`, `outputs.yaml`, or `config.yaml`. The registry is
-read-only during a run; no registration or unregistration occurs.
+During a pipeline run, estimator, connector, and renderer plugins are retrieved
+from their respective registries by IDs declared in `models.yaml`,
+`outputs.yaml`, or `config.yaml`. The registry is read-only during a run; no
+registration or unregistration occurs.
+
+**Exception: diagnostic plugins (§4) are not retrieved this way.** There is no
+`diagnostics:` config key. `econflow run` does not consult the diagnostics
+registry at all — see the status note in §4.
 
 The `unregister_*()` functions exist for use in test fixtures only. They must
 not be called during a pipeline run.

@@ -1,8 +1,8 @@
 Specification,Pooled OLS,Entity Fixed Effects,Two-way Fixed Effects
 Coefficient: market_value,1.7908***,1.7947***,1.7965***
-SE: market_value,(0.006),(0.006),(0.007)
+SE: market_value,(0.0059),(0.0062),(0.0073)
 Coefficient: capital_stock,0.6098***,0.6013***,0.6019***
-SE: capital_stock,(0.022),(0.020),(0.022)
+SE: capital_stock,(0.0223),(0.0197),(0.0222)
 Firm FE,No,Yes,Yes
 Year FE,No,No,Yes
 N,90,90,90
