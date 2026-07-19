@@ -24,8 +24,9 @@ econflow run [OPTIONS]
     Execute the analysis pipeline (generic or legacy mode).
 
 econflow report [OUTPUT_DIR]
-    Render estimation results into a publication-ready bundle
-    (tables in CSV / LaTeX / Markdown / HTML, figures as JSON).
+    [beta] Write an empty PublicationBundle scaffold (manifest.json).
+    Results-loading is not yet implemented — use outputs/tables/
+    (written by 'econflow run') for publication tables.
 
 econflow certify
     Generate a reproducibility certificate for the current run.
@@ -895,25 +896,29 @@ def report(
         help="Path to project config.yaml.",
     ),
 ) -> None:
-    """[beta] Render a PublicationBundle from the last pipeline run.
+    """[beta] Write an empty PublicationBundle scaffold (results-loading not yet implemented).
 
     NOTE: This command is a beta feature.  'econflow run' already writes
     tables to the outputs/tables/ directory defined in outputs.yaml.
-    Use those files for publication tables.  This command provides an
-    additional publication bundle format and will be fully integrated
-    in a future release.
+    Use those files for publication tables.
 
-    Writes tables (CSV, LaTeX, Markdown, HTML) and figures (JSON) into
-    a structured directory.  Run 'econflow run' first to generate
-    estimation results.
+    As currently implemented, this command does NOT load or render your
+    estimation results, regardless of whether 'econflow run' has already
+    been executed: the step that would deserialise saved results and feed
+    them to the table/figure builders is an unimplemented placeholder
+    (see econflow/commands/report.py).  Every invocation writes a bundle
+    directory containing only an empty manifest.json (0 tables, 0 figures)
+    — this is not an error, and the command exits 0.  Loading real results
+    is planned for a future release.
 
     Examples:
 
     \b
-        # Render with all default formats
+        # Write an empty bundle scaffold with all default formats
         econflow report
 
-        # Render to a custom directory with LaTeX + CSV only
+        # Write to a custom directory with LaTeX + CSV renderer ids selected
+        # (still produces 0 tables/figures today — see note above)
         econflow report outputs/paper --formats csv,latex
 
         # Render from an explicit config
@@ -922,25 +927,27 @@ def report(
     Common mistakes:
 
     \b
-        * Running econflow report before econflow run — there are no
-          estimation results to render yet.
-          Fix: econflow run ... first, then econflow report.
+        * Expecting 'econflow report' to render your regression tables.
+          It does not yet — for publication tables, use the files
+          'econflow run' already wrote to outputs/tables/.
 
         * Specifying an unknown format ID — valid IDs are:
           csv, latex, markdown, html, json.
 
-    Expected output (abbreviated):
+    Expected output (current behaviour, verbatim):
 
     \b
-        EconFlow report [beta]
+        EconFlow — Reporting Engine
+          Output dir : outputs/econflow
+          Formats    : csv, latex, markdown, html
+          Overwrite  : True
 
-        Rendering 2 table(s) in 4 format(s) …
-          ✔  table_regression_results.csv
-          ✔  table_regression_results.tex
-          ✔  table_regression_results.md
-          ✔  table_regression_results.html
+          ⚠  No saved results found in outputs/results.
+               Run econflow run first, then re-run econflow report.
 
-        Written to: outputs/econflow/
+          ✔  Bundle written — 0 table(s), 0 figure(s)
+               Directory : outputs/econflow
+               Manifest  : outputs/econflow/manifest.json
     """
     from econflow.commands.report import run_report
 
