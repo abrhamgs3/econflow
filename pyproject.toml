@@ -54,7 +54,15 @@ source = ["src/econflow"]
 omit = [
     # Development scaffold (not shipped in wheel)
     "src/econflow/cli_scaffold/*",
-    # Dead-code stub packages (all NotImplementedError -- see docs/development/TECHNICAL_DEBT.md)
+    # NOT uniformly dead code. estimation/, diagnostics/, and outputs/ contain
+    # live, tested, load-bearing functionality (the PooledOLS/EntityFE/TwoWayFE
+    # estimators; the diagnostics plugin registry; the renderer engine behind
+    # 'econflow report') alongside a substantial NotImplementedError stub
+    # surface -- omitted so stub code doesn't dilute the coverage percentage,
+    # not because the package is unused. features/, ml/, processing/, and most
+    # of core/, data/, econometrics/, reporting/, sensitivity/ are largely or
+    # entirely unreferenced outside themselves. See
+    # docs/development/TECHNICAL_DEBT.md for the per-file breakdown.
     "src/econflow/core/*",
     "src/econflow/data/*",
     "src/econflow/diagnostics/*",
