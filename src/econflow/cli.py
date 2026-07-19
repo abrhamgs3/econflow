@@ -36,6 +36,9 @@ econflow verify
 econflow package
     Build a journal-ready replication package directory.
 
+econflow reproduce [PROJECT_DIR]
+    Reproduce a project from its configuration in an isolated subprocess.
+
 econflow fetch <CONNECTOR_ID>
     Download a dataset using a registered connector.
 
@@ -78,6 +81,8 @@ Examples
     $ econflow verify --baseline outputs/certificate.json
 
     $ econflow package --certificate outputs/certificate.json
+
+    $ econflow reproduce examples/blind_replication/
 
     $ econflow fetch world_bank --param indicators=IT.NET.USER.ZS --param year_start=2000
 
