@@ -36,7 +36,7 @@ processing      Harmonisation, feature engineering, composite index, TFP (stubs)
 sensitivity     SensitivityRunner, ResultsComparison (stubs)
 """
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"
 __author__ = "Ab"
 __email__ = "abrhamgs3@gmail.com"
 

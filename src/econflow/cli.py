@@ -55,7 +55,7 @@ econflow release-check
 Examples
 --------
     $ econflow --version
-    EconFlow 0.1.0
+    EconFlow 1.0.0
 
     $ econflow init my_project
     EconFlow init — creating project my_project …
@@ -539,7 +539,7 @@ def info(
     Expected output (abbreviated):
 
     \b
-        EconFlow 0.1.0 · Python 3.11.9
+        EconFlow 1.0.0 · Python 3.11.9
 
         Platform
           Project   my_study
@@ -671,7 +671,7 @@ def run(
     Expected output (abbreviated):
 
     \b
-        ──────────────── EconFlow 0.1.0 ────────────────
+        ──────────────── EconFlow 1.0.0 ────────────────
 
         INFO  [1/5] Loading data: data/processed/panel.csv
         INFO  [2/5] Validating panel structure

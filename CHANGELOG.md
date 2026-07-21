@@ -1,6 +1,17 @@
 # Changelog
 
-## [Unreleased] — Repository Integrity Repair (2026-07-18)
+## [1.0.0] — 2026-07-19
+
+First tagged release. Everything below was previously logged under
+`[Unreleased]` across several development sprints and audit passes; none of
+it has shipped in a prior tagged version. Section headers below have been
+relabeled from `[Unreleased]` to `[1.0.0]` accordingly — their original
+dates are unchanged. See `RELEASE_NOTES_v1.0.0.md` for a reader-facing
+summary and `docs/release/` for the full audit trail.
+
+---
+
+## [1.0.0] — Repository Integrity Repair (2026-07-18)
 
 Follows an independent Repository Integrity Audit
 (`docs/release/REPOSITORY_INTEGRITY_REPORT.md`) that found the dispatcher
@@ -124,7 +135,7 @@ source, which was itself one of the audit's findings.
 
 ---
 
-## [Unreleased] — Architecture Freeze v1 / EstimationDispatcher Migration (Phase 5–6) / Sprint S1–S2 (2026-07-10 – 2026-07-12)
+## [1.0.0] — Architecture Freeze v1 / EstimationDispatcher Migration (Phase 5–6) / Sprint S1–S2 (2026-07-10 – 2026-07-12)
 
 Previously undocumented in this file despite being complete in source — see
 "Repository Integrity Repair" above. Full detail in
@@ -166,7 +177,7 @@ Previously undocumented in this file despite being complete in source — see
 
 ---
 
-## [Unreleased] — Sprint 11F: Evaluator-Reported Fixes
+## [1.0.0] — Sprint 11F: Evaluator-Reported Fixes
 
 ### Fixed
 - **F1 — Windows Unicode crash**: `cli.py` now reconfigures `stdout`/`stderr`
@@ -202,7 +213,7 @@ Previously undocumented in this file despite being complete in source — see
 
 ---
 
-## [Unreleased] — Sprint 11E: Release Candidate Audit
+## [1.0.0] — Sprint 11E: Release Candidate Audit
 
 ### Fixed
 - `econflow release-check` QG-03: version-check false-negative when
@@ -223,7 +234,7 @@ Previously undocumented in this file despite being complete in source — see
 
 ---
 
-## [Unreleased] — Sprint 11D: End-to-End Acceptance Test
+## [1.0.0] — Sprint 11D: End-to-End Acceptance Test
 
 ### Added
 - `econflow doctor` now checks whether `~/.local/bin` is on `PATH` (EXT-07) and
@@ -252,7 +263,7 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-## [Unreleased]
+## [1.0.0] — Documentation Audit and earlier (2026-07-07 and prior)
 
 ### Documentation Audit (2026-07-07)
 

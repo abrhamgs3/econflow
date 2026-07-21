@@ -2,8 +2,8 @@ cff-version: 1.2.0
 message: "If you use EconFlow in academic or research work, please cite it as below."
 type: software
 title: "EconFlow: Reusable panel econometrics research platform"
-version: "0.1.0"
-date-released: "2026-06-24"
+version: "1.0.0"
+date-released: "2026-07-19"
 license: MIT
 url: "https://github.com/abrhamgs3/econflow"
 repository-code: "https://github.com/abrhamgs3/econflow"
@@ -37,7 +37,8 @@ preferred-citation:
       email: "abrhamgs3@gmail.com"
       orcid: "https://orcid.org/0000-0000-0000-0000"  # replace with your ORCID
       affiliation: ""  # replace with your institution
-  version: "0.1.0"
-  date-released: "2026-06-24"
+  version: "1.0.0"
+  date-released: "2026-07-19"
   url: "https://github.com/abrhamgs3/econflow"
   license: MIT
+# doi: "10.5281/zenodo.XXXXXXX"  # add once a Zenodo DOI has been minted for this release

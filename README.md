@@ -16,7 +16,7 @@ any panel study, regardless of dataset, discipline, or research question.
 ## Features
 
 - **End-to-end pipeline** — ingest → validate → estimate → diagnose → render → certify
-- **Panel econometrics** — FE, two-way FE, RE, IV estimators via `linearmodels` (GMM and panel quantile are planned for v1.0 — `econflow validate` will warn if you reference them)
+- **Panel econometrics** — FE, two-way FE, RE, IV estimators via `linearmodels` (System GMM and panel quantile are planned for a future release — `econflow validate` will warn if you reference them)
 - **Reproducibility** — every run produces a provenance certificate with SHA-256 fingerprints
 - **Config-driven** — projects defined by three YAML files; no code changes to run a new study
 - **Integrity chain** — `certify` → `verify` → `package` → `reproduce` for full replication support
@@ -181,7 +181,7 @@ If you use EconFlow in academic work, please cite it:
   author  = {Meressa, Abrha Megos},
   title   = {{EconFlow}: Open-source platform for reproducible panel econometric research},
   year    = {2026},
-  version = {0.1.0},
+  version = {1.0.0},
   url     = {https://github.com/abrhamgs3/econflow},
   license = {MIT}
 }
