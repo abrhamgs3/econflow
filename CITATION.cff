@@ -19,7 +19,7 @@ authors:
     given-names: "Abrha Megos"
     email: "abrhamgs3@gmail.com"
     orcid: "https://orcid.org/0000-0000-0000-0000"  # replace with your ORCID
-    affiliation: ""  # replace with your institution
+    # affiliation: ""  # optional; add your institution here (CFF requires non-empty if present)
 keywords:
   - econometrics
   - panel data
@@ -36,7 +36,7 @@ preferred-citation:
       given-names: "Abrha Megos"
       email: "abrhamgs3@gmail.com"
       orcid: "https://orcid.org/0000-0000-0000-0000"  # replace with your ORCID
-      affiliation: ""  # replace with your institution
+      # affiliation: ""  # optional; add your institution here (CFF requires non-empty if present)
   version: "1.0.0"
   date-released: "2026-07-19"
   url: "https://github.com/abrhamgs3/econflow"

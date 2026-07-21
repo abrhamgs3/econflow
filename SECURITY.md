@@ -4,10 +4,10 @@
 
 | Version | Supported |
 |---------|-----------|
-| 0.1.x   | ✅ Active  |
+| 1.0.x   | ✅ Active  |
 
 Only the latest release receives security fixes. We follow
-[Semantic Versioning](https://semver.org/), so patch releases (0.1.x)
+[Semantic Versioning](https://semver.org/), so patch releases (1.0.x)
 are reserved for bug and security fixes with no breaking changes.
 
 ## Reporting a Vulnerability

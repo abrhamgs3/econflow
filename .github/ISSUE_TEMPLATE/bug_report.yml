@@ -13,7 +13,7 @@ body:
     attributes:
       label: EconFlow version
       description: Output of `econflow --version`
-      placeholder: "e.g. EconFlow 0.1.0"
+      placeholder: "e.g. EconFlow 1.0.0"
     validations:
       required: true
 
