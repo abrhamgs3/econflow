@@ -19,6 +19,7 @@ Coverage dimensions:
 
 from __future__ import annotations
 
+import sys
 import warnings
 
 import pytest
@@ -75,13 +76,28 @@ class TestBackwardCompatAccess:
 # ---------------------------------------------------------------------------
 
 class TestDeprecationWarning:
-    def test_first_access_warns(self) -> None:
+    def test_first_access_warns(self, monkeypatch) -> None:
         # Import a fresh module object so caching from earlier tests in this
         # session doesn't suppress the warning.
+        #
+        # NOTE: a raw `sys.modules.pop("econflow", None)` here (as this test
+        # used to do) leaks: it drops the *key* but leaves every already-
+        # imported submodule (econflow.commands, econflow.estimation, ...)
+        # cached in sys.modules, parented to the *old* module object. The
+        # fresh `importlib.import_module("econflow")` below creates a new
+        # module object that never re-imports those submodules, so it has
+        # no `.commands` attribute -- and since the submodules are still
+        # cached, later `import econflow.commands...` calls (e.g. inside
+        # unittest.mock.patch(...) in test_release_check.py, when the full
+        # suite runs in one process) short-circuit on the cache and never
+        # rebind `commands` onto the new econflow module, causing a
+        # persistent `AttributeError: module 'econflow' has no attribute
+        # 'commands'` for the rest of the test session. Using
+        # monkeypatch.delitem instead ensures pytest restores the original,
+        # fully-populated sys.modules["econflow"] entry at teardown.
         import importlib
-        import sys
 
-        sys.modules.pop("econflow", None)
+        monkeypatch.delitem(sys.modules, "econflow", raising=False)
         econflow = importlib.import_module("econflow")
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
