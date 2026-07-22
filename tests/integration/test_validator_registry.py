@@ -177,12 +177,21 @@ class TestUnknownEstimatorFullPipeline:
         """L-04 is a warning; result.ok may still be True unless other errors exist."""
         models = tmp_path / "models.yaml"
         _write_models(models, "not_a_real_estimator")
+        # VALID/outputs.yaml references model ids "pooled_ols"/"entity_fe", but
+        # _write_models() always writes id "m1" -- using VALID/outputs.yaml here
+        # would introduce an unrelated cross-file X-01 error that has nothing to
+        # do with the L-04 check this test exercises (same root cause already
+        # documented and fixed for TestValidateStrictRaisesOnL14 below).
+        outputs = tmp_path / "outputs.yaml"
+        TestValidateStrictRaisesOnL14._write_outputs_for_m1(outputs)
 
-        result = validator.validate(VALID / "config.yaml", models, VALID / "outputs.yaml")
+        result = validator.validate(VALID / "config.yaml", models, outputs)
         l04 = [i for i in result.issues if i.code == "L-04"]
         assert l04
         # L-04 is severity="warning" → result.ok is True (no errors)
         errors_excl_l04 = [i for i in result.issues if i.severity == "error" and i.code != "L-04"]
+        assert not errors_excl_l04, "Unexpected error-severity issues besides L-04"
+        assert result.ok, "L-04 is a warning and must not make result.ok False"
         assert all(i.severity == "warning" or i.severity == "info" for i in l04)
 
 

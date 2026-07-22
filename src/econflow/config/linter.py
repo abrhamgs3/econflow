@@ -289,12 +289,17 @@ def _resolve_via_registry(
     # Lazy imports: keep the linter importable without the estimation package.
     try:
         import warnings as _warnings  # noqa: PLC0415
+
         from econflow.estimation.dispatcher import (  # noqa: PLC0415
             EstimationDispatcher as _Dispatcher,
         )
         from econflow.estimation.registry import (  # noqa: PLC0415
             RegistryError as _RegistryError,
+        )
+        from econflow.estimation.registry import (
             get_estimator as _get_estimator,
+        )
+        from econflow.estimation.registry import (
             list_estimators as _list_estimators,
         )
     except ImportError:

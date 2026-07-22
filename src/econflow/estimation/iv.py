@@ -38,7 +38,8 @@ from econflow.estimation.result import DiagnosticResult
     "iv",
     label="IV / 2SLS",
     status="implemented",
-    notes="linearmodels.IV2SLS (pooled — no entity FE); requires instruments in params['instruments']",
+    notes="linearmodels.IV2SLS (pooled — no entity FE); requires instruments "
+    "in params['instruments']",
     supported_data=["balanced_panel", "unbalanced_panel"],
 )
 class IV2SLS(BaseEstimator):

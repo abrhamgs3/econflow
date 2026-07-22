@@ -93,7 +93,7 @@ def twfe_result(grunfeld_df):
 def _make_synthetic_panel(n_entities: int = 8, n_time: int = 10, seed: int = 0) -> pd.DataFrame:
     """Return a tiny balanced panel with entity+time structure."""
     import numpy as np
-    rng = numpy_rng = __import__("numpy").random.default_rng(seed)
+    rng = np.random.default_rng(seed)
     rows = []
     for e in range(n_entities):
         for t in range(n_time):

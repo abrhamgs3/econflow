@@ -178,7 +178,7 @@ class EstimationResult:
     # ------------------------------------------------------------------
 
     @property
-    def resids(self) -> "pd.Series | None":
+    def resids(self) -> pd.Series | None:
         """
         Residuals as a ``pd.Series``, with the panel ``(entity, time)``
         MultiIndex when available.

@@ -67,6 +67,9 @@ from econflow.estimation.backends import (
 
 # Core abstractions (also re-exports EstimationResult for backward compat)
 from econflow.estimation.base import BaseEstimator, EstimatorError, ModelSpecificationError
+
+# Pipeline integration — Phase 5C+: EstimationDispatcher is the sole production path
+from econflow.estimation.dispatcher import EstimationDispatcher, PipelineContext
 from econflow.estimation.first_difference import FirstDifference
 from econflow.estimation.fixed_effects import EntityFE, TwoWayFE
 from econflow.estimation.gmm import SystemGMM
@@ -101,9 +104,6 @@ from econflow.estimation.registry import (
 
 # Result objects
 from econflow.estimation.result import DiagnosticResult, EstimationResult
-
-# Pipeline integration — Phase 5C+: EstimationDispatcher is the sole production path
-from econflow.estimation.dispatcher import EstimationDispatcher, PipelineContext
 
 __all__ = [
     # Result objects

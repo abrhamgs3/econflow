@@ -707,7 +707,7 @@ class TestComparisonTableMarkdown:
         assert "---" in md_content or ":---" in md_content
 
     def test_has_eight_data_rows(self, md_content):
-        lines = [l for l in md_content.strip().split("\n") if l.startswith("|")]
+        lines = [line for line in md_content.strip().split("\n") if line.startswith("|")]
         # header + separator + 8 data rows = 10 lines
         assert len(lines) == 10, f"Expected 10 table lines, got {len(lines)}"
 
@@ -885,7 +885,7 @@ class TestNoProductionChanges:
             if line.startswith("??")
         ]
         assert not untracked, (
-            f"New untracked files found in src/ — Phase 0 must not add production files:\n"
+            "New untracked files found in src/ — Phase 0 must not add production files:\n"
             + "\n".join(untracked)
         )
 
