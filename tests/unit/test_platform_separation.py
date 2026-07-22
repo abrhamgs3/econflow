@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import importlib
 import inspect
+import re
 import sys
 from pathlib import Path
 
@@ -32,6 +33,18 @@ from typer.testing import CliRunner
 from econflow.cli import app
 
 runner = CliRunner()
+
+# Rich/Typer's help renderer applies ANSI styling to individual tokens (e.g.
+# switch prefixes vs. option names) whose exact boundaries depend on the
+# installed rich/click/typer versions (pyproject.toml pins no upper bound on
+# any of them). A literal substring check like `"--config" in result.output`
+# is therefore not robust across dependency versions/terminal widths -- strip
+# ANSI escape sequences before asserting on rendered CLI text.
+_ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def _strip_ansi(text: str) -> str:
+    return _ANSI_ESCAPE_RE.sub("", text)
 
 
 # ---------------------------------------------------------------------------
@@ -265,7 +278,11 @@ class TestRunHelpTextPlatformFraming:
 
     def test_help_mentions_config_flag(self):
         result = runner.invoke(app, ["run", "--help"])
-        assert "--config" in result.output
+        clean_output = _strip_ansi(result.output)
+        assert "--config" in clean_output, (
+            "Expected '--config' in 'econflow run --help' output "
+            f"(ANSI stripped). Got:\n{clean_output}"
+        )
 
     def test_help_does_not_mention_data_path_prominently(self):
         """--data-path should be hidden from the main help text."""
